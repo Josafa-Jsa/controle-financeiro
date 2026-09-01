@@ -21,6 +21,7 @@ export const FILIAIS = [
   "Filial 5",
   "Filial 6",
   "Filial 7",
+  "Filial Particular",
 ];
 
 export const SYSTEM_SCREENS = [

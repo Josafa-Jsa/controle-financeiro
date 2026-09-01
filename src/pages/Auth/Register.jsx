@@ -422,6 +422,7 @@ export default function Register() {
               <option value="Filial 5">🏢 Filial 5</option>
               <option value="Filial 6">🏢 Filial 6</option>
               <option value="Filial 7">🏢 Filial 7</option>
+              <option value="Filial Particular">🏢 Filial Particular</option>
             </select>
           </div>
 
