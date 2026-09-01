@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// Define a URL base do backend (Porta 4000 no servidor/LAN ou /api via proxy)
+// Define a URL base do backend (Porta 4000 no servidor/LAN/VPN ou /api via proxy)
 export const getApiBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
@@ -8,7 +8,14 @@ export const getApiBaseUrl = () => {
   if (typeof window !== 'undefined') {
     const isCapacitor = typeof window.Capacitor !== 'undefined' || window.location.protocol === 'capacitor:';
     if (isCapacitor || (window.location.protocol === 'https:' && window.location.hostname === 'localhost')) {
-      const serverHost = localStorage.getItem('api_server_host') || '192.168.40.67:4000';
+      const currentHost = window.location.hostname;
+      let defaultHost = '26.118.72.235:4000';
+      if (currentHost && currentHost.startsWith('192.168.')) {
+        defaultHost = `${currentHost}:4000`;
+      } else if (currentHost && currentHost === '26.118.72.235') {
+        defaultHost = '26.118.72.235:4000';
+      }
+      const serverHost = localStorage.getItem('api_server_host') || defaultHost;
       return `http://${serverHost}/api`;
     }
   }

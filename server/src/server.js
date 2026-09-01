@@ -62,7 +62,9 @@ async function startServer(port = DEFAULT_PORT) {
   const server = app.listen(port, '0.0.0.0', () => {
     console.log('====================================================');
     console.log(`🚀 [JSA Server] API Back-end rodando na porta ${port}`);
-    console.log(`📡 URL Local: http://localhost:${port}/api/health`);
+    console.log(`📡 Local:   http://localhost:${port}/api/health`);
+    console.log(`📡 LAN:     http://192.168.40.67:${port}/api/health`);
+    console.log(`📡 VPN:     http://26.118.72.235:${port}/api/health`);
     console.log(`📱 Acessível para Frontend Desktop (5173) e Mobile (2515)`);
     console.log('====================================================');
   });

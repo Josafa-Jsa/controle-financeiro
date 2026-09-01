@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node ./node_modules/vite/bin/vite.js --host 192.168.40.67 --port 5173",
-    "dev:mobile": "node ./node_modules/vite/bin/vite.js --host 192.168.40.67 --port 2515",
+    "dev": "node ./node_modules/vite/bin/vite.js --host 0.0.0.0 --port 5173",
+    "dev:mobile": "node ./node_modules/vite/bin/vite.js --host 0.0.0.0 --port 2515",
     "server": "node server/src/server.js",
     "server:dev": "node --watch server/src/server.js",
     "build": "node ./node_modules/vite/bin/vite.js build",

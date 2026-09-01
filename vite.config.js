@@ -91,7 +91,10 @@ function mobileBridgePlugin(mobilePort = 2515) {
       });
 
       bridge.listen(mobilePort, "0.0.0.0", () => {
-        console.log(`\n  📱 [JSA Mobile] Porta 2515 ativa em: http://192.168.40.67:${mobilePort}/\n`);
+        console.log(`\n  📱 [JSA Mobile] Porta ${mobilePort} ativa em:`);
+        console.log(`     - Local: http://localhost:${mobilePort}/`);
+        console.log(`     - LAN:   http://192.168.40.67:${mobilePort}/`);
+        console.log(`     - VPN:   http://26.118.72.235:${mobilePort}/\n`);
       });
 
       server.httpServer?.on("close", () => {
