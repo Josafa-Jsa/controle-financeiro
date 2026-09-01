@@ -1,0 +1,857 @@
+/* =========================================================
+   PALETA DE CORES (MikroTik & Ubiquiti) E VARIÁVEIS GLOBAIS
+   ========================================================= */
+:root {
+  /* MikroTik (vermelhos) */
+  --mk-50: #2a1515;
+  --mk-100: #3d1b1b;
+  --mk-200: #5c2222;
+  --mk-300: #8a2e2e;
+  --mk-400: #ff6f6f;
+  --mk-500: #ff5b5b;
+  --mk-600: #e54040;
+  --mk-700: #ff4d4d;
+
+  /* Ubiquiti (azul/ciano) */
+  --ub-50: #0f242a;
+  --ub-100: #14353d;
+  --ub-200: #1a4d59;
+  --ub-300: #236f80;
+  --ub-400: #42d3ea;
+  --ub-500: #19c5d8;
+  --ub-600: #10a7b7;
+  --ub-700: #0b8794;
+
+  /* Estados e Base Dark */
+  --success-600: #2e7d32;
+  --success-bg: #142e18;
+  --warning-200: #3a3218;
+  --border: #2b2b2e;
+  --bg-page: #0f0f10;
+  --bg-card: #1b1b1d;
+  --text: #f0f0f0;
+  --muted: #aaa;
+}
+
+/* =========================================================
+   ESTILOS GERAIS DE NAVEGAÇÃO E ELEMENTOS BASE
+   ========================================================= */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* =========================================================
+   ESTRUTURA DO LAYOUT PRINCIPAL (EXPANSÃO E FOOTER FIXADO NA BASE)
+   ========================================================= */
+.app-main-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  background-color: var(--bg-page);
+  box-sizing: border-box;
+}
+
+.app-main-content {
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding-bottom: 30px;
+}
+
+/* =========================================================
+   ANIMAÇÃO GLOBAL DE ENTRADA DE TELA (PADRÃO NOTASPAGE)
+   ========================================================= */
+.fade-in-page {
+  animation: fadeInPage 0.4s ease-out forwards;
+  min-height: 75vh;
+}
+
+@keyframes fadeInPage {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.card-slide-in {
+  animation: cardSlideIn 0.35s ease-out backwards;
+}
+
+@keyframes cardSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* =========================================================
+   OVERLAYS E MODAIS GLOBAIS (SOBREPOSIÇÃO COMPLETA E DESFOQUE)
+   ========================================================= */
+.modal-overlay,
+.modal-relatorio-overlay,
+.chamados-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  background: rgba(0, 0, 0, 0.78) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  z-index: 99999 !important;
+  padding: 24px 16px !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.modal-box,
+.modal-card,
+.modal-content,
+.modal-pix-content,
+.modal-boleto-container,
+.modal-relatorio-box,
+.modal-relatorio-content,
+.modal-relatorio-simulacoes,
+.chamados-detail-modal-card {
+  margin: auto !important;
+  max-height: calc(100vh - 48px) !important;
+  max-width: min(600px, 95vw);
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+}
+
+.modal-card.modal-lg,
+.modal-box.modal-lg,
+.modal-relatorio-box,
+.modal-relatorio-simulacoes {
+  max-width: min(920px, 95vw) !important;
+}
+
+h1,
+h2 {
+  color: var(--mk-700) !important;
+}
+
+/* Navbar / Topbar */
+nav,
+.navbar,
+.topbar {
+  background: #161618 !important;
+  border-bottom: 1px solid var(--border) !important;
+  font-weight: 700;
+  padding: 12px 16px;
+}
+
+nav a,
+.navbar a,
+.topbar a,
+a {
+  color: var(--mk-400) !important;
+  text-decoration: none;
+}
+
+nav a:hover,
+.navbar a:hover,
+.topbar a:hover,
+a:hover {
+  color: var(--mk-500) !important;
+  text-decoration: underline;
+}
+
+/* Botões Genéricos */
+.btn--primary,
+.nconta {
+  background: var(--mk-600);
+  color: #fff;
+  border: 1px solid var(--mk-700);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn--primary:hover,
+.nconta:hover:not(:disabled) {
+  background: var(--mk-500);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+}
+
+/* Marca (Logo + Texto) */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px 0;
+}
+
+.brand__logo {
+  width: 38px;
+  height: 38px;
+  object-fit: cover;
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.brand__text {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: var(--mk-700);
+}
+
+/* =========================================================
+   CONTAINER DE PÁGINAS INTERNAS (SISTEMA)
+   ========================================================= */
+.page-container {
+  padding: 24px;
+  background-color: #13131a;
+  min-height: auto; /* Evita rolagens excessivas na tela */
+  color: #e1e1e6;
+  box-sizing: border-box;
+}
+
+.page-title {
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  color: #ffffff !important;
+}
+
+.table-responsive {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #2d2d3d;
+  background-color: #1e1e2d;
+  margin-bottom: 20px;
+}
+
+.custom-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.custom-table th,
+.custom-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #2d2d3d;
+}
+
+.custom-table th {
+  background-color: #151521;
+  color: #a0a0b0;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.custom-table tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Badges de Status */
+.badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.badge.status-emitida {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.badge.status-cancelada {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.badge.status-pendente {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+/* Botões Customizados */
+.btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-primary {
+  background-color: #45a374;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: inline-block;
+  width: auto; 
+}
+
+.btn-primary:hover {
+  background-color: #335fa1;
+}
+
+.btn-secondary.edit {
+  background-color: #3b82f6;
+  color: #ffffff;
+}
+
+.btn-danger.exc {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+
+.btn-warning.cancel {
+  background-color: #f59e0b;
+  color: #ffffff;
+}
+
+/* =========================================================
+   TABELA DE CONTAS E FILTROS
+   ========================================================= */
+.filtersBar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.checkInline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.searchInput,
+.filtersBar select {
+  background: #121214;
+  color: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  outline: none;
+}
+
+.searchInput:focus,
+.filtersBar select:focus {
+  border-color: var(--ub-500);
+}
+
+.contasTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  background: var(--bg-card);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.contasTable th {
+  background: #222226;
+  color: #fff;
+  border: 1px solid var(--border);
+  padding: 12px;
+  text-align: left;
+}
+
+.contasTable td {
+  border: 1px solid var(--border);
+  padding: 10px;
+  color: #ddd;
+}
+
+.contasTable tr.row--paid td,
+.row--paid {
+  background-color: var(--success-bg) !important;
+}
+
+.contasTable tr.row--overdue td,
+.row--overdue {
+  background-color: var(--mk-50) !important;
+}
+
+.contasTable tr.row--alert td,
+.row--alert {
+  background-color: var(--warning-200) !important;
+}
+
+.actionsCell {
+  white-space: nowrap;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.edit {
+  background: #3d3b1e;
+  color: #f7e06d;
+  border: 1px solid #6e682e;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.edit:hover:not(:disabled) {
+  background: #524f24;
+}
+
+.exclui,
+.exc {
+  background: var(--mk-600);
+  color: #fff;
+  border: 1px solid var(--mk-700);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.exclui:hover:not(:disabled),
+.exc:hover:not(:disabled) {
+  background: var(--mk-500);
+}
+
+.seta {
+  background: #2b2b2e;
+  color: #ccc;
+  border: 1px solid #444;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.seta:hover:not(:disabled) {
+  background: var(--ub-500);
+  color: #000;
+}
+
+.btn-pay {
+  background: #2f8b3f;
+  color: #fff;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn-pay:hover:not(:disabled) {
+  background: #38a54b;
+}
+
+/* =========================================================
+   CARDS DE RESUMO FINANCEIRO
+   ========================================================= */
+.financeSummary {
+  width: 100%;
+  margin-top: 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.financeSummaryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: #161618;
+  border-bottom: 1px solid var(--border);
+}
+
+.financeSummaryHeader h2 {
+  margin: 0;
+  padding: 0;
+  color: var(--mk-700) !important;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.financeSummaryHeader span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.financeSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+
+.financeCard {
+  min-height: 82px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #121214;
+}
+
+.financeCardIcon {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.financeCardContent {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.financeCardLabel {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 3px;
+}
+
+.financeCardContent strong {
+  font-size: 20px;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.financeCardContent small {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.financeCard--receber { border-left: 4px solid var(--ub-500); }
+.financeCard--receber .financeCardIcon { background: var(--ub-50); color: var(--ub-400); }
+.financeCard--pagar { border-left: 4px solid var(--mk-500); }
+.financeCard--pagar .financeCardIcon { background: var(--mk-50); color: var(--mk-400); }
+.financeCard--recebidos { border-left: 4px solid var(--success-600); }
+.financeCard--recebidos .financeCardIcon { background: var(--success-bg); color: #4caf50; }
+
+/* =========================================================
+   TELA DE AUTENTICAÇÃO (LOGIN / REGISTRO)
+   ========================================================= */
+.auth-wrap {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  min-height: 100vh !important;
+  width: 100% !important;
+  background-color: var(--bg-page) !important;
+  padding: 20px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  padding: 32px 28px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  text-align: left;
+}
+
+.auth-title {
+  margin: 0 0 4px 0 !important;
+  font-size: 26px !important;
+  font-weight: 800;
+  color: var(--mk-500) !important;
+}
+
+.auth-subtitle {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: 13px;
+  color: #ddd;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  background-color: #121214;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  border-color: var(--mk-500);
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.input-with-icon .input {
+  padding-right: 40px;
+}
+
+.eye {
+  position: absolute;
+  right: 10px;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.auth-actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 16px 0;
+  font-size: 13px;
+}
+
+.auth-remember {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.auth-card .link {
+  color: var(--mk-400) !important;
+  text-decoration: none;
+}
+
+.auth-card .link:hover {
+  text-decoration: underline;
+}
+
+.auth-card button[type="submit"].btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.auth-foot {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* =========================================================
+   RODAPÉ DA APLICAÇÃO
+   ========================================================= */
+footer,
+.appFooter,
+.appFooter *,
+.appFooter a,
+.appFooter p,
+.appFooter span,
+.appFooter div {
+  color: #cccccc !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+footer,
+.appFooter {
+  width: 100%;
+  margin-top: 34px;
+  padding: 18px 8px;
+  border-top: 1px solid var(--border) !important;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  background-color: transparent !important;
+}
+
+.appFooter strong,
+.appFooter b,
+.appFooter strong *,
+.appFooter b * {
+  color: #ffffff !important;
+  font-weight: 800;
+}
+
+/* RESPONSIVIDADE */
+@media (max-width: 900px) {
+  .financeSummaryGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bg-jsa {
+  position: relative;
+  background-color: #0f0f10;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Camada para escurecer suavemente a imagem de fundo */
+.bg-jsa::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1;
+}
+
+.bg-jsa > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Suporte a campos lado a lado (Nome e Sobrenome) */
+.auth-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Card mais largo para telas de cadastro */
+.auth-card--wide {
+  max-width: 480px !important;
+}
+
+/* Ajuste para telas pequenas */
+@media (max-width: 480px) {
+  .auth-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Customização Toastify (Tema Dark Identico da Foto) */
+:root {
+  --toastify-color-dark: #121212;
+  --toastify-text-color-dark: #ffffff;
+  --toastify-color-success: #00c853;
+  --toastify-icon-color-success: #00c853;
+}
+
+.Toastify__toast--dark {
+  background-color: #121212;
+  color: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.Toastify__progress-bar--success {
+  background: #00e676;
+}
+
+.Toastify__close-button--dark {
+  color: #a0a0a0;
+  opacity: 0.8;
+}
+
+.Toastify__close-button--dark:hover {
+  color: #ffffff;
+  opacity: 1;
+}
+
+/* Estilos para os links da Navbar */
+.navbar .nav-item {
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  transition: transform 0.2s ease, font-size 0.2s ease, color 0.2s ease;
+  display: inline-block;
+}
+
+/* Efeito ao passar o cursor do mouse (Hover) */
+.navbar .nav-item:hover {
+  transform: scale(1.1); /* Aumenta o tamanho suavemente */
+  color: #00c853; /* Opcional: altera para a mesma cor verde do toast */
+}
+
+/* Item Ativo */
+.navbar .nav-item.active {
+  font-weight: bold;
+  border-bottom: 2px solid #00c853;
+}

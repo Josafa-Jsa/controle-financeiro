@@ -1,0 +1,262 @@
+/* =========================================================
+   ESTILIZAÇÃO DO MODAL DE CONTAS (MikroTik / Ubiquiti)
+   ========================================================= */
+
+/* Fundo escurecido e desfocado que alinha todos os modais no topo e centralizados */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  background: rgba(0, 0, 0, 0.78) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  z-index: 99999 !important;
+  padding: 2.5vh 14px 18px 14px !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  animation: fadeInPage 0.2s ease-out forwards;
+}
+
+/* Caixa Principal do Modal alinhada ao topo e centralizada */
+.modal-box,
+.modal-card,
+.modal-content {
+  background: #1b1b1d !important;
+  border: 1px solid #2b2b2e !important;
+  border-radius: 14px !important;
+  width: min(560px, 94vw) !important;
+  margin: 0 auto !important;
+  padding: 18px 22px !important;
+  color: #fff !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25) !important;
+  position: relative !important;
+  max-height: calc(100vh - 5vh - 24px) !important;
+  box-sizing: border-box !important;
+  animation: modalTopSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modalTopSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-card.modal-sm,
+.modal-box.modal-sm {
+  width: min(440px, 92vw) !important;
+  max-width: 440px !important;
+}
+
+.modal-card.modal-lg,
+.modal-box.modal-lg {
+  width: min(680px, 94vw) !important;
+  max-width: 680px !important;
+}
+
+.modal-card.modal-xl,
+.modal-box.modal-xl {
+  width: min(860px, 95vw) !important;
+  max-width: 860px !important;
+}
+
+.modal-box.modal-compact,
+.modal-card.modal-compact {
+  padding: 14px 18px !important;
+  max-height: calc(100vh - 5vh - 20px) !important;
+}
+
+.modal-compact .modal-form {
+  gap: 10px;
+}
+
+.modal-compact .form-row {
+  gap: 4px;
+}
+
+.modal-compact .form-row label {
+  font-size: 12px;
+}
+
+.modal-compact .form-row input,
+.modal-compact .form-row select {
+  height: 36px;
+  font-size: 13px;
+  padding: 0 10px;
+}
+
+/* Título */
+.modal-box h2,
+.modal-card h2 {
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--mk-700) !important;
+}
+
+/* Form e Estrutura de Grids */
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.form-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-row label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ccc;
+}
+
+/* Estilização dos Inputs e Selects */
+.form-row input[type="text"],
+.form-row input[type="email"],
+.form-row input[type="tel"],
+.form-row input[type="password"],
+.form-row input[type="number"],
+.form-row input[type="date"],
+.form-row select {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #2b2b2e;
+  background: #121214;
+  color: #fff;
+  outline: none;
+  box-sizing: border-box;
+  font-size: 14px;
+}
+
+.form-row input:focus,
+.form-row select:focus {
+  border-color: var(--ub-500);
+  box-shadow: 0 0 0 3px rgba(25, 197, 216, 0.18);
+}
+
+.modal-hint {
+  font-size: 11px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.modal-hint b {
+  color: #bbb;
+}
+
+/* Linha Divisória */
+.modal-divider {
+  border: 0;
+  height: 1px;
+  background: #2b2b2e;
+  margin: 6px 0;
+}
+
+/* Checkbox estilizado */
+.checkbox-label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  cursor: pointer;
+  color: #ddd;
+  font-size: 13px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ub-500);
+  cursor: pointer;
+}
+
+/* Botões de Ação */
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.salve {
+  background: var(--ub-500);
+  color: #000;
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.salve:hover {
+  background: var(--ub-400);
+}
+
+.cancela {
+  background: #2b2b2e;
+  color: #ccc;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.cancela:hover {
+  background: var(--mk-600);
+  color: #fff;
+}
+
+/* Responsividade do Modal */
+@media (max-width: 768px) {
+  .form-grid-3,
+  .form-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .form-grid,
+  .form-grid-3,
+  .form-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,205 @@
+/* src/components/Visual/OrdemServicoForm.css */
+
+.os-form-container {
+  width: 100%;
+  margin: 0 0 28px 0;
+  padding: 24px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 14px;
+  box-sizing: border-box;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  text-align: left;
+}
+
+.os-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #27272a;
+}
+
+.os-title {
+  color: #ff5252;
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.os-badge-numero {
+  background: rgba(255, 82, 82, 0.12);
+  color: #ff5252;
+  border: 1px solid rgba(255, 82, 82, 0.3);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  font-family: monospace;
+}
+
+/* Grid de Seções do Formulário */
+.botoes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+  width: 100%;
+}
+
+/* Padronização dos botões das seções em Cards Modernos */
+.btn-secao {
+  background-color: #1e1e24;
+  color: #e4e4e7;
+  border: 1px solid #2e2e38;
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  text-align: left;
+}
+
+.btn-secao:hover {
+  background-color: #262630;
+  border-color: #ff5252;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 82, 82, 0.18);
+}
+
+.btn-secao.filled {
+  border-color: rgba(34, 197, 94, 0.4);
+  background-color: rgba(34, 197, 94, 0.06);
+}
+
+.btn-secao.filled:hover {
+  border-color: #22c55e;
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.18);
+}
+
+.btn-secao-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-secao-icon {
+  font-size: 1.2rem;
+}
+
+.btn-secao-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.btn-secao-name {
+  font-weight: 700;
+  color: #ffffff;
+  font-size: 0.9rem;
+}
+
+.btn-secao-hint {
+  font-size: 0.75rem;
+  color: #a1a1aa;
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-secao-tag {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.btn-secao-tag.pending {
+  background: rgba(161, 161, 170, 0.12);
+  color: #a1a1aa;
+}
+
+.btn-secao-tag.done {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* Linha de Ações Finais */
+.acoes-os {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding-top: 18px;
+  border-top: 1px solid #27272a;
+}
+
+.btn-acao {
+  padding: 11px 22px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+}
+
+.btn-acao:hover {
+  transform: translateY(-2px);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #ff5252 0%, #dc2626 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ef4444 100%);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.5);
+}
+
+.btn-secondary {
+  background-color: #27272a;
+  color: #e4e4e7;
+  border: 1px solid #3f3f46;
+}
+
+.btn-secondary:hover {
+  background-color: #3f3f46;
+  border-color: #71717a;
+  color: #ffffff;
+}
+
+.btn-info {
+  background-color: #0284c7;
+  color: #ffffff;
+}
+
+.btn-info:hover {
+  background-color: #0369a1;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+}

@@ -1,0 +1,663 @@
+// src/services/prevencaoService.js
+import { getUser, isAdmin } from '../auth/auth';
+import { api } from '../api/client';
+
+const STORAGE_KEY = 'jsa_ocorrencias_prevencao';
+
+function _resolveUser(provided = null) {
+  const u = provided || getUser() || {};
+  const email = (u.email || u.user_email || '').trim().toLowerCase();
+  const rawName = (u.name || u.nome || '').trim();
+  const rawSurname = (u.surname || u.sobrenome || '').trim();
+  let fullName = [rawName, rawSurname].filter(Boolean).join(' ');
+  if (!fullName || fullName.toLowerCase() === 'usuario') {
+    fullName = email ? email.split('@')[0] : 'Operador';
+  }
+
+  let username = (u.username || u.user_login || '').trim();
+  if (!username) {
+    username = email ? email.split('@')[0] : 'operador';
+  }
+
+  const id = u.id || null;
+  const isUserAdmin = isAdmin(u);
+
+  return { id, email, username, name: fullName, isUserAdmin };
+}
+
+function safeRead() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function safeWrite(list) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.warn('Erro ao salvar no storage:', e);
+  }
+}
+
+// Sincroniza em segundo plano com o banco de dados MySQL
+export async function sincronizarPrevencaoDoServidor(customUser = null) {
+  const u = _resolveUser(customUser);
+  try {
+    const params = {};
+    if (u.isUserAdmin) {
+      params.isAdmin = true;
+    } else {
+      if (u.email) params.email = u.email;
+      if (u.id) params.userId = u.id;
+      if (u.username) params.username = u.username;
+    }
+
+    const res = await api.get('/prevencao', { params });
+    if (Array.isArray(res.data)) {
+      const serverList = res.data;
+      const localList = safeRead();
+      const map = new Map();
+
+      // Prioriza dados do servidor
+      serverList.forEach((s) => map.set(s.numero || s.id, s));
+      localList.forEach((l) => {
+        const key = l.numero || l.id;
+        if (!map.has(key)) map.set(key, l);
+      });
+
+      const merged = Array.from(map.values());
+      safeWrite(merged);
+      return listarOcorrencias(customUser);
+    }
+  } catch (err) {
+    console.warn('[Prevencao Sync] Servidor indisponível:', err.message);
+  }
+  return listarOcorrencias(customUser);
+}
+
+export function listarOcorrencias(customUser = null) {
+  try {
+    const u = _resolveUser(customUser);
+    const list = safeRead();
+
+    // ADMIN: Visualiza TODAS as ocorrências de todos os usuários
+    if (u.isUserAdmin) {
+      return list;
+    }
+
+    // OPERADOR COMUM: Visualiza apenas as ocorrências registradas por ele mesmo
+    return list.filter((oc) => {
+      const ocEmail = String(oc.userEmail || '').trim().toLowerCase();
+      const ocUser = String(oc.userLogin || '').trim().toLowerCase();
+      const ocId = oc.userId ? String(oc.userId) : null;
+      const ocNome = String(oc.registradoPor || oc.responsaveisRegistro?.emitidoPor?.nome || '').trim().toLowerCase();
+
+      if (ocEmail || ocUser || ocId) {
+        return (
+          (u.email && ocEmail && ocEmail === u.email) ||
+          (u.username && ocUser && ocUser === u.username) ||
+          (u.id && ocId && ocId === String(u.id))
+        );
+      }
+
+      if (u.name && ocNome) {
+        return ocNome.includes(u.name.toLowerCase()) || u.name.toLowerCase().includes(ocNome);
+      }
+
+      return true;
+    });
+  } catch (e) {
+    console.error('Erro ao listar ocorrências de prevenção:', e);
+    return [];
+  }
+}
+
+export function gerarProximoNumeroOcorrencia() {
+  const lista = safeRead();
+  const ano = new Date().getFullYear();
+  const totalNoAno = lista.filter((o) => String(o.numero || '').includes(`OC-${ano}-`)).length + 1;
+  const seq = String(totalNoAno).padStart(4, '0');
+  return `OC-${ano}-${seq}`;
+}
+
+export async function salvarOcorrencia(ocorrencia, customUser = null) {
+  try {
+    const u = _resolveUser(customUser);
+    const lista = safeRead();
+    const numeroAuto = ocorrencia.numero || gerarProximoNumeroOcorrencia();
+    const usuarioLogado = u.name || ocorrencia.registradoPor || 'Operador';
+    const nowIso = new Date().toISOString();
+
+    const nova = {
+      id: ocorrencia.id || Date.now(),
+      numero: numeroAuto,
+      nome: ocorrencia.nome || ocorrencia.titulo || `Ocorrência - ${ocorrencia.tipo || 'Geral'}`,
+      status: ocorrencia.status || 'Em Aberto',
+      data: ocorrencia.data || nowIso.slice(0, 10),
+      horaInicio: ocorrencia.horaInicio || new Date().toTimeString().slice(0, 5),
+      horaTermino: ocorrencia.horaTermino || '',
+      tipo: ocorrencia.tipo || 'Geral',
+      classificacao: ocorrencia.classificacao || 'Média',
+      local: ocorrencia.local || 'Loja Principal',
+      setor: ocorrencia.setor || 'Geral',
+      descricao: ocorrencia.descricao || '',
+      relatoFatos: ocorrencia.relatoFatos || '',
+      medidasAdotadas: ocorrencia.medidasAdotadas || '',
+      pessoasEnvolvidas: ocorrencia.pessoasEnvolvidas || [],
+      pessoaEnvolvida: ocorrencia.pessoaEnvolvida || (ocorrencia.pessoasEnvolvidas?.[0] || null),
+      produtosEnvolvidos: ocorrencia.produtosEnvolvidos || [],
+      valorTotalEnvolvido: Number(ocorrencia.valorTotalEnvolvido) || 0,
+      abordagem: ocorrencia.abordagem || null,
+      evidencias: ocorrencia.evidencias || [],
+      responsaveisRegistro: ocorrencia.responsaveisRegistro || {
+        emitidoPor: {
+          nome: usuarioLogado,
+          cargo: ocorrencia.cargo || 'Prevenção de Perdas',
+          matricula: ocorrencia.matricula || '',
+          dataHora: nowIso,
+        },
+        presenciou: { nome: '', cargo: '', matricula: '' },
+        atendeu: { nome: '', cargo: '', matricula: '' },
+        recebeu: { nome: '', cargo: '', dataHora: '' },
+        analisou: { nome: '', parecer: '', dataHora: '' },
+        autorizouEncerramento: { nome: '', cargo: '', despacho: '', dataHora: '' },
+      },
+      historicoCustodia: ocorrencia.historicoCustodia || [
+        {
+          id: Date.now(),
+          dataHora: nowIso,
+          usuario: usuarioLogado,
+          acao: `${usuarioLogado} registrou a ocorrência ${numeroAuto} no sistema`,
+          tipo: 'sistema',
+        },
+      ],
+      userId: u.id,
+      userEmail: u.email,
+      userLogin: u.username,
+      registradoPor: usuarioLogado,
+      createdAt: nowIso,
+    };
+
+    lista.unshift(nova);
+    safeWrite(lista);
+
+    // Persiste no banco de dados MySQL via API
+    try {
+      api.post('/prevencao', nova).catch((err) => console.warn('[Prevencao API POST error]', err.message));
+    } catch {}
+
+    return nova;
+  } catch (e) {
+    console.error('Erro ao salvar ocorrência:', e);
+    throw e;
+  }
+}
+
+export function atualizarStatusOcorrencia(id, novoStatus, usuario = 'Operador') {
+  try {
+    const lista = safeRead();
+    const idx = lista.findIndex((o) => String(o.id) === String(id) || o.numero === id);
+    if (idx !== -1) {
+      const oc = lista[idx];
+      const nowIso = new Date().toISOString();
+      const historico = Array.isArray(oc.historicoCustodia) ? [...oc.historicoCustodia] : [];
+
+      historico.unshift({
+        id: Date.now(),
+        dataHora: nowIso,
+        usuario,
+        acao: `${usuario} alterou o status para "${novoStatus}"`,
+        tipo: 'status',
+      });
+
+      lista[idx] = {
+        ...oc,
+        status: novoStatus,
+        historicoCustodia: historico,
+        updatedAt: nowIso,
+      };
+      safeWrite(lista);
+
+      // Sincroniza com o MySQL
+      try {
+        api.put(`/prevencao/${oc.id || oc.numero}`, { status: novoStatus, historicoCustodia: historico }).catch(() => {});
+      } catch {}
+
+      return lista[idx];
+    }
+    return null;
+  } catch (e) {
+    console.error('Erro ao atualizar status da ocorrência:', e);
+    throw e;
+  }
+}
+
+export function salvarRelatoFatos(id, relatoFatos, medidasAdotadas = '', usuario = 'Operador') {
+  try {
+    const lista = safeRead();
+    const idx = lista.findIndex((o) => String(o.id) === String(id) || o.numero === id);
+    if (idx !== -1) {
+      const oc = lista[idx];
+      const nowIso = new Date().toISOString();
+      const historico = Array.isArray(oc.historicoCustodia) ? [...oc.historicoCustodia] : [];
+
+      historico.unshift({
+        id: Date.now(),
+        dataHora: nowIso,
+        usuario,
+        acao: `${usuario} registrou o relato factual dos acontecimentos`,
+        tipo: 'relato',
+      });
+
+      lista[idx] = {
+        ...oc,
+        relatoFatos: relatoFatos || '',
+        medidasAdotadas: medidasAdotadas || '',
+        historicoCustodia: historico,
+        relatadoEm: nowIso,
+        updatedAt: nowIso,
+      };
+      safeWrite(lista);
+
+      try {
+        api.put(`/prevencao/${oc.id || oc.numero}`, lista[idx]).catch(() => {});
+      } catch {}
+
+      return lista[idx];
+    }
+    return null;
+  } catch (e) {
+    console.error('Erro ao salvar relato dos fatos:', e);
+    throw e;
+  }
+}
+
+export function salvarPessoasEnvolvidas(id, listaPessoas, usuario = 'Operador') {
+  try {
+    const lista = safeRead();
+    const idx = lista.findIndex((o) => String(o.id) === String(id) || o.numero === id);
+    if (idx !== -1) {
+      const oc = lista[idx];
+      const nowIso = new Date().toISOString();
+      const historico = Array.isArray(oc.historicoCustodia) ? [...oc.historicoCustodia] : [];
+
+      const pessoasFormatadas = Array.isArray(listaPessoas)
+        ? listaPessoas.map((p, i) => ({
+            id: p.id || Date.now() + i,
+            nome: p.nome || '',
+            documento: p.documento || '',
+            sexo: p.sexo || 'Não informado',
+            descricaoFisica: p.descricaoFisica || '',
+            vestimenta: p.vestimenta || '',
+            caracteristicas: p.caracteristicas || '',
+            clienteIdentificado: p.clienteIdentificado ?? 'Não',
+            funcionario: p.funcionario ?? 'Não',
+            formaIdentificacao: p.formaIdentificacao || '',
+            observacoes: p.observacoes || '',
+          }))
+        : [];
+
+      historico.unshift({
+        id: Date.now(),
+        dataHora: nowIso,
+        usuario,
+        acao: `${usuario} atualizou o registro de pessoas envolvidas (${pessoasFormatadas.length} ${pessoasFormatadas.length === 1 ? 'pessoa' : 'pessoas'})`,
+        tipo: 'pessoa',
+      });
+
+      lista[idx] = {
+        ...oc,
+        pessoasEnvolvidas: pessoasFormatadas,
+        pessoaEnvolvida: pessoasFormatadas[0] || null,
+        historicoCustodia: historico,
+        updatedAt: nowIso,
+      };
+      safeWrite(lista);
+
+      try {
+        api.put(`/prevencao/${oc.id || oc.numero}`, lista[idx]).catch(() => {});
+      } catch {}
+
+      return lista[idx];
+    }
+    return null;
+  } catch (e) {
+    console.error('Erro ao salvar pessoas envolvidas:', e);
+    throw e;
+  }
+}
+
+export function salvarProdutosEnvolvidos(id, listaProdutos, usuario = 'Operador') {
+  try {
+    const lista = safeRead();
+    const idx = lista.findIndex((o) => String(o.id) === String(id) || o.numero === id);
+    if (idx !== -1) {
+      const oc = lista[idx];
+      const nowIso = new Date().toISOString();
+      const historico = Array.isArray(oc.historicoCustodia) ? [...oc.historicoCustodia] : [];
+
+      let valorTotal = 0;
+      const produtosFormatados = Array.isArray(listaProdutos)
+        ? listaProdutos.map((p, i) => {
+            const qtd = Number(p.quantidade) || 1;
+            const unit = Number(p.valorUnitario) || 0;
+            const subtotal = Number(p.total) || qtd * unit;
+            valorTotal += subtotal;
+
+            return {
+              id: p.id || Date.now() + i,
+              produto: p.produto || '',
+              codigo: p.codigo || '',
+              quantidade: qtd,
+              valorUnitario: unit,
+              total: subtotal,
+              recuperado: p.recuperado ?? 'Sim',
+              avaria: p.avaria ?? 'Não',
+              setor: p.setor || '',
+            };
+          })
+        : [];
+
+      historico.unshift({
+        id: Date.now(),
+        dataHora: nowIso,
+        usuario,
+        acao: `${usuario} atualizou a relação de produtos envolvidos (${produtosFormatados.length} itens - Total R$ ${valorTotal.toFixed(2)})`,
+        tipo: 'produto',
+      });
+
+      lista[idx] = {
+        ...oc,
+        produtosEnvolvidos: produtosFormatados,
+        valorTotalEnvolvido: valorTotal,
+        historicoCustodia: historico,
+        updatedAt: nowIso,
+      };
+      safeWrite(lista);
+
+      try {
+        api.put(`/prevencao/${oc.id || oc.numero}`, lista[idx]).catch(() => {});
+      } catch {}
+
+      return lista[idx];
+    }
+    return null;
+  } catch (e) {
+    console.error('Erro ao salvar produtos envolvidos:', e);
+    throw e;
+  }
+}
+
+export function salvarAbordagem(id, dadosAbordagem, usuario = 'Operador') {
+  try {
+    const lista = safeRead();
+    const idx = lista.findIndex((o) => String(o.id) === String(id) || o.numero === id);
+    if (idx !== -1) {
+      const oc = lista[idx];
+      const nowIso = new Date().toISOString();
+      const historico = Array.isArray(oc.historicoCustodia) ? [...oc.historicoCustodia] : [];
+
+      const abordagemFormatada = {
+        houveAbordagem: dadosAbordagem.houveAbordagem || 'Sim',
+        data: dadosAbordagem.data || nowIso.slice(0, 10),
+        hora: dadosAbordagem.hora || '',
+        local: dadosAbordagem.local || '',
+        responsaveis: dadosAbordagem.responsaveis || '',
+        comportamento: dadosAbordagem.comportamento || 'Pacífico / Cooperativo',
+        recuperacaoMercadorias: dadosAbordagem.recuperacaoMercadorias || 'Sim - Total',
+        acionamentoPolicial: dadosAbordagem.acionamentoPolicial || 'Não',
+        numeroBoletim: dadosAbordagem.numeroBoletim || '',
+        conducaoSalaReservada: dadosAbordagem.conducaoSalaReservada || 'Não',
+        relatoAbordagem: dadosAbordagem.relatoAbordagem || '',
+        registradoEm: nowIso,
+      };
+
+      historico.unshift({
+        id: Date.now(),
+        dataHora: nowIso,
+        usuario,
+        acao: `${usuario} registrou o relatório de abordagem da ocorrência`,
+        tipo: 'abordagem',
+      });
+
+      lista[idx] = {
+        ...oc,
+        abordagem: abordagemFormatada,
+        historicoCustodia: historico,
+        updatedAt: nowIso,
+      };
+      safeWrite(lista);
+
+      try {
+        api.put(`/prevencao/${oc.id || oc.numero}`, lista[idx]).catch(() => {});
+      } catch {}
+
+      return lista[idx];
+    }
+    return null;
+  } catch (e) {
+    console.error('Erro ao salvar abordagem:', e);
+    throw e;
+  }
+}
+
+export function salvarResponsaveisRegistro(id, dadosResponsaveis, usuario = 'Operador') {
+  try {
+    const lista = safeRead();
+    const idx = lista.findIndex((o) => String(o.id) === String(id) || o.numero === id);
+    if (idx !== -1) {
+      const oc = lista[idx];
+      const nowIso = new Date().toISOString();
+      const historico = Array.isArray(oc.historicoCustodia) ? [...oc.historicoCustodia] : [];
+
+      const emitidoPorNome = dadosResponsaveis.emitidoPor?.nome || usuario;
+      const emitidoPorCargo = dadosResponsaveis.emitidoPor?.cargo || 'Prevenção de Perdas';
+
+      historico.unshift({
+        id: Date.now(),
+        dataHora: nowIso,
+        usuario,
+        acao: `${usuario} atualizou a matriz de responsabilidades do registro`,
+        tipo: 'responsavel',
+      });
+
+      lista[idx] = {
+        ...oc,
+        responsaveisRegistro: {
+          emitidoPor: {
+            nome: emitidoPorNome,
+            cargo: emitidoPorCargo,
+            matricula: dadosResponsaveis.emitidoPor?.matricula || '',
+            dataHora: dadosResponsaveis.emitidoPor?.dataHora || nowIso,
+          },
+          presenciou: {
+            nome: dadosResponsaveis.presenciou?.nome || '',
+            cargo: dadosResponsaveis.presenciou?.cargo || '',
+            matricula: dadosResponsaveis.presenciou?.matricula || '',
+          },
+          atendeu: {
+            nome: dadosResponsaveis.atendeu?.nome || '',
+            cargo: dadosResponsaveis.atendeu?.cargo || '',
+            matricula: dadosResponsaveis.atendeu?.matricula || '',
+          },
+          recebeu: {
+            nome: dadosResponsaveis.recebeu?.nome || '',
+            cargo: dadosResponsaveis.recebeu?.cargo || '',
+            dataHora: dadosResponsaveis.recebeu?.dataHora || '',
+          },
+          analisou: {
+            nome: dadosResponsaveis.analisou?.nome || '',
+            parecer: dadosResponsaveis.analisou?.parecer || '',
+            dataHora: dadosResponsaveis.analisou?.dataHora || '',
+          },
+          autorizouEncerramento: {
+            nome: dadosResponsaveis.autorizouEncerramento?.nome || '',
+            cargo: dadosResponsaveis.autorizouEncerramento?.cargo || '',
+            despacho: dadosResponsaveis.autorizouEncerramento?.despacho || '',
+            dataHora: dadosResponsaveis.autorizouEncerramento?.dataHora || '',
+          },
+          atualizadoEm: nowIso,
+        },
+        historicoCustodia: historico,
+        updatedAt: nowIso,
+      };
+      safeWrite(lista);
+
+      try {
+        api.put(`/prevencao/${oc.id || oc.numero}`, lista[idx]).catch(() => {});
+      } catch {}
+
+      return lista[idx];
+    }
+    return null;
+  } catch (e) {
+    console.error('Erro ao salvar responsáveis pelo registro:', e);
+    throw e;
+  }
+}
+
+export function salvarEvidencias(id, listaEvidencias, usuario = 'Operador') {
+  try {
+    const lista = safeRead();
+    const idx = lista.findIndex((o) => String(o.id) === String(id) || o.numero === id);
+    if (idx !== -1) {
+      const oc = lista[idx];
+      const nowIso = new Date().toISOString();
+      const historico = Array.isArray(oc.historicoCustodia) ? [...oc.historicoCustodia] : [];
+
+      const evidenciasFormatadas = Array.isArray(listaEvidencias)
+        ? listaEvidencias.map((ev, i) => ({
+            id: ev.id || Date.now() + i,
+            numeroSequencial: ev.numeroSequencial || `#${String(i + 1).padStart(3, '0')}`,
+            tipo: ev.tipo || 'Vídeo',
+            camera: ev.camera || '',
+            local: ev.local || '',
+            data: ev.data || nowIso.slice(0, 10),
+            horaInicio: ev.horaInicio || '',
+            horaFim: ev.horaFim || '',
+            arquivoNome: ev.arquivoNome || '',
+            arquivoUrl: ev.arquivoUrl || '',
+            adicionadoPor: ev.adicionadoPor || usuario,
+            dataHoraUpload: ev.dataHoraUpload || nowIso,
+            observacao: ev.observacao || '',
+          }))
+        : [];
+
+      historico.unshift({
+        id: Date.now(),
+        dataHora: nowIso,
+        usuario,
+        acao: `${usuario} atualizou o acervo de evidências (${evidenciasFormatadas.length} itens)`,
+        tipo: 'evidencia',
+      });
+
+      lista[idx] = {
+        ...oc,
+        evidencias: evidenciasFormatadas,
+        historicoCustodia: historico,
+        updatedAt: nowIso,
+      };
+      safeWrite(lista);
+
+      try {
+        api.put(`/prevencao/${oc.id || oc.numero}`, lista[idx]).catch(() => {});
+      } catch {}
+
+      return lista[idx];
+    }
+    return null;
+  } catch (e) {
+    console.error('Erro ao salvar evidências:', e);
+    throw e;
+  }
+}
+
+export function adicionarEventoCustodia(id, acao, usuario = 'Operador', tipo = 'custodia') {
+  try {
+    const lista = safeRead();
+    const idx = lista.findIndex((o) => String(o.id) === String(id) || o.numero === id);
+    if (idx !== -1) {
+      const oc = lista[idx];
+      const nowIso = new Date().toISOString();
+      const historico = Array.isArray(oc.historicoCustodia) ? [...oc.historicoCustodia] : [];
+
+      const novoEvento = {
+        id: Date.now(),
+        dataHora: nowIso,
+        usuario,
+        acao,
+        tipo,
+      };
+
+      historico.unshift(novoEvento);
+
+      lista[idx] = {
+        ...oc,
+        historicoCustodia: historico,
+        updatedAt: nowIso,
+      };
+      safeWrite(lista);
+
+      try {
+        api.put(`/prevencao/${oc.id || oc.numero}`, { historicoCustodia: historico }).catch(() => {});
+      } catch {}
+
+      return lista[idx];
+    }
+    return null;
+  } catch (e) {
+    console.error('Erro ao adicionar evento de custódia:', e);
+    throw e;
+  }
+}
+
+export function registrarVisualizacaoCustodia(id, usuario = 'Operador') {
+  return adicionarEventoCustodia(id, `${usuario} visualizou a ocorrência e cadeia de custódia`, usuario, 'visualizacao');
+}
+
+export function atualizarOcorrencia(ocorrencia) {
+  try {
+    const lista = safeRead();
+    const idx = lista.findIndex((o) => String(o.id) === String(ocorrencia.id) || o.numero === ocorrencia.numero);
+    if (idx !== -1) {
+      lista[idx] = {
+        ...lista[idx],
+        ...ocorrencia,
+        updatedAt: new Date().toISOString(),
+      };
+      safeWrite(lista);
+
+      try {
+        api.put(`/prevencao/${lista[idx].id || lista[idx].numero}`, lista[idx]).catch(() => {});
+      } catch {}
+
+      return lista[idx];
+    }
+    return null;
+  } catch (e) {
+    console.error('Erro ao atualizar ocorrência:', e);
+    throw e;
+  }
+}
+
+export function excluirOcorrencia(id) {
+  try {
+    const lista = safeRead();
+    const filtrada = lista.filter((o) => String(o.id) !== String(id) && o.numero !== id);
+    safeWrite(filtrada);
+
+    try {
+      api.delete(`/prevencao/${id}`).catch(() => {});
+    } catch {}
+
+    return true;
+  } catch (e) {
+    console.error('Erro ao excluir ocorrência:', e);
+    return false;
+  }
+}

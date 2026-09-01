@@ -1,0 +1,296 @@
+.modal-boleto-container {
+  max-width: 680px !important;
+  width: 95%;
+  max-height: 92vh !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  color: #f4f4f5;
+  font-family: inherit;
+}
+
+.boleto-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #27272a;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+}
+
+.boleto-bank-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bank-icon {
+  font-size: 2rem;
+  background: rgba(0, 210, 255, 0.1);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 210, 255, 0.3);
+}
+
+.boleto-bank-logo h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.bank-code {
+  font-size: 0.85rem;
+  color: #00d2ff;
+  font-weight: 600;
+}
+
+.boleto-doc-title {
+  text-align: right;
+}
+
+.boleto-doc-title span {
+  display: block;
+  font-size: 0.75rem;
+  color: #a1a1aa;
+  letter-spacing: 1px;
+}
+
+.boleto-doc-title strong {
+  font-size: 1.35rem;
+  color: #10b981;
+}
+
+/* Linha Digitável Box */
+.boleto-linha-digitavel-box {
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.linha-label {
+  font-size: 0.8rem;
+  color: #a1a1aa;
+  font-weight: 600;
+  width: 100%;
+}
+
+.linha-code {
+  font-family: monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #38bdf8;
+  letter-spacing: 0.5px;
+}
+
+.btn-copiar-linha {
+  background: #3b82f6;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-copiar-linha:hover {
+  background: #2563eb;
+}
+
+/* Grid de Informações */
+.boleto-grid-info {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  background: #202024;
+  border: 1px solid #2d2d35;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.info-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.info-title {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-value {
+  font-size: 0.95rem;
+  color: #f1f5f9;
+}
+
+.info-sub {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.text-danger {
+  color: #f87171 !important;
+}
+
+/* Instruções */
+.boleto-instrucoes-box {
+  background: rgba(0, 163, 190, 0.08);
+  border: 1px dashed rgba(0, 163, 190, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.boleto-instrucoes-box strong {
+  color: #00d2ff;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.boleto-instrucoes-box p {
+  margin: 2px 0;
+}
+
+/* Barcode */
+.boleto-barcode-box {
+  background: #09090b;
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.barcode-bars {
+  background: repeating-linear-gradient(
+    90deg,
+    #ffffff,
+    #ffffff 2px,
+    #09090b 2px,
+    #09090b 4px,
+    #ffffff 4px,
+    #ffffff 7px,
+    #09090b 7px,
+    #09090b 9px
+  );
+  height: 48px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.barcode-numeric {
+  background: rgba(0, 0, 0, 0.8);
+  color: #a1a1aa;
+  font-family: monospace;
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.btn-copiar-barcode {
+  background: #27272a;
+  border: 1px solid #3f3f46;
+  color: #e4e4e7;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-copiar-barcode:hover {
+  background: #3f3f46;
+  color: #ffffff;
+}
+
+/* Ações */
+.boleto-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.btn-imprimir-pdf {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.btn-imprimir-pdf:hover {
+  transform: translateY(-1px);
+}
+
+.btn-confirmar-boleto-pago {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.btn-confirmar-boleto-pago:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-confirmar-boleto-pago:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.btn-fechar-boleto {
+  background: #27272a;
+  color: #a1a1aa;
+  border: 1px solid #3f3f46;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-fechar-boleto:hover {
+  background: #3f3f46;
+  color: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .boleto-grid-info {
+    grid-template-columns: 1fr;
+  }
+  .boleto-modal-actions {
+    flex-direction: column;
+  }
+  .boleto-modal-actions button {
+    width: 100%;
+  }
+}

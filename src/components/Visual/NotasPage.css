@@ -1,0 +1,340 @@
+/* Animação Global de entrada da página */
+.fade-in-page {
+  animation: fadeInPage 0.4s ease-out forwards;
+}
+
+@keyframes fadeInPage {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-container {
+  padding: 24px;
+  max-width: 1340px;
+  width: 100%;
+  min-height: 75vh;
+  margin: 0 auto;
+  box-sizing: border-box;
+  color: #e1e1e6;
+}
+
+/* Header bar */
+.notas-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.page-subtitle {
+  color: #8a94a6;
+  font-size: 0.95rem;
+  margin-top: 4px;
+}
+
+.btn-nova-nota {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-nova-nota:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+/* Barra de selecionar tudo */
+.select-all-bar {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 20px;
+}
+
+.checkbox-custom-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+}
+
+.checkbox-custom-label input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
+  accent-color: #007bff;
+}
+
+/* Empty State */
+.empty-state-card {
+  text-align: center;
+  padding: 50px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  margin-top: 20px;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+
+/* Container Grid dos Cards */
+.notas-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+/* Card Individual de Nota */
+.nota-card {
+  background: #1e222d;
+  border: 1px solid #2a2e3d;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+              box-shadow 0.25s ease, 
+              border-color 0.25s ease;
+  animation: cardSlideIn 0.35s ease-out backwards;
+  position: relative;
+}
+
+@keyframes cardSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.nota-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  border-color: #3f475a;
+}
+
+.nota-card.selected {
+  border-color: #007bff;
+  background: #1c2638;
+}
+
+/* Header do Card */
+.nota-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.nota-number {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #fff;
+}
+
+/* Corpo do Card */
+.nota-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.nota-main-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.nota-cliente {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  word-break: break-word;
+}
+
+.nota-valor {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #2ea043;
+  white-space: nowrap;
+}
+
+.nota-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-item.full-width {
+  grid-column: span 2;
+}
+
+.detail-label {
+  color: #8a94a6;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.key-value {
+  font-family: monospace;
+  font-size: 0.78rem;
+  word-break: break-all;
+  color: #a0aec0;
+}
+
+/* Status Badges */
+.badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.badge.status-emitida, .badge.status-ativa {
+  background: rgba(46, 160, 67, 0.15);
+  color: #3fb950;
+  border: 1px solid rgba(46, 160, 67, 0.3);
+}
+
+.badge.status-pendente {
+  background: rgba(210, 153, 34, 0.15);
+  color: #d29922;
+  border: 1px solid rgba(210, 153, 34, 0.3);
+}
+
+.badge.status-cancelada {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+  border: 1px solid rgba(248, 81, 73, 0.3);
+}
+
+/* Caixas de Alertas Internos */
+.nota-alert-box {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: pulseAlert 2s infinite ease-in-out;
+}
+
+.nota-alert-box.warning {
+  background: rgba(210, 153, 34, 0.1);
+  border: 1px solid rgba(210, 153, 34, 0.3);
+  color: #e3b341;
+}
+
+.nota-alert-box.danger {
+  background: rgba(248, 81, 73, 0.1);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  color: #ff7b72;
+}
+
+@keyframes pulseAlert {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Footer do Card com Botões de Ação Independentes */
+.nota-card-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nota-card-footer .btn {
+  flex: 1;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.nota-card-footer .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.nota-card-footer .btn-secondary.edit {
+  background: #2d3748;
+  color: #e2e8f0;
+}
+.nota-card-footer .btn-secondary.edit:hover:not(:disabled) {
+  background: #3a4a61;
+}
+
+.nota-card-footer .btn-warning.cancel {
+  background: #9b6d12;
+  color: #ffffff;
+}
+.nota-card-footer .btn-warning.cancel:hover:not(:disabled) {
+  background: #b58017;
+}
+
+.nota-card-footer .btn-danger.exc {
+  background: #a12c2c;
+  color: #ffffff;
+}
+.nota-card-footer .btn-danger.exc:hover:not(:disabled) {
+  background: #c53030;
+}
+
+.nota-card-footer .btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}

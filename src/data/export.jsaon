@@ -1,0 +1,11 @@
+const payload = {
+  users: JSON.parse(localStorage.getItem('users') || '[]'),
+  notas: JSON.parse(localStorage.getItem('notas') || '[]'),
+  contas: JSON.parse(localStorage.getItem('contas') || '[]'),
+  contratos: JSON.parse(localStorage.getItem('contratos') || '[]'),
+  produtos: JSON.parse(localStorage.getItem('produtos') || '[]'),
+  simulacoes: JSON.parse(localStorage.getItem('simulacoes') || '[]'),
+  logs: JSON.parse(localStorage.getItem('app_logs') || '[]'),
+};
+console.log('Export pronto:', payload);
+copy(JSON.stringify(payload, null, 2)); // cola num arquivo data/export.json

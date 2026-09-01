@@ -1,0 +1,327 @@
+/* ============================================================
+   ESTILOS ADAPTATIVOS PARA MODO MOBILE (PORTA 2515)
+   ============================================================ */
+
+/* BARRA DE NAVEGAÇÃO INFERIOR */
+.mobile-bottom-nav {
+  display: none;
+}
+
+.mode-mobile-2515 .mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: rgba(18, 18, 20, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 9998;
+  padding: 0 4px;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-nav-btn {
+  background: transparent;
+  border: none;
+  color: #a1a1aa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex: 1;
+  height: 100%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 6px 0;
+  outline: none;
+}
+
+.mobile-nav-btn:active {
+  transform: scale(0.92);
+}
+
+.mobile-nav-icon {
+  font-size: 1.25rem;
+  transition: transform 0.2s ease;
+}
+
+.mobile-nav-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.mobile-nav-btn.active {
+  color: #ff5252;
+}
+
+.mobile-nav-btn.active .mobile-nav-icon {
+  transform: translateY(-2px);
+}
+
+/* DRAWER SUSPENSO MOBILE */
+.mobile-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeInDrawer 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInDrawer {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.mobile-drawer-content {
+  width: 100%;
+  max-width: 500px;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 20px 20px 0 0;
+  padding: 20px 16px 36px 16px;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+  animation: slideUpDrawer 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+@keyframes slideUpDrawer {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.mobile-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #27272a;
+  margin-bottom: 14px;
+}
+
+.mobile-drawer-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-user-icon {
+  font-size: 1.8rem;
+  background: #27272a;
+  padding: 6px;
+  border-radius: 50%;
+}
+
+.mobile-drawer-user h4 {
+  margin: 0;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.mobile-drawer-user small {
+  color: #a1a1aa;
+  font-size: 0.78rem;
+}
+
+.mobile-drawer-close {
+  background: #27272a;
+  border: none;
+  color: #a1a1aa;
+  font-size: 1.1rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-drawer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mobile-drawer-item {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #e4e4e7;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-drawer-item:hover,
+.mobile-drawer-item.active {
+  background: rgba(255, 82, 82, 0.1);
+  color: #ff5252;
+  border-color: rgba(255, 82, 82, 0.25);
+}
+
+.mobile-drawer-item.logout {
+  color: #ef4444;
+}
+
+.mobile-drawer-item.logout:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.mobile-drawer-divider {
+  height: 1px;
+  background: #27272a;
+  margin: 8px 0;
+}
+
+.mobile-drawer-subtitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #71717a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 14px;
+}
+
+/* ============================================================
+   REGRAS ESPECÍFICAS DE PÁGINAS NO MODO MOBILE (PORTA 2515)
+   ============================================================ */
+
+/* Oculta o menu de texto superior no modo mobile */
+.mode-mobile-2515 .navbar-header .menu-group {
+  display: none !important;
+}
+
+.mode-mobile-2515 .navbar-container {
+  padding: 8px 14px !important;
+}
+
+.mode-mobile-2515 .brand-title {
+  font-size: 1.05rem !important;
+}
+
+.mode-mobile-2515 .user-name-text {
+  display: none !important;
+}
+
+.mode-mobile-2515 .logout-btn {
+  display: none !important;
+}
+
+.mode-mobile-2515 .access-btn {
+  padding: 5px 8px !important;
+  font-size: 0.75rem !important;
+}
+
+/* Ajustes de Container para não sobrepor barra inferior */
+.mode-mobile-2515 .app-main-layout,
+.mode-mobile-2515 .page-container,
+.mode-mobile-2515 .contas-page-container,
+.mode-mobile-2515 .notas-page-container,
+.mode-mobile-2515 .os-page-container {
+  padding-bottom: 84px !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+
+/* Contas: 1 card por linha no mobile */
+.mode-mobile-2515 .contas-lista {
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+}
+
+.mode-mobile-2515 .conta-card {
+  padding: 16px !important;
+}
+
+.mode-mobile-2515 .contas-header {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+}
+
+.mode-mobile-2515 .contas-header .header-actions {
+  width: 100% !important;
+  display: flex !important;
+  gap: 8px !important;
+}
+
+.mode-mobile-2515 .contas-header .header-actions button {
+  flex: 1 !important;
+  justify-content: center !important;
+}
+
+.mode-mobile-2515 .contas-filtros {
+  flex-direction: column !important;
+  gap: 10px !important;
+  padding: 12px !important;
+}
+
+/* Ordem de Serviço no Mobile */
+.mode-mobile-2515 .botoes-grid {
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 8px !important;
+}
+
+.mode-mobile-2515 .btn-secao {
+  padding: 10px 12px !important;
+  font-size: 0.82rem !important;
+}
+
+.mode-mobile-2515 .btn-secao-hint {
+  display: none !important;
+}
+
+.mode-mobile-2515 .acoes-os {
+  flex-direction: column !important;
+  width: 100% !important;
+}
+
+.mode-mobile-2515 .btn-acao {
+  width: 100% !important;
+  justify-content: center !important;
+}
+
+/* Modais Touch Friendly no Mobile */
+.mode-mobile-2515 .modal-box,
+.mode-mobile-2515 .modal-card,
+.mode-mobile-2515 .modal-content {
+  width: 96% !important;
+  max-width: 96% !important;
+  margin: 12px auto !important;
+  padding: 16px !important;
+  border-radius: 14px !important;
+}
+
+/* Tabelas com Scroll Suave no Mobile */
+.mode-mobile-2515 .table-responsive {
+  border-radius: 8px !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Footer com padding no Mobile */
+.mode-mobile-2515 footer {
+  margin-bottom: 64px !important;
+}
