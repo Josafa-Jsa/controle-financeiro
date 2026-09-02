@@ -16,8 +16,11 @@ export default function JsaLoginIntroAnimation({ onComplete = () => { } }) {
         ? (u.permissions || u.permissoes)
         : [];
       
-      const hasPrevencao = permissions.includes("prevencao");
-      setIsPrevencaoUser(hasPrevencao);
+      const hasBigMaster =
+        permissions.includes("prevencao") ||
+        permissions.includes("uniformes") ||
+        permissions.includes("controle-uniformes");
+      setIsPrevencaoUser(hasBigMaster);
     } catch {
       setIsPrevencaoUser(false);
     }

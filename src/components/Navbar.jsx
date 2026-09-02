@@ -491,7 +491,7 @@ export default function Navbar({ onOpenAccessModal }) {
             onClick={(e) => handleNavClick(e, "/", "Início")}
             className="brand-link"
           >
-            {userPermissions.includes("prevencao")
+            {userPermissions.includes("prevencao") || userPermissions.includes("uniformes")
               ? "🛒 Big Master Supermercados"
               : "JSA Soluções Tecnológicas"}
           </Link>
@@ -617,6 +617,17 @@ export default function Navbar({ onOpenAccessModal }) {
                 }`}
             >
               🛡️ Prevenção
+            </Link>
+          )}
+
+          {canAccess("uniformes") && (
+            <Link
+              to="/uniformes"
+              onClick={(e) => handleNavClick(e, "/uniformes", "Controle de Uniformes")}
+              className={`nav-link ${location.pathname === "/uniformes" ? "active" : ""
+                }`}
+            >
+              👔 Uniformes
             </Link>
           )}
 
@@ -946,6 +957,15 @@ export default function Navbar({ onOpenAccessModal }) {
                   className={`mobile-nav-item ${location.pathname === "/prevencao" ? "active" : ""}`}
                 >
                   <span>🛡️</span> Prevenção
+                </Link>
+              )}
+              {canAccess("uniformes") && (
+                <Link
+                  to="/uniformes"
+                  onClick={(e) => handleNavClick(e, "/uniformes", "Controle de Uniformes")}
+                  className={`mobile-nav-item ${location.pathname === "/uniformes" ? "active" : ""}`}
+                >
+                  <span>👔</span> Uniformes
                 </Link>
               )}
               {canAccess("usuarios") && (

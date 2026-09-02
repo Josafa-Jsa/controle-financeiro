@@ -7,7 +7,7 @@ const Footer = () => {
   const perms = Array.isArray(u.permissions || u.permissoes)
     ? (u.permissions || u.permissoes)
     : [];
-  const isPrevencao = perms.includes('prevencao');
+  const isBigMaster = perms.includes('prevencao') || perms.includes('uniformes');
 
   return (
     <footer
@@ -24,8 +24,8 @@ const Footer = () => {
       }}
     >
       Copyright © {anoAtual}{' '}
-      <strong style={{ color: isPrevencao ? '#00d2ff' : '#ff5252' }}>
-        {isPrevencao ? '🛒 Big Master Supermercados' : 'JSA Soluções Tecnológicas'}
+      <strong style={{ color: isBigMaster ? '#00d2ff' : '#ff5252' }}>
+        {isBigMaster ? '🛒 Big Master Supermercados' : 'JSA Soluções Tecnológicas'}
       </strong>
       . All rights reserved.
     </footer>

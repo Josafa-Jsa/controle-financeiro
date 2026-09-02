@@ -36,6 +36,7 @@ export const SYSTEM_SCREENS = [
   { key: "contrato-internet", label: "Contrato Internet / Provedor", icon: "🌐", path: "/contrato-internet", desc: "Planos e contratos de internet", isFixed: false },
   { key: "estoque", label: "Controle de Estoque", icon: "📦", path: "/estoque", desc: "Produtos, itens e movimentações", isFixed: false },
   { key: "prevencao", label: "Prevenção de Perdas", icon: "🛡️", path: "/prevencao", desc: "Registro e gestão de ocorrências e segurança", isFixed: false },
+  { key: "uniformes", label: "Controle de Uniformes", icon: "👔", path: "/uniformes", desc: "Estoque de uniformes novos e usados por departamento", isFixed: false },
 ];
 
 const FIXED_SCREEN_KEYS = ["chamados"];

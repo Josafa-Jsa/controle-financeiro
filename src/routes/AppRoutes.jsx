@@ -592,6 +592,7 @@ import ContratoInternetPage from "../pages/Contratos/ContratoInternetPage";
 import EstoquePage from "../pages/Estoque/EstoquePage";
 import NotasPage from "../pages/NotasFiscais/NotasPage";
 import PrevencaoPage from "../pages/Prevencao/PrevencaoPage";
+import ControleUniformesPage from "../pages/Uniformes/ControleUniformesPage";
 
 /* ---------- Chamados ---------- */
 import ChamadosAdmin from "../pages/Chamados/ChamadosAdmin";
@@ -903,6 +904,15 @@ export default function AppRoutes({ ordens, adicionarOrdem, excluirOrdem }) {
           element={
             <ProtectedRoute requiredPermission="prevencao">
               <PrevencaoPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/uniformes"
+          element={
+            <ProtectedRoute requiredPermission="uniformes">
+              <ControleUniformesPage />
             </ProtectedRoute>
           }
         />

@@ -51,7 +51,7 @@ export default function MobileBottomNav() {
     return () => window.removeEventListener('permissoes_alteradas_evento', handlePerms);
   }, [email, isAdmin]);
 
-  const isPrevencaoUser = perms.includes('prevencao');
+  const isPrevencaoUser = perms.includes('prevencao') || perms.includes('uniformes');
 
   const canAccess = (key) => {
     if (isAdmin) return true;
@@ -199,6 +199,16 @@ export default function MobileBottomNav() {
                   onClick={() => handleNav('/prevencao', 'Prevenção de Perdas')}
                 >
                   <span>🛡️</span> Prevenção
+                </button>
+              )}
+
+              {canAccess('uniformes') && (
+                <button
+                  type="button"
+                  className={`mobile-drawer-item ${path === '/uniformes' ? 'active' : ''}`}
+                  onClick={() => handleNav('/uniformes', 'Controle de Uniformes')}
+                >
+                  <span>👔</span> Uniformes
                 </button>
               )}
 

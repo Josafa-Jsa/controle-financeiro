@@ -84,4 +84,12 @@ router.delete('/prevencao/:id', prevencaoController.deletePrevencao);
 router.get('/system-status', systemStatusController.getSystemStatus);
 router.post('/system-status', systemStatusController.updateSystemStatus);
 
+// Controle de Uniformes (Estoque & Movimentações)
+import * as uniformesController from '../controllers/uniformesController.js';
+router.get('/uniformes/estoque', uniformesController.listEstoque);
+router.get('/uniformes/movimentacoes', uniformesController.listMovimentacoes);
+router.post('/uniformes/entrada', uniformesController.cadastrarEntrada);
+router.post('/uniformes/saida', uniformesController.cadastrarSaida);
+router.delete('/uniformes/movimentacoes/:id', uniformesController.deleteMovimentacao);
+
 export default router;
