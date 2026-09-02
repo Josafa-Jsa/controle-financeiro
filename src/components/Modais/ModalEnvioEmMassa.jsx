@@ -23,7 +23,12 @@ export default function ModalEnvioEmMassa({
   estoque = [],
   onConfirmarEnvio,
 }) {
+  const user = getUser();
+  const usuarioNomePadrao = user?.name || user?.nome || 'Operador';
+
   const [filial, setFilial] = useState('Filial 2');
+  const [enviadoPor, setEnviadoPor] = useState(usuarioNomePadrao);
+  const [quemIraReceber, setQuemIraReceber] = useState('');
   const [motorista, setMotorista] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [itens, setItens] = useState([]);
@@ -32,7 +37,10 @@ export default function ModalEnvioEmMassa({
 
   useEffect(() => {
     if (isOpen) {
+      const u = getUser();
       setFilial('Filial 2');
+      setEnviadoPor(u?.name || u?.nome || 'Operador');
+      setQuemIraReceber('');
       setMotorista('');
       setObservacoes('');
       setItens([]);
@@ -72,17 +80,31 @@ export default function ModalEnvioEmMassa({
 
   const totalPecas = itens.reduce((acc, i) => acc + (Number(i.quantidade) || 0), 0);
 
-  const handleImprimirGuia = () => {
-    if (itens.length === 0) {
-      toast.warn('Adicione ao menos um uniforme para gerar a guia de transferência.');
-      return;
+  const validarCamposGerais = () => {
+    if (!enviadoPor.trim()) {
+      toast.warn('Informe quem está enviando os uniformes.');
+      return false;
     }
-    const user = getUser();
+    if (!quemIraReceber.trim()) {
+      toast.warn('Informe quem irá receber os uniformes na filial de destino.');
+      return false;
+    }
+    if (itens.length === 0) {
+      toast.warn('Adicione ao menos um uniforme ao lote de envio.');
+      return false;
+    }
+    return true;
+  };
+
+  const handleImprimirGuia = () => {
+    if (!validarCamposGerais()) return;
     const dadosParaPDF = {
       filial,
+      enviadoPor: enviadoPor.trim(),
+      quemIraReceber: quemIraReceber.trim(),
       motorista: motorista.trim() || 'Logística / Próprio',
       observacoes: observacoes.trim(),
-      responsavel: user?.name || user?.nome || 'Operador',
+      responsavel: enviadoPor.trim(),
       itens,
     };
     const doc = gerarGuiaTransferenciaUniformePDF(dadosParaPDF);
@@ -91,19 +113,17 @@ export default function ModalEnvioEmMassa({
   };
 
   const handleConfirmar = async () => {
-    if (itens.length === 0) {
-      toast.warn('Adicione ao menos um uniforme para realizar o envio em massa.');
-      return;
-    }
+    if (!validarCamposGerais()) return;
 
     setSalvando(true);
     try {
-      const user = getUser();
       await onConfirmarEnvio({
         filial,
+        enviadoPor: enviadoPor.trim(),
+        quemIraReceber: quemIraReceber.trim(),
         motorista: motorista.trim(),
         observacoes: observacoes.trim(),
-        responsavel: user?.name || user?.nome || 'Operador',
+        responsavel: enviadoPor.trim(),
         itens,
       });
       toast.success(`Envio em massa de ${totalPecas} uniforme(s) para ${filial} registrado com sucesso!`);
@@ -121,7 +141,7 @@ export default function ModalEnvioEmMassa({
       <div
         className="modal-box modal-xl"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '820px', width: '94%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+        style={{ maxWidth: '840px', width: '94%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
       >
         {/* Cabeçalho */}
         <div
@@ -151,8 +171,8 @@ export default function ModalEnvioEmMassa({
           </button>
         </div>
 
-        {/* Linha de Dados da Filial e Transporte */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr', gap: '12px', marginBottom: '14px' }}>
+        {/* Linha 1: Filial e Motorista */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.2fr', gap: '12px', marginBottom: '10px' }}>
           <div className="form-row">
             <label className="required" style={{ fontSize: '12px', color: '#fed7aa', fontWeight: 600 }}>
               🏢 Filial de Destino:
@@ -181,6 +201,37 @@ export default function ModalEnvioEmMassa({
               value={motorista}
               onChange={(e) => setMotorista(e.target.value)}
               style={{ height: '38px', fontSize: '13px' }}
+            />
+          </div>
+        </div>
+
+        {/* Linha 2: Quem está Enviando e Quem irá Receber */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+          <div className="form-row">
+            <label className="required" style={{ fontSize: '12px', color: '#fed7aa', fontWeight: 600 }}>
+              📤 Está sendo enviado por quem (Remetente):
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: Nathalia Girardi / Operador Prevenção"
+              value={enviadoPor}
+              onChange={(e) => setEnviadoPor(e.target.value)}
+              style={{ height: '38px', fontSize: '13px' }}
+              required
+            />
+          </div>
+
+          <div className="form-row">
+            <label className="required" style={{ fontSize: '12px', color: '#fed7aa', fontWeight: 600 }}>
+              📥 Quem irá receber na Filial (Destinatário):
+            </label>
+            <input
+              type="text"
+              placeholder="Ex: Marcos (Gerente) / Maria (Líder Frente de Caixa)"
+              value={quemIraReceber}
+              onChange={(e) => setQuemIraReceber(e.target.value)}
+              style={{ height: '38px', fontSize: '13px' }}
+              required
             />
           </div>
         </div>

@@ -72,14 +72,16 @@ export function gerarGuiaTransferenciaUniformePDF(dadosEnvio) {
         { content: `${totalPecas} uniforme(s)`, styles: { textColor: [16, 185, 129], fontStyle: 'bold', fontSize: 9.5 } },
       ],
       [
-        { content: 'Responsável pelo Envio:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
-        { content: String(dadosEnvio.responsavel || 'Operador / Estoquista') },
-        { content: 'Transporte / Motorista:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
-        { content: String(dadosEnvio.motorista || 'Próprio / Logística') },
+        { content: 'Enviado por (Remetente):', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+        { content: String(dadosEnvio.enviadoPor || dadosEnvio.responsavel || '-').toUpperCase(), styles: { textColor: [15, 23, 42], fontStyle: 'bold' } },
+        { content: 'Quem irá receber (Destinatário):', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+        { content: String(dadosEnvio.quemIraReceber || '-').toUpperCase(), styles: { textColor: [15, 23, 42], fontStyle: 'bold' } },
       ],
       [
+        { content: 'Transporte / Motorista:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+        { content: String(dadosEnvio.motorista || 'Próprio / Logística') },
         { content: 'Observações do Lote:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
-        { content: String(dadosEnvio.observacoes || 'Envio de reposição periódica de estoque de uniformes.'), colSpan: 3 },
+        { content: String(dadosEnvio.observacoes || 'Envio de reposição periódica de estoque de uniformes.') },
       ],
     ],
     styles: { fontSize: 8.5, cellPadding: 2.5 },
@@ -137,18 +139,29 @@ export function gerarGuiaTransferenciaUniformePDF(dadosEnvio) {
   const colW = (contentWidth - 10) / 2;
 
   // Assinatura Expedição (Origem)
+  const nomeExpedidor = String(dadosEnvio.enviadoPor || dadosEnvio.responsavel || 'EXPEDIÇÃO (ORIGEM)').toUpperCase();
   doc.setDrawColor(100, 116, 139);
   doc.line(margin + 6, currentY + 24, margin + colW, currentY + 24);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
-  doc.setTextColor(51, 65, 85);
-  doc.text('RESPONSÁVEL PELA EXPEDIÇÃO (ORIGEM)', margin + colW / 2 + 3, currentY + 28, { align: 'center' });
-  doc.text(`Data: ___/___/______`, margin + colW / 2 + 3, currentY + 32, { align: 'center' });
+  doc.setTextColor(15, 23, 42);
+  doc.text(nomeExpedidor, margin + colW / 2 + 3, currentY + 27.5, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Expedição / Remetente • Data: ___/___/______`, margin + colW / 2 + 3, currentY + 31.5, { align: 'center' });
 
   // Assinatura Recebimento (Destino)
+  const nomeRecebedor = String(dadosEnvio.quemIraReceber || `RESPONSÁVEL RECEBIMENTO (${dadosEnvio.filial || 'DESTINO'})`).toUpperCase();
   doc.line(margin + colW + 10, currentY + 24, margin + contentWidth - 6, currentY + 24);
-  doc.text(`RESPONSÁVEL RECEBIMENTO (${String(dadosEnvio.filial || 'DESTINO').toUpperCase()})`, margin + colW + 10 + (colW - 16) / 2, currentY + 28, { align: 'center' });
-  doc.text(`Data: ___/___/______`, margin + colW + 10 + (colW - 16) / 2, currentY + 32, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text(nomeRecebedor, margin + colW + 10 + (colW - 16) / 2, currentY + 27.5, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Recebimento ${dadosEnvio.filial || ''} • Data: ___/___/______`, margin + colW + 10 + (colW - 16) / 2, currentY + 31.5, { align: 'center' });
 
   // Rodapé
   doc.setFontSize(7);
