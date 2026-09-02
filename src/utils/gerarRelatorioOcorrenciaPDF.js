@@ -52,53 +52,53 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
   const temEvidencias = listaEvidencias.length > 0;
   const dataEmissao = new Date().toLocaleString('pt-BR');
 
-  // --- CABEÇALHO DO RELATÓRIO ---
+  // --- CABEÇALHO DO RELATÓRIO (COMPACTO & ELEGANTE) ---
   doc.setFillColor(15, 23, 42); // Navy escuro #0f172a
-  doc.rect(margin, 10, contentWidth, 22, 'F');
+  doc.rect(margin, 8, contentWidth, 14, 'F');
 
   // Faixa decorativa ciano
   doc.setFillColor(56, 189, 248); // #38bdf8
-  doc.rect(margin, 31, contentWidth, 1, 'F');
+  doc.rect(margin, 21.3, contentWidth, 0.7, 'F');
 
   // Título e Subtítulo
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11.5);
-  doc.text('RELATÓRIO OFICIAL DE OCORRÊNCIA E PREVENÇÃO DE PERDAS', margin + 6, 18);
+  doc.setFontSize(9.5);
+  doc.text('RELATÓRIO OFICIAL DE OCORRÊNCIA E PREVENÇÃO DE PERDAS', margin + 4, 13.5);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
+  doc.setFontSize(6.8);
   doc.setTextColor(56, 189, 248);
-  // doc.text('JSA SOLUÇÕES TECNOLÓGICAS • DEPARTAMENTO DE PREVENÇÃO DE PERDAS', margin + 6, 24);
-  doc.text('BIG MASTER • DEPARTAMENTO DE PREVENÇÃO DE PERDAS E ROUBOS', margin + 6, 24);
+  doc.text('BIG MASTER • DEPARTAMENTO DE PREVENÇÃO DE PERDAS E ROUBOS', margin + 4, 18.5);
+  // doc.text('JSA SOLUÇÕES TECNOLÓGICAS • DEPARTAMENTO DE PREVENÇÃO DE PERDAS E ROUBOS', margin + 4, 18.5);
 
   // Metadados à direita
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(255, 255, 255);
-  doc.text(`REGISTRO: ${oc.numero || 'OC-0000'}`, pageWidth - margin - 6, 17.5, { align: 'right' });
+  doc.text(`REGISTRO: ${oc.numero || 'OC-0000'}`, pageWidth - margin - 4, 13.5, { align: 'right' });
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
+  doc.setFontSize(6.5);
   doc.setTextColor(148, 163, 184);
-  doc.text(`STATUS: ${String(oc.status || 'Em Aberto').toUpperCase()}  |  EMISSÃO: ${dataEmissao}`, pageWidth - margin - 6, 24, { align: 'right' });
+  doc.text(`STATUS: ${String(oc.status || 'Em Aberto').toUpperCase()}  |  EMISSÃO: ${dataEmissao}`, pageWidth - margin - 4, 18.5, { align: 'right' });
 
-  let y = 35;
+  let y = 25;
 
   // --- BANNER DE DESTAQUE: REGISTRO DE EVIDÊNCIAS DIGITAIS ---
   if (temEvidencias) {
     doc.setFillColor(238, 242, 255); // Indigo claro
     doc.setDrawColor(99, 102, 241);
     doc.setLineWidth(0.35);
-    doc.roundedRect(margin, y, contentWidth, 8.5, 1.2, 1.2, 'FD');
+    doc.roundedRect(margin, y, contentWidth, 7.5, 1.2, 1.2, 'FD');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.2);
+    doc.setFontSize(6.8);
     doc.setTextColor(67, 56, 202);
     const txtMidias = `ACERVO PROBATÓRIO AUDITADO: ${imagens.length} REGISTRO(S) DE IMAGEM, ${videos.length} REGISTRO(S) DE VÍDEO E ${outrosAnexos.length} DOCUMENTO(S) VINCULADOS`;
-    doc.text(txtMidias, margin + 4, y + 5.5, { maxWidth: contentWidth - 8 });
+    doc.text(txtMidias, margin + 4, y + 4.8, { maxWidth: contentWidth - 8 });
 
-    y += 11.5;
+    y += 10;
   } else {
     y += 2;
   }
@@ -401,49 +401,6 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
     ],
     showHead: 'everyPage',
   });
-
-  y = doc.lastAutoTable.finalY + 8;
-
-  // --- 8. TERMOS DE ENCERRAMENTO E ASSINATURAS FORMAIS ---
-  if (y > pageHeight - 32) {
-    doc.addPage();
-    y = 20;
-  }
-
-  const colWidth = (contentWidth - 12) / 3;
-
-  doc.setDrawColor(148, 163, 184);
-  doc.setLineWidth(0.35);
-
-  // Linha 1: Emissor
-  doc.line(margin, y, margin + colWidth, y);
-  doc.setFontSize(7.2);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(15, 23, 42);
-  doc.text(resp.emitidoPor?.nome || oc.registradoPor || 'Operador', margin + colWidth / 2, y + 3.5, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 116, 139);
-  doc.text('Emissor / Prevenção de Perdas', margin + colWidth / 2, y + 7, { align: 'center' });
-
-  // Linha 2: Atendeu / Fiscal
-  const x2 = margin + colWidth + 6;
-  doc.line(x2, y, x2 + colWidth, y);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(15, 23, 42);
-  doc.text(resp.atendeu?.nome || oc.abordagem?.responsaveis || 'Fiscal / Segurança', x2 + colWidth / 2, y + 3.5, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 116, 139);
-  doc.text('Fiscal de Loja / Segurança', x2 + colWidth / 2, y + 7, { align: 'center' });
-
-  // Linha 3: Gerência
-  const x3 = x2 + colWidth + 6;
-  doc.line(x3, y, x3 + colWidth, y);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(15, 23, 42);
-  doc.text(resp.autorizouEncerramento?.nome || 'Gerente Responsável', x3 + colWidth / 2, y + 3.5, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 116, 139);
-  doc.text('Gerência / Diretoria', x3 + colWidth / 2, y + 7, { align: 'center' });
 
   // --- RODAPÉ OFICIAL EM TODAS AS PÁGINAS ---
   const totalPages = doc.internal.getNumberOfPages();
