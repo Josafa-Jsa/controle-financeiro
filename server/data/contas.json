@@ -19,8 +19,8 @@
     "deleteRequestId": null,
     "motivoExclusao": null,
     "baixas": [],
-    "createdAt": "2026-09-02T16:19:00.046Z",
-    "updatedAt": "2026-09-02T16:19:00.046Z"
+    "createdAt": "2026-09-02T18:41:10.242Z",
+    "updatedAt": "2026-09-02T18:41:10.242Z"
   },
   {
     "id": 4,
@@ -42,8 +42,8 @@
     "deleteRequestId": null,
     "motivoExclusao": null,
     "baixas": [],
-    "createdAt": "2026-09-02T16:19:00.100Z",
-    "updatedAt": "2026-09-02T16:19:00.100Z"
+    "createdAt": "2026-09-02T18:41:10.254Z",
+    "updatedAt": "2026-09-02T18:41:10.254Z"
   },
   {
     "id": 6,
@@ -60,8 +60,8 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-02T16:18:59.959Z",
-    "updatedAt": "2026-09-02T16:18:59.959Z"
+    "createdAt": "2026-09-02T18:41:09.865Z",
+    "updatedAt": "2026-09-02T18:41:09.865Z"
   },
   {
     "id": 7,
@@ -175,8 +175,8 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-02T16:18:59.962Z",
-    "updatedAt": "2026-09-02T16:18:59.962Z"
+    "createdAt": "2026-09-02T18:41:09.886Z",
+    "updatedAt": "2026-09-02T18:41:09.886Z"
   },
   {
     "id": 3,
@@ -193,8 +193,8 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-02T16:18:59.966Z",
-    "updatedAt": "2026-09-02T16:18:59.966Z"
+    "createdAt": "2026-09-02T18:41:09.927Z",
+    "updatedAt": "2026-09-02T18:41:09.927Z"
   },
   {
     "id": 1,
@@ -211,7 +211,7 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-02T16:18:59.919Z",
-    "updatedAt": "2026-09-02T16:18:59.919Z"
+    "createdAt": "2026-09-02T18:41:09.574Z",
+    "updatedAt": "2026-09-02T18:41:09.574Z"
   }
 ]

@@ -176,6 +176,7 @@ export default function PrevencaoPage() {
           details: { id, numero: atualizada.numero },
         });
 
+        setOcorrencias((prev) => prev.map((item) => (String(item.id) === String(id) || item.numero === id ? atualizada : item)));
         carregarOcorrencias();
         setModalRelatoAberto(false);
 
@@ -203,6 +204,7 @@ export default function PrevencaoPage() {
           title: 'Pessoas envolvidas registradas',
           details: { id, numero: atualizada.numero, total },
         });
+        setOcorrencias((prev) => prev.map((item) => (String(item.id) === String(id) || item.numero === id ? atualizada : item)));
       }
 
       carregarOcorrencias();
@@ -224,6 +226,7 @@ export default function PrevencaoPage() {
           title: 'Produtos envolvidos atualizados',
           details: { id, numero: atualizada.numero, total: atualizada.valorTotalEnvolvido },
         });
+        setOcorrencias((prev) => prev.map((item) => (String(item.id) === String(id) || item.numero === id ? atualizada : item)));
       }
 
       carregarOcorrencias();
@@ -245,6 +248,7 @@ export default function PrevencaoPage() {
           title: 'Abordagem registrada',
           details: { id, numero: atualizada.numero, houve: dadosAbordagem.houveAbordagem },
         });
+        setOcorrencias((prev) => prev.map((item) => (String(item.id) === String(id) || item.numero === id ? atualizada : item)));
       }
 
       carregarOcorrencias();
@@ -266,6 +270,7 @@ export default function PrevencaoPage() {
           title: 'Responsáveis pelo registro atualizados',
           details: { id, numero: atualizada.numero, emitidoPor: dadosResponsaveis.emitidoPor?.nome },
         });
+        setOcorrencias((prev) => prev.map((item) => (String(item.id) === String(id) || item.numero === id ? atualizada : item)));
       }
 
       carregarOcorrencias();
@@ -287,6 +292,7 @@ export default function PrevencaoPage() {
           title: 'Evidências atualizadas',
           details: { id, numero: atualizada.numero, total: evidencias.length },
         });
+        setOcorrencias((prev) => prev.map((item) => (String(item.id) === String(id) || item.numero === id ? atualizada : item)));
       }
 
       carregarOcorrencias();
@@ -725,18 +731,38 @@ export default function PrevencaoPage() {
               const statusBadge = getStatusBadge(oc.status);
               const horario = oc.horaTermino ? `${oc.horaInicio} às ${oc.horaTermino}` : oc.horaInicio || '-';
               const nomeOcorrencia = oc.nome || oc.titulo || `Ocorrência de ${oc.tipo}`;
-              const temRelato = Boolean(oc.relatoFatos);
+              const temRelato = Boolean(oc.relatoFatos && String(oc.relatoFatos).trim().length > 0);
               const listaPessoas = Array.isArray(oc.pessoasEnvolvidas) && oc.pessoasEnvolvidas.length > 0
                 ? oc.pessoasEnvolvidas
                 : oc.pessoaEnvolvida
                   ? [oc.pessoaEnvolvida]
                   : [];
-              const temPessoa = listaPessoas.length > 0;
-              const temProdutos = Array.isArray(oc.produtosEnvolvidos) && oc.produtosEnvolvidos.length > 0;
-              const temAbordagem = Boolean(oc.abordagem);
+              const temPessoa = listaPessoas.length > 0 && listaPessoas.some((p) => p && (p.nome?.trim() || p.cpf?.trim() || p.tipoEnvolvido || p.descricaoFisica?.trim()));
+              const listaProdutos = Array.isArray(oc.produtosEnvolvidos) ? oc.produtosEnvolvidos : [];
+              const temProdutos = listaProdutos.length > 0 && listaProdutos.some((p) => p && (p.produto?.trim() || p.codigo?.trim() || Number(p.quantidade) > 0));
+              const temAbordagem = Boolean(
+                oc.abordagem && (
+                  (typeof oc.abordagem.houveAbordagem === 'string' && oc.abordagem.houveAbordagem.trim().length > 0) ||
+                  (typeof oc.abordagem.relatoAbordagem === 'string' && oc.abordagem.relatoAbordagem.trim().length > 0) ||
+                  (typeof oc.abordagem.responsaveis === 'string' && oc.abordagem.responsaveis.trim().length > 0) ||
+                  (typeof oc.abordagem.local === 'string' && oc.abordagem.local.trim().length > 0) ||
+                  oc.abordagem.registradoEm
+                )
+              );
               const totalEvidencias = Array.isArray(oc.evidencias) ? oc.evidencias.length : 0;
+              const temEvidencias = totalEvidencias > 0;
               const resp = oc.responsaveisRegistro || {};
-              const temResponsavelConfigurado = Boolean(resp.emitidoPor?.nome);
+              const temResponsavelConfigurado = Boolean(
+                oc.responsaveisRegistro && (
+                  (resp.emitidoPor?.nome && String(resp.emitidoPor.nome).trim().length > 0) ||
+                  (resp.presenciou?.nome && String(resp.presenciou.nome).trim().length > 0) ||
+                  (resp.atendeu?.nome && String(resp.atendeu.nome).trim().length > 0) ||
+                  (resp.recebeu?.nome && String(resp.recebeu.nome).trim().length > 0) ||
+                  (resp.analisou?.nome && String(resp.analisou.nome).trim().length > 0) ||
+                  (resp.autorizouEncerramento?.nome && String(resp.autorizouEncerramento.nome).trim().length > 0) ||
+                  resp.atualizadoEm
+                )
+              );
               const autorNome = oc.registradoPor || resp.emitidoPor?.nome || 'Operador';
 
               return (
@@ -1172,7 +1198,7 @@ export default function PrevencaoPage() {
                       >
                         👤 Definir Responsáveis pelo Registro
                       </button>
-                    ) : totalEvidencias === 0 ? (
+                    ) : !temEvidencias ? (
                       <button
                         type="button"
                         className="quick-action-btn btn-pendente-evidencias-pulse"
@@ -1181,7 +1207,26 @@ export default function PrevencaoPage() {
                       >
                         📁 Anexar Evidências e Cadeia de Custódia
                       </button>
-                    ) : null}
+                    ) : (
+                      <div
+                        style={{
+                          background: 'rgba(16, 185, 129, 0.12)',
+                          border: '1px solid rgba(16, 185, 129, 0.4)',
+                          borderRadius: '8px',
+                          padding: '8px 12px',
+                          marginBottom: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          color: '#34d399',
+                          fontSize: '12.5px',
+                          fontWeight: 700,
+                        }}
+                      >
+                        <span>✅</span> Registro e Cadeia de Custódia 100% Preenchidos
+                      </div>
+                    )}
 
                     {/* Grade de Atalhos e Edição Rápida */}
                     <div className="prevencao-actions-grid">
@@ -1316,18 +1361,39 @@ export default function PrevencaoPage() {
                   const badge = getClassificacaoBadge(oc.classificacao);
                   const statusBadge = getStatusBadge(oc.status);
                   const nomeOcorrencia = oc.nome || oc.titulo || `Ocorrência de ${oc.tipo}`;
-                  const autorNome = oc.registradoPor || oc.responsaveisRegistro?.emitidoPor?.nome || 'Operador';
+                  const temRelato = Boolean(oc.relatoFatos && String(oc.relatoFatos).trim().length > 0);
                   const listaPessoas = Array.isArray(oc.pessoasEnvolvidas) && oc.pessoasEnvolvidas.length > 0
                     ? oc.pessoasEnvolvidas
                     : oc.pessoaEnvolvida
                       ? [oc.pessoaEnvolvida]
                       : [];
-                  const temPessoa = listaPessoas.length > 0;
-                  const temProdutos = Array.isArray(oc.produtosEnvolvidos) && oc.produtosEnvolvidos.length > 0;
-                  const temAbordagem = Boolean(oc.abordagem);
+                  const temPessoa = listaPessoas.length > 0 && listaPessoas.some((p) => p && (p.nome?.trim() || p.cpf?.trim() || p.tipoEnvolvido || p.descricaoFisica?.trim()));
+                  const listaProdutos = Array.isArray(oc.produtosEnvolvidos) ? oc.produtosEnvolvidos : [];
+                  const temProdutos = listaProdutos.length > 0 && listaProdutos.some((p) => p && (p.produto?.trim() || p.codigo?.trim() || Number(p.quantidade) > 0));
+                  const temAbordagem = Boolean(
+                    oc.abordagem && (
+                      (typeof oc.abordagem.houveAbordagem === 'string' && oc.abordagem.houveAbordagem.trim().length > 0) ||
+                      (typeof oc.abordagem.relatoAbordagem === 'string' && oc.abordagem.relatoAbordagem.trim().length > 0) ||
+                      (typeof oc.abordagem.responsaveis === 'string' && oc.abordagem.responsaveis.trim().length > 0) ||
+                      (typeof oc.abordagem.local === 'string' && oc.abordagem.local.trim().length > 0) ||
+                      oc.abordagem.registradoEm
+                    )
+                  );
                   const resp = oc.responsaveisRegistro || {};
-                  const temResponsavelConfigurado = Boolean(resp.emitidoPor?.nome && resp.emitidoPor?.matricula);
+                  const temResponsavelConfigurado = Boolean(
+                    oc.responsaveisRegistro && (
+                      (resp.emitidoPor?.nome && String(resp.emitidoPor.nome).trim().length > 0) ||
+                      (resp.presenciou?.nome && String(resp.presenciou.nome).trim().length > 0) ||
+                      (resp.atendeu?.nome && String(resp.atendeu.nome).trim().length > 0) ||
+                      (resp.recebeu?.nome && String(resp.recebeu.nome).trim().length > 0) ||
+                      (resp.analisou?.nome && String(resp.analisou.nome).trim().length > 0) ||
+                      (resp.autorizouEncerramento?.nome && String(resp.autorizouEncerramento.nome).trim().length > 0) ||
+                      resp.atualizadoEm
+                    )
+                  );
                   const totalEvidencias = Array.isArray(oc.evidencias) ? oc.evidencias.length : 0;
+                  const temEvidencias = totalEvidencias > 0;
+                  const autorNome = oc.registradoPor || resp.emitidoPor?.nome || 'Operador';
 
                   return (
                     <tr key={oc.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -1481,9 +1547,9 @@ export default function PrevencaoPage() {
                           </button>
                           <button
                             type="button"
-                            className={`quick-action-btn ${totalEvidencias === 0 ? 'btn-pendente-evidencias-pulse' : ''}`}
+                            className={`quick-action-btn ${!temEvidencias ? 'btn-pendente-evidencias-pulse' : ''}`}
                             onClick={() => handleAbrirEvidencias(oc)}
-                            style={totalEvidencias > 0 ? {
+                            style={temEvidencias ? {
                               padding: '3px 8px',
                               fontSize: '11px',
                               background: 'rgba(56, 189, 248, 0.15)',
@@ -1495,7 +1561,7 @@ export default function PrevencaoPage() {
                             }}
                             title="Evidências e Custódia"
                           >
-                            {totalEvidencias > 0 ? `📁 (${totalEvidencias})` : '+ Mídia'}
+                            {temEvidencias ? `📁 (${totalEvidencias})` : '+ Mídia'}
                           </button>
                         </div>
                       </td>
