@@ -45,7 +45,7 @@ export default function ModalStatusManutencao({ isOpen, onClose, currentStatus, 
       }
       setMensagem(currentStatus.mensagem || '');
     }
-  }, [isOpen, currentStatus]);
+  }, [isOpen]);
 
   useEffect(() => {
     const onEsc = (e) => e.key === 'Escape' && isOpen && onClose();
@@ -228,7 +228,8 @@ export default function ModalStatusManutencao({ isOpen, onClose, currentStatus, 
               </div>
 
               <div style={{ fontSize: '11.5px', color: '#fbbf24', fontStyle: 'italic' }}>
-                💡 O Dashboard exibirá a mensagem: <strong>"Manutenção: {tela === 'Outra' ? (telaPersonalizada || 'Tela') : tela}"</strong> com efeito pulsante amarelo.
+                💡 O Dashboard exibirá a mensagem: <strong>"Manutenção:
+                  {tela === 'Outra' ? (telaPersonalizada || 'Tela') : tela}"</strong> com efeito pulsante amarelo.
               </div>
             </div>
           )}
