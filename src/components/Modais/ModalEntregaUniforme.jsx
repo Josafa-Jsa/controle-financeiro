@@ -1,5 +1,5 @@
 // src/components/Modais/ModalEntregaUniforme.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import {
   DEPARTAMENTOS_PADRAO,
