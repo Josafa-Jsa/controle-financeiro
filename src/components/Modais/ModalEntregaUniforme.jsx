@@ -12,6 +12,7 @@ import '../Visual/modal.css';
 export default function ModalEntregaUniforme({
   isOpen,
   onClose,
+  estoque = [],
   onSave,
 }) {
   const [formData, setFormData] = useState({
@@ -30,6 +31,17 @@ export default function ModalEntregaUniforme({
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
+
+  // Calcula saldo em estoque disponível para a combinação selecionada
+  const saldoDisponivel = useMemo(() => {
+    const item = estoque.find(
+      (i) => i.departamento === formData.departamento && i.tamanho === formData.tamanho
+    );
+    if (!item) return 0;
+    return formData.estado === 'Novo'
+      ? (Number(item.estado_novo_qtd) || 0)
+      : (Number(item.estado_usado_qtd) || 0);
+  }, [estoque, formData.departamento, formData.tamanho, formData.estado]);
 
   // Inicializa o canvas de assinatura
   useEffect(() => {
@@ -167,6 +179,22 @@ export default function ModalEntregaUniforme({
       toast.warn('A quantidade deve ser maior que zero.');
       return false;
     }
+
+    // TRAVA OBRIGATÓRIA: Bloqueio estrito de entrega sem estoque
+    if (saldoDisponivel <= 0) {
+      toast.error(
+        `⛔ Entrega Bloqueada: Não há estoque disponível para ${formData.departamento} (Tam: ${formData.tamanho} - ${formData.estado}). Saldo atual: 0 un.`
+      );
+      return false;
+    }
+
+    if (qtd > saldoDisponivel) {
+      toast.error(
+        `⛔ Entrega Bloqueada: A quantidade informada (${qtd} un) excede o saldo disponível em estoque (${saldoDisponivel} un).`
+      );
+      return false;
+    }
+
     return true;
   };
 
@@ -386,17 +414,34 @@ export default function ModalEntregaUniforme({
             </div>
 
             <div className="form-row">
-              <label className="required" style={{ fontSize: '12px', color: '#fed7aa', fontWeight: 600 }}>
-                🔢 Quantidade Entregue:
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="required" style={{ fontSize: '12px', color: '#fed7aa', fontWeight: 600 }}>
+                  🔢 Quantidade Entregue:
+                </label>
+                <span
+                  style={{
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    color: saldoDisponivel > 0 ? '#34d399' : '#f87171',
+                  }}
+                >
+                  Saldo: {saldoDisponivel} un
+                </span>
+              </div>
               <input
                 type="number"
                 name="quantidade"
                 min="1"
+                max={Math.max(1, saldoDisponivel)}
                 step="1"
                 value={formData.quantidade}
                 onChange={handleChange}
-                style={{ height: '36px', fontSize: '13px', fontWeight: 700 }}
+                style={{
+                  height: '36px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  borderColor: saldoDisponivel <= 0 ? '#ef4444' : undefined,
+                }}
                 required
               />
             </div>

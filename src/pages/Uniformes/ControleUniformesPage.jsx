@@ -14,6 +14,7 @@ import ModalEntradaUniforme from '../../components/Modais/ModalEntradaUniforme';
 import ModalDepartamentosUniformes from '../../components/Modais/ModalDepartamentosUniformes';
 import ModalEntregaUniforme from '../../components/Modais/ModalEntregaUniforme';
 import ModalEnvioEmMassa from '../../components/Modais/ModalEnvioEmMassa';
+import ModalSaidaUniformeDescarte from '../../components/Modais/ModalSaidaUniformeDescarte';
 import { getUser, isAdmin } from '../../auth/auth';
 import './uniformes.css';
 
@@ -22,6 +23,7 @@ export default function ControleUniformesPage() {
   const [movimentacoes, setMovimentacoes] = useState([]);
   const [modalEntradaAberto, setModalEntradaAberto] = useState(false);
   const [modalEntregaAberto, setModalEntregaAberto] = useState(false);
+  const [modalSaidaDescarteAberto, setModalSaidaDescarteAberto] = useState(false);
   const [modalEnvioEmMassaAberto, setModalEnvioEmMassaAberto] = useState(false);
   const [modalDepartamentosAberto, setModalDepartamentosAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState('consolidado'); // 'consolidado', 'novos', 'usados', 'movimentacoes'
@@ -59,6 +61,11 @@ export default function ControleUniformesPage() {
   };
 
   const handleSalvarEntrega = async (dados) => {
+    await cadastrarSaidaUniforme(dados);
+    await carregarDados();
+  };
+
+  const handleSalvarBaixaDescarte = async (dados) => {
     await cadastrarSaidaUniforme(dados);
     await carregarDados();
   };
@@ -194,6 +201,29 @@ export default function ControleUniformesPage() {
             }}
           >
             <span>📦</span> Entrega de Uniforme
+          </button>
+
+          <button
+            type="button"
+            className="btn-saida-descarte-uniforme"
+            onClick={() => setModalSaidaDescarteAberto(true)}
+            style={{
+              background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+              color: '#ffffff',
+              border: '1px solid #f87171',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              fontSize: '13.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.25s ease',
+              boxShadow: '0 4px 14px rgba(220, 38, 38, 0.35)',
+            }}
+          >
+            <span>🗑️</span> Saída de Uniforme
           </button>
 
           <button
@@ -473,7 +503,16 @@ export default function ControleUniformesPage() {
       <ModalEntregaUniforme
         isOpen={modalEntregaAberto}
         onClose={() => setModalEntregaAberto(false)}
+        estoque={estoque}
         onSave={handleSalvarEntrega}
+      />
+
+      {/* Modal de Saída de Uniforme por Descarte / Avaria */}
+      <ModalSaidaUniformeDescarte
+        isOpen={modalSaidaDescarteAberto}
+        onClose={() => setModalSaidaDescarteAberto(false)}
+        estoque={estoque}
+        onSalvarBaixa={handleSalvarBaixaDescarte}
       />
 
       {/* Modal de Envio de Uniformes em Massa para Filiais */}
