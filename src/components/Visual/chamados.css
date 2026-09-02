@@ -128,6 +128,12 @@
   box-shadow: 0 8px 24px rgba(0, 200, 200, 0.15);
 }
 
+.chamados-category-whatsapp:hover {
+  border-color: #22c55e !important;
+  box-shadow: 0 10px 28px rgba(34, 197, 94, 0.25) !important;
+  transform: translateY(-4px);
+}
+
 .chamados-category-icon {
   font-size: 30px;
   margin-bottom: 12px;

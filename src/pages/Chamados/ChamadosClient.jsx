@@ -5,6 +5,7 @@ import emailjs from "@emailjs/browser";
 import { getUser, setUser } from "../../auth/auth";
 import { api } from "../../api/client";
 import { sendTelegramEvent } from "../../utils/telegram";
+import whatsSuporteImg from "../../assets/whatssuporte.jpeg";
 import "../../components/Visual/chamados.css";
 
 const EMAILJS_SERVICE_ID = "jsasolucoestecnologicas";
@@ -513,6 +514,78 @@ export default function ChamadosClient() {
               </button>
             </div>
           ))}
+
+          {/* Container Especial: WhatsApp Suporte e QR Code */}
+          <div
+            className="chamados-category-card chamados-category-whatsapp card-slide-in"
+            style={{
+              animationDelay: "0.25s",
+              border: "1px solid rgba(34, 197, 94, 0.35)",
+              background: "linear-gradient(145deg, #18181b 0%, #0d1e13 100%)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+              cursor: "default",
+            }}
+          >
+            <div className="chamados-category-icon" style={{ fontSize: "28px", marginBottom: "8px" }}>
+              💬
+            </div>
+            <h3 className="chamados-category-title" style={{ color: "#4ade80", marginBottom: "6px" }}>
+              Atendimento Direto
+            </h3>
+            <p
+              className="chamados-category-desc"
+              style={{
+                fontSize: "12px",
+                lineHeight: 1.45,
+                color: "#cbd5e1",
+                marginBottom: "12px",
+                textAlign: "center",
+              }}
+            >
+              Dúvidas, reclamações ou atendimento personalizado, escanei o QrCode, e entre em contato direto com o Analista.
+            </p>
+
+            <div
+              style={{
+                background: "#ffffff",
+                padding: "6px",
+                borderRadius: "10px",
+                boxShadow: "0 6px 20px rgba(0, 0, 0, 0.55), 0 0 16px rgba(34, 197, 94, 0.2)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "10px",
+              }}
+            >
+              <img
+                src={whatsSuporteImg}
+                alt="QR Code WhatsApp Suporte"
+                style={{
+                  width: "115px",
+                  height: "115px",
+                  display: "block",
+                  objectFit: "contain",
+                  borderRadius: "6px",
+                }}
+              />
+            </div>
+
+            <span
+              style={{
+                fontSize: "11px",
+                color: "#86efac",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <span>📱</span> Escaneie o QR Code no WhatsApp
+            </span>
+          </div>
         </div>
       </div>
 
