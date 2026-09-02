@@ -6,17 +6,22 @@ const STORAGE_ESTOQUE_KEY = 'jsa_uniformes_estoque';
 const STORAGE_MOV_KEY = 'jsa_uniformes_movimentacoes';
 
 export const DEPARTAMENTOS_PADRAO = [
-  'Prevenção de Perdas',
-  'Operação de Loja',
-  'Frente de Caixa',
-  'Açougue',
+  'Hortifruti',
+  'Operador(a) de Caixa',
+  'Pacote',
   'Padaria',
-  'Hortifrúti',
-  'Frios e Laticínios',
-  'Depósito / Logística',
-  'Limpeza / Higienização',
-  'Administrativo / Financeiro',
-  'Segurança / CFTV',
+  'Lanchonete',
+  'Mercearia',
+  'Frios',
+  'Açougue',
+  'Cozinha',
+  'Confeitaria',
+  'Deposito',
+  'Recebimento',
+  'Fiscal de Caixa',
+  'Administrativo',
+  'TI',
+  'Prevenção de Perdas',
   'Outro',
 ];
 

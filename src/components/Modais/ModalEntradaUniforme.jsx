@@ -14,7 +14,7 @@ export default function ModalEntradaUniforme({
   onSave,
 }) {
   const [formData, setFormData] = useState({
-    departamento: 'Prevenção de Perdas',
+    departamento: 'Hortifruti',
     tamanho: 'M',
     quantidade: '1',
     estado: 'Novo',
@@ -29,7 +29,7 @@ export default function ModalEntradaUniforme({
   useEffect(() => {
     if (isOpen) {
       setFormData({
-        departamento: 'Prevenção de Perdas',
+        departamento: 'Hortifruti',
         tamanho: 'M',
         quantidade: '1',
         estado: 'Novo',
