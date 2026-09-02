@@ -95,6 +95,15 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.company-status-badge.maintenance {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  color: #fbbf24;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.3);
+  animation: badgeYellowPulse 2s infinite ease-in-out;
 }
 
 .pulse-dot {
@@ -105,10 +114,48 @@
   animation: pulse 1.8s infinite;
 }
 
+.pulse-dot.maintenance {
+  background-color: #f59e0b;
+  animation: pulseYellow 1.5s infinite;
+}
+
 @keyframes pulse {
   0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
   70% { transform: scale(1.2); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
   100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+@keyframes pulseYellow {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.8); }
+  70% { transform: scale(1.3); box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+@keyframes badgeYellowPulse {
+  0%, 100% {
+    border-color: rgba(245, 158, 11, 0.5);
+    background-color: rgba(245, 158, 11, 0.12);
+  }
+  50% {
+    border-color: rgba(251, 191, 36, 0.95);
+    background-color: rgba(245, 158, 11, 0.25);
+  }
+}
+
+.dashboard-maintenance-banner {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(180, 83, 9, 0.2) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  border-left: 4px solid #f59e0b;
+  border-radius: 10px;
+  padding: 12px 18px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #fef08a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  animation: fadeIn 0.3s ease;
 }
 
 /* ================= GRID DE KPIS ================= */

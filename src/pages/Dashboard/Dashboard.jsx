@@ -4,6 +4,8 @@ import { toast } from "react-toastify";
 import { sincronizarContasDoServidor } from "../../services/contasService";
 import { listarNotas } from "../../services/notasService";
 import { sincronizarSimulacoesDoServidor } from "../../services/simulacoesService";
+import { obterStatusSistema, obterStatusLocal } from "../../services/systemStatusService";
+import ModalStatusManutencao from "../../components/Modais/ModalStatusManutencao";
 import { getCurrentUser } from "../../auth/auth";
 import { formatCurrencyBRL, formatDateBR, sendTelegramEvent } from "../../utils/telegram";
 import "./Dashboard.css";
@@ -12,6 +14,8 @@ const FEEDBACK_STORAGE_KEY = "feedback_jsa";
 
 export default function Dashboard() {
   const [user, setUserState] = useState(() => getCurrentUser());
+  const [systemStatus, setSystemStatus] = useState(() => obterStatusLocal());
+  const [modalStatusAberto, setModalStatusAberto] = useState(false);
 
   useEffect(() => {
     const handlePerms = () => setUserState(getCurrentUser());
@@ -20,6 +24,37 @@ export default function Dashboard() {
     return () => {
       window.removeEventListener("permissoes_alteradas_evento", handlePerms);
       window.removeEventListener("storage", handlePerms);
+    };
+  }, []);
+
+  // Sincronização em tempo real do status do sistema e manutenção
+  useEffect(() => {
+    const carregarStatus = async () => {
+      const s = await obterStatusSistema();
+      if (s) setSystemStatus(s);
+    };
+    carregarStatus();
+
+    const handleStatusEvent = (e) => {
+      if (e.detail) {
+        setSystemStatus(e.detail);
+      } else {
+        carregarStatus();
+      }
+    };
+
+    window.addEventListener("system_status_updated", handleStatusEvent);
+    window.addEventListener("storage", (e) => {
+      if (e.key === "system_status_updated_event") {
+        carregarStatus();
+      }
+    });
+
+    const intervalId = window.setInterval(carregarStatus, 8_000);
+
+    return () => {
+      window.removeEventListener("system_status_updated", handleStatusEvent);
+      window.clearInterval(intervalId);
     };
   }, []);
 
@@ -343,26 +378,95 @@ export default function Dashboard() {
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "10px" }}>
-            <div className="company-status-badge">
-              <div className="pulse-dot"></div>
-              <span>Sistema Operacional & Online</span>
-            </div>
-            <button
-              onClick={carregarDadosDashboard}
-              className="btn btn-secondary"
-              style={{
-                fontSize: "0.85rem",
-                padding: "6px 14px",
-                borderRadius: "8px",
-                cursor: "pointer",
-              }}
-              title="Atualizar indicadores agora"
+            <div
+              className={`company-status-badge ${systemStatus.emManutencao ? "maintenance" : "online"}`}
+              style={isAdmin ? { cursor: "pointer" } : undefined}
+              onClick={isAdmin ? () => setModalStatusAberto(true) : undefined}
+              title={isAdmin ? "Clique para gerenciar status de manutenção do sistema" : undefined}
             >
-              🔄 Atualizar Dados
-            </button>
+              <div className={`pulse-dot ${systemStatus.emManutencao ? "maintenance" : "online"}`}></div>
+              <span>
+                {systemStatus.emManutencao
+                  ? `⚠️ Manutenção: ${systemStatus.tela || "Ajuste em Andamento"}`
+                  : "Sistema Operacional & Online"}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setModalStatusAberto(true)}
+                  className="btn btn-secondary"
+                  style={{
+                    fontSize: "0.85rem",
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    background: systemStatus.emManutencao ? "rgba(245, 158, 11, 0.2)" : undefined,
+                    borderColor: systemStatus.emManutencao ? "#f59e0b" : undefined,
+                    color: systemStatus.emManutencao ? "#fef08a" : undefined,
+                  }}
+                  title="Gerenciar status de manutenção das telas"
+                >
+                  ⚙️ Status do Sistema
+                </button>
+              )}
+              <button
+                onClick={carregarDadosDashboard}
+                className="btn btn-secondary"
+                style={{
+                  fontSize: "0.85rem",
+                  padding: "6px 14px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                }}
+                title="Atualizar indicadores agora"
+              >
+                🔄 Atualizar Dados
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Banner Informativo de Manutenção Ativa para todos os usuários */}
+      {systemStatus.emManutencao && (
+        <div className="dashboard-maintenance-banner">
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span style={{ fontSize: "24px" }}>🛠️</span>
+            <div>
+              <strong style={{ fontSize: "14px", color: "#fef08a", display: "block" }}>
+                Aviso de Manutenção: Tela "{systemStatus.tela || 'Módulo do Sistema'}" em Ajustes
+              </strong>
+              <span style={{ fontSize: "12.5px", color: "#fef9c3" }}>
+                {systemStatus.mensagem
+                  ? systemStatus.mensagem
+                  : `A tela "${systemStatus.tela}" está recebendo atualizações técnicas no momento. As demais funcionalidades seguem operacionais.`}
+              </span>
+            </div>
+          </div>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setModalStatusAberto(true)}
+              style={{
+                background: "rgba(0, 0, 0, 0.3)",
+                border: "1px solid #f59e0b",
+                color: "#fef08a",
+                padding: "5px 12px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: 700,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              ⚙️ Alterar / Concluir
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 2. PAINÉIS DE MÉTRICAS / KPIS DO SISTEMA */}
       {(canAccess("contas") || canAccess("notas") || canAccess("simulador")) && (
@@ -729,6 +833,14 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Modal de Gerenciamento de Status & Manutenção para Administradores */}
+      <ModalStatusManutencao
+        isOpen={modalStatusAberto}
+        onClose={() => setModalStatusAberto(false)}
+        currentStatus={systemStatus}
+        onStatusChanged={(novo) => setSystemStatus(novo)}
+      />
     </div>
   );
 }

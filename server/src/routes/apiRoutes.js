@@ -9,6 +9,7 @@ import * as estoqueController from '../controllers/estoqueController.js';
 import * as simuladorController from '../controllers/simuladorController.js';
 import * as logsController from '../controllers/logsController.js';
 import * as prevencaoController from '../controllers/prevencaoController.js';
+import * as systemStatusController from '../controllers/systemStatusController.js';
 
 const router = Router();
 
@@ -78,5 +79,9 @@ router.get('/prevencao', prevencaoController.listPrevencao);
 router.post('/prevencao', prevencaoController.createPrevencao);
 router.put('/prevencao/:id', prevencaoController.updatePrevencao);
 router.delete('/prevencao/:id', prevencaoController.deletePrevencao);
+
+// Status do Sistema & Manutenção
+router.get('/system-status', systemStatusController.getSystemStatus);
+router.post('/system-status', systemStatusController.updateSystemStatus);
 
 export default router;
