@@ -199,9 +199,15 @@ export async function heartbeat(req, res) {
     if (userId) {
       const [r] = await pool.query('SELECT force_disconnect FROM users WHERE id = ? LIMIT 1', [userId]);
       if (r[0]) forceDisconnect = Number(r[0].force_disconnect) || 0;
+      if (forceDisconnect === 1) {
+        await pool.query('UPDATE users SET force_disconnect = 0, is_online = 0 WHERE id = ?', [userId]).catch(() => {});
+      }
     } else if (email) {
       const [r] = await pool.query('SELECT force_disconnect FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1', [String(email).trim()]);
       if (r[0]) forceDisconnect = Number(r[0].force_disconnect) || 0;
+      if (forceDisconnect === 1) {
+        await pool.query('UPDATE users SET force_disconnect = 0, is_online = 0 WHERE LOWER(email) = LOWER(?)', [String(email).trim()]).catch(() => {});
+      }
     }
 
     res.json({ ok: true, forceDisconnect: forceDisconnect === 1 });

@@ -483,15 +483,46 @@ export function initAuthWatcher() {
   const id = window.setInterval(tick, 30_000);
   window.__authWatcherId = id;
 
-  // Heartbeat para rastreamento de atividade em tempo real no banco de dados (Apenas se logado)
-  const sendHeartbeat = async () => {
-    try {
-      if (!isLoggedIn()) return; // NUNCA contabiliza online sem login ativo
-      const u = getUser();
-      if (!u || (!u.email && !u.username && !u.id)) return;
+  let isForcedLoggingOut = false;
 
+  const performForcedLogout = (msg) => {
+    if (isForcedLoggingOut) return;
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+    if (currentPath === "/login" || currentPath === "/register") {
+      clearUser();
+      return;
+    }
+    isForcedLoggingOut = true;
+    clearUser();
+    try {
+      localStorage.removeItem("usuario_desconectado_admin");
+      localStorage.removeItem("desconectar_todos_usuarios_evento");
+    } catch {}
+
+    toast.warn(msg || "Sua sessão foi encerrada pela administração. Redirecionando...", {
+      toastId: "forced_logout_toast",
+      autoClose: 2000,
+    });
+
+    setTimeout(() => {
+      window.location.href = "/login";
+    }, 1200);
+  };
+
+  const sendHeartbeat = async () => {
+    if (isForcedLoggingOut) return;
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      if (path === "/login" || path === "/register") return;
+    }
+
+    const u = getUser();
+    if (!u || !u.email) return;
+
+    try {
       const emailKey = String(u.email || "").toLowerCase().trim();
       const userKey = String(u.username || "").toLowerCase().trim();
+
       if (emailKey) {
         try {
           localStorage.setItem(
@@ -517,11 +548,8 @@ export function initAuthWatcher() {
       });
 
       if (resp && resp.data && resp.data.forceDisconnect) {
-        toast.warn("Sua sessão foi encerrada pela administração. Redirecionando...", { autoClose: 2000 });
-        setTimeout(() => {
-          clearUser();
-          window.location.href = "/login";
-        }, 1000);
+        performForcedLogout("Sua sessão foi encerrada pela administração. Redirecionando...");
+        return;
       } else if (resp && resp.data && Array.isArray(resp.data.permissions)) {
         // Sincroniza permissões atualizadas pelo admin sem precisar de logout
         const serverPerms = resp.data.permissions;
@@ -563,20 +591,12 @@ export function initAuthWatcher() {
       const isCurrentUserAdmin = isAdmin(currentUser);
 
       if (detail.all && !isCurrentUserAdmin) {
-        toast.warn("Todas as sessões de usuários foram encerradas pela administração. Redirecionando...", { autoClose: 2000 });
-        setTimeout(() => {
-          clearUser();
-          window.location.href = "/login";
-        }, 1000);
+        performForcedLogout("Todas as sessões de usuários foram encerradas pela administração. Redirecionando...");
         return;
       }
 
       if (matchEmail || matchUser || matchId) {
-        toast.warn("Sua sessão foi encerrada pela administração. Redirecionando...", { autoClose: 2000 });
-        setTimeout(() => {
-          clearUser();
-          window.location.href = "/login";
-        }, 1000);
+        performForcedLogout("Sua sessão foi encerrada pela administração. Redirecionando...");
       }
     }
   });
@@ -588,11 +608,7 @@ export function initAuthWatcher() {
     if (ev.key === "desconectar_todos_usuarios_evento") {
       const currentUser = getUser();
       if (currentUser && !isAdmin(currentUser)) {
-        toast.warn("Todas as sessões de usuários foram encerradas pela administração. Redirecionando...", { autoClose: 2000 });
-        setTimeout(() => {
-          clearUser();
-          window.location.href = "/login";
-        }, 1000);
+        performForcedLogout("Todas as sessões de usuários foram encerradas pela administração. Redirecionando...");
       }
       return;
     }
@@ -617,12 +633,7 @@ export function initAuthWatcher() {
             String(currentUser.id) === String(payload.userId);
 
           if (matchEmail || matchUser || matchId) {
-            toast.warn("Sua sessão foi encerrada pela administração. Redirecionando...", { autoClose: 2000 });
-
-            setTimeout(() => {
-              clearUser();
-              window.location.href = "/login";
-            }, 1000);
+            performForcedLogout("Sua sessão foi encerrada pela administração. Redirecionando...");
           }
         }
       } catch (err) {
