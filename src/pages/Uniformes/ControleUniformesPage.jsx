@@ -10,6 +10,7 @@ import {
   FABRICANTES_PADRAO,
 } from '../../services/uniformesService';
 import ModalEntradaUniforme from '../../components/Modais/ModalEntradaUniforme';
+import ModalDepartamentosUniformes from '../../components/Modais/ModalDepartamentosUniformes';
 import { getUser, isAdmin } from '../../auth/auth';
 import './uniformes.css';
 
@@ -17,6 +18,7 @@ export default function ControleUniformesPage() {
   const [estoque, setEstoque] = useState([]);
   const [movimentacoes, setMovimentacoes] = useState([]);
   const [modalEntradaAberto, setModalEntradaAberto] = useState(false);
+  const [modalDepartamentosAberto, setModalDepartamentosAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState('consolidado'); // 'consolidado', 'novos', 'usados', 'movimentacoes'
 
   const [busca, setBusca] = useState('');
@@ -125,13 +127,37 @@ export default function ControleUniformesPage() {
           </div>
         </div>
 
-        <button
-          type="button"
-          className="btn-cadastrar-uniforme"
-          onClick={() => setModalEntradaAberto(true)}
-        >
-          <span>➕</span> Cadastrar Entrada de Uniforme
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn-departamentos-uniforme"
+            onClick={() => setModalDepartamentosAberto(true)}
+            style={{
+              background: '#1e293b',
+              color: '#38bdf8',
+              border: '1px solid #38bdf8',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              fontSize: '13.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span>🏢</span> Departamentos
+          </button>
+
+          <button
+            type="button"
+            className="btn-cadastrar-uniforme"
+            onClick={() => setModalEntradaAberto(true)}
+          >
+            <span>➕</span> Cadastrar Entrada de Uniforme
+          </button>
+        </div>
       </div>
 
       {/* Cards de Métricas */}
@@ -380,6 +406,17 @@ export default function ControleUniformesPage() {
         isOpen={modalEntradaAberto}
         onClose={() => setModalEntradaAberto(false)}
         onSave={handleSalvarEntrada}
+      />
+
+      {/* Modal de Visão Geral por Departamentos */}
+      <ModalDepartamentosUniformes
+        isOpen={modalDepartamentosAberto}
+        onClose={() => setModalDepartamentosAberto(false)}
+        estoque={estoque}
+        onSelecionarDepartamento={(dep) => {
+          setFiltroDepartamento(dep);
+          setAbaAtiva('consolidado');
+        }}
       />
     </div>
   );
