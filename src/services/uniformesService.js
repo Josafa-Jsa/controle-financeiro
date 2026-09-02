@@ -221,3 +221,24 @@ export async function excluirMovimentacaoUniforme(id) {
     console.warn('[Uniformes Service] Erro ao excluir movimentação:', err.message);
   }
 }
+
+// Envio de Uniformes em Massa para Filiais
+export async function cadastrarEnvioEmMassaUniforme(dadosEnvio) {
+  const { filial, motorista, observacoes, responsavel, itens = [] } = dadosEnvio;
+
+  for (const item of itens) {
+    const payload = {
+      departamento: item.departamento,
+      tamanho: item.tamanho,
+      quantidade: item.quantidade,
+      estado: item.estado || 'Novo',
+      colaborador: `Remessa para ${filial}`,
+      responsavel: responsavel || 'Operador',
+      observacoes: `[Transferência em Massa • ${filial}] ${motorista ? `Motorista: ${motorista} | ` : ''}${observacoes || ''}`,
+    };
+
+    await cadastrarSaidaUniforme(payload);
+  }
+
+  return { success: true, count: itens.length };
+}

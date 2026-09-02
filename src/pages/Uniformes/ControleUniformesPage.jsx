@@ -5,6 +5,7 @@ import {
   listarMovimentacoesUniformes,
   cadastrarEntradaUniforme,
   cadastrarSaidaUniforme,
+  cadastrarEnvioEmMassaUniforme,
   DEPARTAMENTOS_PADRAO,
   TAMANHOS_PADRAO,
   FABRICANTES_PADRAO,
@@ -12,6 +13,7 @@ import {
 import ModalEntradaUniforme from '../../components/Modais/ModalEntradaUniforme';
 import ModalDepartamentosUniformes from '../../components/Modais/ModalDepartamentosUniformes';
 import ModalEntregaUniforme from '../../components/Modais/ModalEntregaUniforme';
+import ModalEnvioEmMassa from '../../components/Modais/ModalEnvioEmMassa';
 import { getUser, isAdmin } from '../../auth/auth';
 import './uniformes.css';
 
@@ -20,6 +22,7 @@ export default function ControleUniformesPage() {
   const [movimentacoes, setMovimentacoes] = useState([]);
   const [modalEntradaAberto, setModalEntradaAberto] = useState(false);
   const [modalEntregaAberto, setModalEntregaAberto] = useState(false);
+  const [modalEnvioEmMassaAberto, setModalEnvioEmMassaAberto] = useState(false);
   const [modalDepartamentosAberto, setModalDepartamentosAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState('consolidado'); // 'consolidado', 'novos', 'usados', 'movimentacoes'
 
@@ -57,6 +60,11 @@ export default function ControleUniformesPage() {
 
   const handleSalvarEntrega = async (dados) => {
     await cadastrarSaidaUniforme(dados);
+    await carregarDados();
+  };
+
+  const handleSalvarEnvioEmMassa = async (dados) => {
+    await cadastrarEnvioEmMassaUniforme(dados);
     await carregarDados();
   };
 
@@ -186,6 +194,29 @@ export default function ControleUniformesPage() {
             }}
           >
             <span>📦</span> Entrega de Uniforme
+          </button>
+
+          <button
+            type="button"
+            className="btn-envio-massa-uniforme"
+            onClick={() => setModalEnvioEmMassaAberto(true)}
+            style={{
+              background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+              color: '#ffffff',
+              border: '1px solid #a78bfa',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              fontSize: '13.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.25s ease',
+              boxShadow: '0 4px 14px rgba(139, 92, 246, 0.35)',
+            }}
+          >
+            <span>🚚</span> Envio de Uniformes em Massa
           </button>
         </div>
       </div>
@@ -443,6 +474,14 @@ export default function ControleUniformesPage() {
         isOpen={modalEntregaAberto}
         onClose={() => setModalEntregaAberto(false)}
         onSave={handleSalvarEntrega}
+      />
+
+      {/* Modal de Envio de Uniformes em Massa para Filiais */}
+      <ModalEnvioEmMassa
+        isOpen={modalEnvioEmMassaAberto}
+        onClose={() => setModalEnvioEmMassaAberto(false)}
+        estoque={estoque}
+        onConfirmarEnvio={handleSalvarEnvioEmMassa}
       />
 
       {/* Modal de Visão Geral por Departamentos */}
