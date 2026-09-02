@@ -95,61 +95,34 @@ function _checkPertenceAoUsuario(oc, u) {
 
 // Sincroniza em segundo plano com o banco de dados MySQL
 export async function sincronizarPrevencaoDoServidor(customUser = null) {
-  const u = _resolveUser(customUser);
   try {
-    const params = {};
-    if (u.isUserAdmin) {
-      params.isAdmin = true;
-    } else {
-      if (u.email) params.email = u.email;
-      if (u.id) params.userId = u.id;
-      if (u.username) params.username = u.username;
-    }
-
-    const res = await api.get('/prevencao', { params });
+    const res = await api.get('/prevencao');
     if (Array.isArray(res.data)) {
       const serverList = res.data;
       const localList = safeRead();
       const map = new Map();
 
-      if (u.isUserAdmin) {
-        // ADMIN: o banco MySQL é a fonte autoritativa total
-        serverList.forEach((s) => map.set(String(s.numero || s.id), s));
-        localList.forEach((l) => {
-          const key = String(l.numero || l.id);
-          if (!map.has(key)) map.set(key, l);
-        });
-      } else {
-        // OPERADOR: mantém todos os registros do servidor e preserva os locais
-        serverList.forEach((s) => map.set(String(s.numero || s.id), s));
-        localList.forEach((l) => {
-          const key = String(l.numero || l.id);
-          if (!map.has(key)) map.set(key, l);
-        });
-      }
+      // Prioriza os dados mais atualizados do MySQL
+      serverList.forEach((s) => map.set(String(s.numero || s.id), s));
+      // Preserva dados locais que ainda estão em criação
+      localList.forEach((l) => {
+        const key = String(l.numero || l.id);
+        if (!map.has(key)) map.set(key, l);
+      });
 
       const merged = Array.from(map.values());
       safeWrite(merged);
-      return listarOcorrencias(customUser);
+      return merged;
     }
   } catch (err) {
     console.warn('[Prevencao Sync] Servidor indisponível:', err.message);
   }
-  return listarOcorrencias(customUser);
+  return safeRead();
 }
 
 export function listarOcorrencias(customUser = null) {
   try {
-    const u = _resolveUser(customUser);
-    const list = safeRead();
-
-    // ADMIN: Visualiza TODAS as ocorrências de todos os usuários
-    if (u.isUserAdmin) {
-      return list;
-    }
-
-    // OPERADOR COMUM: Visualiza todas as ocorrências registradas por ele
-    return list.filter((oc) => _checkPertenceAoUsuario(oc, u));
+    return safeRead();
   } catch (e) {
     console.error('Erro ao listar ocorrências de prevenção:', e);
     return [];

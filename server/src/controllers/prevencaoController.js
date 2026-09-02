@@ -2,40 +2,8 @@ import pool from '../config/db.js';
 
 export async function listPrevencao(req, res) {
   try {
-    const userEmail = req.query?.email || req.headers['x-user-email'];
-    const userId = req.query?.userId;
-    const userLogin = req.query?.username;
-    const isAdmin =
-      String(req.query?.isAdmin || '').toLowerCase() === 'true' ||
-      String(userEmail || '').toLowerCase() === 'jsa@jsa.com' ||
-      String(userEmail || '').toLowerCase() === 'josafa.santos.jss@gmail.com';
-
-    let query = 'SELECT * FROM prevencao';
-    const params = [];
-
-    if (!isAdmin && (userEmail || userId || userLogin)) {
-      const conds = [];
-      if (userEmail) {
-        conds.push('LOWER(user_email) = LOWER(?)');
-        params.push(userEmail);
-      }
-      if (userId) {
-        conds.push('user_id = ?');
-        params.push(userId);
-      }
-      if (userLogin) {
-        conds.push('LOWER(user_login) = LOWER(?)');
-        params.push(userLogin);
-      }
-      conds.push('user_email IS NULL');
-      conds.push('user_email = ""');
-
-      query += ` WHERE (${conds.join(' OR ')})`;
-    }
-
-    query += ' ORDER BY created_at DESC LIMIT 500';
-
-    const [rows] = await pool.query(query, params);
+    const query = 'SELECT * FROM prevencao ORDER BY created_at DESC LIMIT 500';
+    const [rows] = await pool.query(query);
 
     const ocorrencias = rows.map((row) => ({
       id: row.id,
