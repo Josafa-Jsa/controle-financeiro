@@ -10,7 +10,7 @@ import "../../components/Visual/chamados.css";
 
 const EMAILJS_SERVICE_ID = "jsasolucoestecnologicas";
 // const EMAILJS_TEMPLATE_ID = "template_vrnfmrt"; 
-const EMAILJS_TEMPLATE_ID = "template_qra8gli"; 
+const EMAILJS_TEMPLATE_ID = "template_qra8gli";
 const EMAILJS_PUBLIC_KEY = "YUEhSf74n7z0_XT30";
 
 const formatWhatsApp = (value) => {
@@ -804,9 +804,8 @@ export default function ChamadosClient() {
                   <button
                     key={status}
                     onClick={() => setFiltroStatus(status)}
-                    className={`chamados-filter-tab ${
-                      filtroStatus === status ? "active" : ""
-                    }`}
+                    className={`chamados-filter-tab ${filtroStatus === status ? "active" : ""
+                      }`}
                   >
                     {status}
                   </button>

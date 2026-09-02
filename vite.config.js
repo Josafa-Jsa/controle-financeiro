@@ -114,8 +114,10 @@ export default defineConfig({
     },
   },
   server: {
-    host: "0.0.0.0", // acessível via LAN (192.168.40.67) e localhost
+    host: "0.0.0.0", // acessível via LAN (192.168.40.67), VPN (26.118.72.235) e localhost
     port: 5173,
+    cors: true,
+    allowedHosts: true, // Permite qualquer host/IP de VPN como 26.118.72.235
     proxy: {
       "/api": {
         target: "http://127.0.0.1:4000",
