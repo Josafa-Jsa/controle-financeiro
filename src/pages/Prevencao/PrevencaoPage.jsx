@@ -15,6 +15,7 @@ import {
   registrarVisualizacaoCustodia,
   atualizarStatusOcorrencia,
   atualizarOcorrencia,
+  encerrarOcorrenciaComBoletim,
   excluirOcorrencia,
 } from '../../services/prevencaoService';
 import ModalOcorrencia, {
@@ -30,6 +31,7 @@ import ModalResponsaveisRegistro from '../../components/Modais/ModalResponsaveis
 import ModalRelatorioPrevencao from '../../components/Modais/ModalRelatorioPrevencao';
 import ModalEvidencias from '../../components/Modais/ModalEvidencias';
 import ModalExcluirOcorrencia from '../../components/Modais/ModalExcluirOcorrencia';
+import ModalEncerrarOcorrencia from '../../components/Modais/ModalEncerrarOcorrencia';
 import { getUser, isAdmin } from '../../auth/auth';
 import { logEvent } from '../../utils/logger';
 import brasaoImg from '../../assets/big.jpg';
@@ -46,6 +48,7 @@ export default function PrevencaoPage() {
   const [modalRelatorioAberto, setModalRelatorioAberto] = useState(false);
   const [modalEvidenciasAberto, setModalEvidenciasAberto] = useState(false);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
+  const [modalEncerrarAberto, setModalEncerrarAberto] = useState(false);
   const [ocorrenciaSelecionada, setOcorrenciaSelecionada] = useState(null);
   const [ocorrenciaParaExcluir, setOcorrenciaParaExcluir] = useState(null);
 
@@ -377,6 +380,32 @@ export default function PrevencaoPage() {
   const handleGerarRelatorio = (oc) => {
     setOcorrenciaSelecionada(oc);
     setModalRelatorioAberto(true);
+  };
+
+  const handleAbrirEncerrar = (oc) => {
+    setOcorrenciaSelecionada(oc);
+    setModalEncerrarAberto(true);
+  };
+
+  const handleConfirmarEncerramento = async (dadosEncerramento) => {
+    try {
+      const atualizada = await encerrarOcorrenciaComBoletim(dadosEncerramento);
+      if (atualizada) {
+        toast.success(`Ocorrência ${atualizada.numero} encerrada com sucesso com B.O. CISC!`);
+        logEvent({
+          type: 'prevencao',
+          title: 'Ocorrência encerrada com B.O. CISC',
+          details: { id: atualizada.id, numero: atualizada.numero, bo: dadosEncerramento.numeroBoletimCisc },
+        });
+        setOcorrencias((prev) => prev.map((item) => (String(item.id) === String(atualizada.id) || item.numero === atualizada.id ? atualizada : item)));
+      }
+      carregarOcorrencias();
+      setModalEncerrarAberto(false);
+      setOcorrenciaSelecionada(null);
+    } catch (e) {
+      console.error('Erro ao encerrar ocorrência:', e);
+      toast.error('Erro ao encerrar ocorrência.');
+    }
   };
 
   const handleSolicitarExclusao = (oc) => {
@@ -1234,23 +1263,63 @@ export default function PrevencaoPage() {
                         📁 Anexar Evidências e Cadeia de Custódia
                       </button>
                     ) : (
-                      <div
-                        style={{
-                          background: 'rgba(16, 185, 129, 0.12)',
-                          border: '1px solid rgba(16, 185, 129, 0.4)',
-                          borderRadius: '8px',
-                          padding: '8px 12px',
-                          marginBottom: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          color: '#34d399',
-                          fontSize: '12.5px',
-                          fontWeight: 700,
-                        }}
-                      >
-                        <span>✅</span> Registro e Cadeia de Custódia 100% Preenchidos
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
+                        <div
+                          style={{
+                            background: 'rgba(16, 185, 129, 0.12)',
+                            border: '1px solid rgba(16, 185, 129, 0.4)',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            color: '#34d399',
+                            fontSize: '12.5px',
+                            fontWeight: 700,
+                          }}
+                        >
+                          <span>✅</span> Registro e Cadeia de Custódia 100% Preenchidos
+                        </div>
+                        {oc.status !== 'Finalizada' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleAbrirEncerrar(oc)}
+                            style={{
+                              background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '8px 12px',
+                              borderRadius: '6px',
+                              fontSize: '12.5px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                            }}
+                            title="Encerrar ocorrência formalmente com Boletim CISC"
+                          >
+                            🔒 Encerrar Ocorrência (Vincular B.O. CISC)
+                          </button>
+                        ) : (
+                          <div
+                            style={{
+                              background: 'rgba(56, 189, 248, 0.12)',
+                              border: '1px solid rgba(56, 189, 248, 0.4)',
+                              borderRadius: '6px',
+                              padding: '6px 10px',
+                              textAlign: 'center',
+                              color: '#38bdf8',
+                              fontSize: '11.5px',
+                              fontWeight: 600,
+                            }}
+                          >
+                            📋 B.O. CISC: <strong>{oc.abordagem?.numeroBoletimCisc || oc.abordagem?.numeroBoletim || 'Vinculado'}</strong>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1291,7 +1360,7 @@ export default function PrevencaoPage() {
                         className={`quick-action-btn ${!temAbordagem ? 'btn-pendente-abordagem-pulse' : ''}`}
                         onClick={() => handleAbrirAbordagem(oc)}
                         style={temAbordagem ? { background: 'rgba(234, 88, 12, 0.15)', color: '#fb923c', borderColor: 'rgba(234, 88, 12, 0.4)' } : undefined}
-                        title="Relatório de Abordagem"
+                        title="Relatório de Abordagem & B.O."
                       >
                         🚨 Abordagem
                       </button>
@@ -1314,6 +1383,16 @@ export default function PrevencaoPage() {
                         title="Evidências e Cadeia de Custódia"
                       >
                         📁 Evidências ({totalEvidencias})
+                      </button>
+
+                      <button
+                        type="button"
+                        className="quick-action-btn"
+                        onClick={() => handleAbrirEncerrar(oc)}
+                        style={oc.status === 'Finalizada' ? { background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', borderColor: '#10b981' } : { background: 'rgba(234, 88, 12, 0.15)', color: '#fb923c', borderColor: '#ea580c' }}
+                        title={oc.status === 'Finalizada' ? "Ocorrência Encerrada (Ver B.O. CISC)" : "Encerrar Ocorrência com B.O. CISC"}
+                      >
+                        {oc.status === 'Finalizada' ? '✅ Encerrada' : '🔒 Encerrar'}
                       </button>
 
                       <button
@@ -1605,6 +1684,15 @@ export default function PrevencaoPage() {
                           <button
                             type="button"
                             className="quick-action-btn"
+                            onClick={() => handleAbrirEncerrar(oc)}
+                            style={{ padding: '4px 8px', fontSize: '11.5px', background: oc.status === 'Finalizada' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(234, 88, 12, 0.18)', color: oc.status === 'Finalizada' ? '#34d399' : '#fb923c' }}
+                            title={oc.status === 'Finalizada' ? "Ocorrência Encerrada" : "Encerrar Ocorrência (Requer B.O. CISC)"}
+                          >
+                            🔒
+                          </button>
+                          <button
+                            type="button"
+                            className="quick-action-btn"
                             onClick={() => handleEditar(oc)}
                             style={{ padding: '4px 8px', fontSize: '11.5px' }}
                             title="Editar Ocorrência"
@@ -1764,6 +1852,17 @@ export default function PrevencaoPage() {
         }}
         onConfirm={handleConfirmarExclusao}
         ocorrencia={ocorrenciaParaExcluir}
+      />
+
+      {/* Modal 10: Encerramento de Ocorrência & B.O. CISC Obrigatório */}
+      <ModalEncerrarOcorrencia
+        isOpen={modalEncerrarAberto}
+        onClose={() => {
+          setModalEncerrarAberto(false);
+          setOcorrenciaSelecionada(null);
+        }}
+        ocorrencia={ocorrenciaSelecionada}
+        onConfirmarEncerramento={handleConfirmarEncerramento}
       />
     </div>
   );

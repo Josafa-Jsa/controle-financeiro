@@ -711,6 +711,102 @@ export function atualizarOcorrencia(ocorrencia) {
   }
 }
 
+export async function encerrarOcorrenciaComBoletim({
+  id,
+  numeroBoletimCisc,
+  orgaoPolicial = 'CISC / Polícia Civil',
+  boletimArquivo,
+  responsavelEncerramento = 'Gerente',
+  parecerEncerramento = '',
+}) {
+  try {
+    const lista = safeRead();
+    const idx = lista.findIndex((o) => String(o.id) === String(id) || o.numero === id);
+    if (idx === -1) return null;
+
+    const oc = lista[idx];
+    const nowIso = new Date().toISOString();
+    const historico = Array.isArray(oc.historicoCustodia) ? [...oc.historicoCustodia] : [];
+
+    const abordagemAtual = oc.abordagem || {};
+    const abordagemAtualizada = {
+      ...abordagemAtual,
+      acionamentoPolicial: `Sim - ${orgaoPolicial}`,
+      numeroBoletim: numeroBoletimCisc,
+      numeroBoletimCisc,
+      boletimArquivo,
+      registradoEm: abordagemAtual.registradoEm || nowIso,
+    };
+
+    let evidenciasAtualizadas = Array.isArray(oc.evidencias) ? [...oc.evidencias] : [];
+    if (boletimArquivo && boletimArquivo.nome) {
+      const jaExiste = evidenciasAtualizadas.some((e) => e.arquivoNome === boletimArquivo.nome);
+      if (!jaExiste) {
+        evidenciasAtualizadas.unshift({
+          id: Date.now(),
+          numeroSequencial: `#${String(evidenciasAtualizadas.length + 1).padStart(3, '0')}`,
+          tipo: 'Boletim de Ocorrência (B.O. CISC)',
+          camera: orgaoPolicial,
+          local: oc.local || 'CISC / Delegacia',
+          data: nowIso.slice(0, 10),
+          horaInicio: '',
+          horaFim: '',
+          arquivoNome: boletimArquivo.nome,
+          tamanhoStr: boletimArquivo.tamanhoStr || 'PDF/Img',
+          arquivoUrl: boletimArquivo.arquivoUrl || '',
+          adicionadoPor: responsavelEncerramento,
+          dataHoraUpload: nowIso,
+          descricaoEvidencia: `Cópia do Boletim de Ocorrência CISC nº ${numeroBoletimCisc}`,
+        });
+      }
+    }
+
+    const resp = oc.responsaveisRegistro || {};
+    const responsaveisAtualizados = {
+      ...resp,
+      autorizouEncerramento: {
+        nome: responsavelEncerramento,
+        cargo: 'Gerência Operacional / Auditoria',
+        despacho: parecerEncerramento,
+        dataHora: nowIso,
+      },
+    };
+
+    historico.unshift({
+      id: Date.now(),
+      dataHora: nowIso,
+      usuario: responsavelEncerramento,
+      acao: `${responsavelEncerramento} encerrou a ocorrência formalmente com B.O. CISC nº ${numeroBoletimCisc}`,
+      tipo: 'encerramento',
+    });
+
+    const atualizada = {
+      ...oc,
+      status: 'Finalizada',
+      abordagem: abordagemAtualizada,
+      evidencias: evidenciasAtualizadas,
+      responsaveisRegistro: responsaveisAtualizados,
+      parecerFinal: parecerEncerramento || oc.parecerFinal || '',
+      historicoCustodia: historico,
+      updatedAt: nowIso,
+    };
+
+    lista[idx] = atualizada;
+    safeWrite(lista);
+
+    try {
+      await api.put(`/prevencao/${oc.id || oc.numero}`, atualizada);
+    } catch (err) {
+      console.warn('[Prevencao API PUT error]', err.message);
+    }
+
+    return atualizada;
+  } catch (e) {
+    console.error('Erro ao encerrar ocorrência com boletim:', e);
+    throw e;
+  }
+}
+
 export async function excluirOcorrencia(id) {
   try {
     const lista = safeRead();
