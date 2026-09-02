@@ -114,31 +114,47 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
   // --- 1. DADOS GERAIS DO INCIDENTE ---
   y = renderSectionHeader('1. DADOS GERAIS DO INCIDENTE', y);
 
+  const dadosGeraisBody = [
+    [
+      { content: 'ID da Ocorrência:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249], cellWidth: 32 } },
+      { content: oc.numero || '-', styles: { fontStyle: 'bold', textColor: [2, 132, 199] } },
+      { content: 'Data / Horário do Fato:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249], cellWidth: 36 } },
+      `${formatDataBR(oc.data)} às ${oc.horaTermino ? `${oc.horaInicio} às ${oc.horaTermino}` : oc.horaInicio || '-'}`,
+    ],
+    [
+      { content: 'Natureza do Evento:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+      oc.tipo || 'Outros',
+      { content: 'Classificação / Gravidade:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+      oc.classificacao || 'Média',
+    ],
+    [
+      { content: 'Local / Setor:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+      `${oc.local || 'Geral'} ${oc.setor ? `(${oc.setor})` : ''}`,
+      { content: 'Valor Total Envolvido:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+      { content: formatBRL(oc.valorTotalEnvolvido), styles: { fontStyle: 'bold', textColor: [22, 101, 52] } },
+    ],
+  ];
+
+  if (oc.nome || oc.titulo) {
+    dadosGeraisBody.push([
+      { content: 'Título / Resumo:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+      { content: oc.nome || oc.titulo, colSpan: 3 },
+    ]);
+  }
+
+  if (oc.descricao && oc.descricao !== oc.relatoFatos) {
+    dadosGeraisBody.push([
+      { content: 'Observações Iniciais:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+      { content: oc.descricao, colSpan: 3, styles: { fontStyle: 'italic' } },
+    ]);
+  }
+
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
     theme: 'grid',
     styles: { fontSize: 7, textColor: [30, 41, 59], cellPadding: 2 },
-    body: [
-      [
-        { content: 'ID da Ocorrência:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249], cellWidth: 32 } },
-        { content: oc.numero || '-', styles: { fontStyle: 'bold', textColor: [2, 132, 199] } },
-        { content: 'Data / Horário do Fato:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249], cellWidth: 36 } },
-        `${formatDataBR(oc.data)} às ${oc.horaTermino ? `${oc.horaInicio} às ${oc.horaTermino}` : oc.horaInicio || '-'}`,
-      ],
-      [
-        { content: 'Natureza do Evento:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-        oc.tipo || 'Outros',
-        { content: 'Classificação / Gravidade:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-        oc.classificacao || 'Média',
-      ],
-      [
-        { content: 'Local / Setor:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-        `${oc.local || 'Geral'} ${oc.setor ? `(${oc.setor})` : ''}`,
-        { content: 'Valor Total Envolvido:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-        { content: formatBRL(oc.valorTotalEnvolvido), styles: { fontStyle: 'bold', textColor: [22, 101, 52] } },
-      ],
-    ],
+    body: dadosGeraisBody,
   });
 
   y = doc.lastAutoTable.finalY + 4;
@@ -146,31 +162,41 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
   // --- 2. RELATO FACTUAL DOS FATOS E PROVIDÊNCIAS ---
   y = renderSectionHeader('2. RELATO FACTUAL DOS FATOS E PROVIDÊNCIAS', y);
 
+  const relatoBody = [
+    [
+      {
+        content: oc.relatoFatos
+          ? `Descrição Factual dos Fatos:\n${oc.relatoFatos}`
+          : 'Nenhum relato detalhado inserido.',
+        styles: { fontStyle: 'italic', fillColor: [255, 255, 255] },
+      },
+    ],
+  ];
+
+  if (oc.medidasAdotadas) {
+    relatoBody.push([
+      {
+        content: `Providências e Medidas Adotadas:\n${oc.medidasAdotadas}`,
+        styles: { fillColor: [248, 250, 252], fontStyle: 'normal' },
+      },
+    ]);
+  }
+
+  if (oc.parecerFinal || oc.conclusao) {
+    relatoBody.push([
+      {
+        content: `Parecer Final / Conclusão Técnica:\n${oc.parecerFinal || oc.conclusao}`,
+        styles: { fillColor: [240, 253, 244], fontStyle: 'normal' },
+      },
+    ]);
+  }
+
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
     theme: 'grid',
     styles: { fontSize: 7, textColor: [30, 41, 59], cellPadding: 2.5 },
-    body: [
-      [
-        {
-          content: oc.relatoFatos
-            ? `Descrição Factual dos Fatos:\n${oc.relatoFatos}`
-            : 'Nenhum relato detalhado inserido.',
-          styles: { fontStyle: 'italic', fillColor: [255, 255, 255] },
-        },
-      ],
-      ...(oc.medidasAdotadas
-        ? [
-            [
-              {
-                content: `Providências e Medidas Adotadas:\n${oc.medidasAdotadas}`,
-                styles: { fillColor: [248, 250, 252], fontStyle: 'normal' },
-              },
-            ],
-          ]
-        : []),
-    ],
+    body: relatoBody,
   });
 
   y = doc.lastAutoTable.finalY + 4;
@@ -185,15 +211,20 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
   if (listaPessoas.length > 0) {
     y = renderSectionHeader(`3. QUALIFICAÇÃO DE PESSOAS ENVOLVIDAS (${listaPessoas.length})`, y);
 
-    const linhasPessoas = listaPessoas.map((p, idx) => [
-      `#${idx + 1}`,
-      p.nome || 'Não informado',
-      p.clienteIdentificado === 'Sim' ? 'Cliente' : p.funcionario === 'Sim' ? 'Funcionário' : (p.tipoEnvolvido || 'Terceiro'),
-      p.sexo || '-',
-      p.vestimenta || '-',
-      p.descricaoFisica || p.caracteristicas || '-',
-      p.formaIdentificacao || p.cpf || '-',
-    ]);
+    const linhasPessoas = listaPessoas.map((p, idx) => {
+      const docStr = p.documento || p.cpf || p.rg || '-';
+      const obsStr = p.observacoes ? ` (Obs: ${p.observacoes})` : '';
+      return [
+        `#${idx + 1}`,
+        p.nome || 'Não informado',
+        docStr,
+        p.clienteIdentificado === 'Sim' ? 'Cliente' : p.funcionario === 'Sim' ? 'Funcionário' : (p.tipoEnvolvido || 'Terceiro'),
+        p.sexo || '-',
+        p.vestimenta || '-',
+        `${p.descricaoFisica || p.caracteristicas || '-'}${obsStr}`,
+        p.formaIdentificacao || '-',
+      ];
+    });
 
     autoTable(doc, {
       startY: y,
@@ -201,7 +232,7 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
       theme: 'grid',
       headStyles: { fillColor: [67, 56, 202], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 6.8 },
       styles: { fontSize: 6.8, textColor: [30, 41, 59], cellPadding: 1.8 },
-      head: [['#', 'Nome do Envolvido', 'Vínculo', 'Sexo', 'Vestimenta Observada', 'Características Físicas', 'Identificação']],
+      head: [['#', 'Nome do Envolvido', 'Documento', 'Vínculo', 'Sexo', 'Vestimenta Observada', 'Características Físicas / Obs', 'Identificação']],
       body: linhasPessoas,
     });
 
@@ -214,7 +245,8 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
 
     const linhasProdutos = oc.produtosEnvolvidos.map((p) => [
       p.codigo || '-',
-      p.produto || '-',
+      p.produto || p.descricao || '-',
+      p.categoria || '-',
       String(p.quantidade || 1),
       formatBRL(p.valorUnitario),
       formatBRL(p.total),
@@ -223,7 +255,7 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
     ]);
 
     linhasProdutos.push([
-      { content: 'VALOR TOTAL ENVOLVIDO:', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold', fillColor: [241, 245, 249] } },
+      { content: 'VALOR TOTAL ENVOLVIDO:', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold', fillColor: [241, 245, 249] } },
       { content: formatBRL(oc.valorTotalEnvolvido), styles: { fontStyle: 'bold', fillColor: [220, 252, 231], textColor: [22, 101, 52] } },
       { content: '', colSpan: 2, styles: { fillColor: [241, 245, 249] } },
     ]);
@@ -234,7 +266,7 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
       theme: 'grid',
       headStyles: { fillColor: [4, 120, 87], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 6.8 },
       styles: { fontSize: 6.8, textColor: [30, 41, 59], cellPadding: 1.8 },
-      head: [['Código', 'Produto / Mercadoria', 'Qtd.', 'Valor Unit.', 'Total (R$)', 'Recuperado?', 'Avaria?']],
+      head: [['Código', 'Produto / Mercadoria', 'Categoria', 'Qtd.', 'Valor Unit.', 'Total (R$)', 'Recuperado?', 'Avaria?']],
       body: linhasProdutos,
     });
 
@@ -245,49 +277,55 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
   if (oc.abordagem) {
     y = renderSectionHeader('5. PROCEDIMENTO DE ABORDAGEM & SEGURANÇA', y);
 
+    const abordagemBody = [
+      [
+        { content: 'Houve Abordagem?', styles: { fontStyle: 'bold', fillColor: [255, 237, 213], cellWidth: 32 } },
+        oc.abordagem.houveAbordagem || 'Sim',
+        { content: 'Data/Hora e Local:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213], cellWidth: 34 } },
+        `${formatDataBR(oc.abordagem.data)} ${oc.abordagem.hora || ''} - ${oc.abordagem.local || oc.local || 'Área da Loja'}`,
+      ],
+      [
+        { content: 'Agentes Responsáveis:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
+        `${oc.abordagem.responsaveis || 'Fiscal de Loja / Segurança'} (Fiscal de Loja / Segurança)`,
+        { content: 'Recuperação Itens:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
+        oc.abordagem.recuperacaoMercadorias || 'Sim - Total',
+      ],
+      [
+        { content: 'Conduta / Comportamento:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
+        oc.abordagem.comportamento || 'Pacífico / Cooperativo',
+        { content: 'Sala Reservada:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
+        oc.abordagem.conducaoSalaReservada || 'Não',
+      ],
+      [
+        { content: 'Polícia / Boletim:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
+        `${oc.abordagem.acionamentoPolicial || 'Não'} ${oc.abordagem.numeroBoletim ? `(B.O.: ${oc.abordagem.numeroBoletim})` : ''}`,
+        { content: 'Status de Custódia:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
+        oc.status || 'Em Aberto',
+      ],
+    ];
+
+    if (oc.abordagem.relatoAbordagem) {
+      abordagemBody.push([
+        {
+          content: `Relato Factual da Abordagem:\n${oc.abordagem.relatoAbordagem}`,
+          colSpan: 4,
+          styles: { fontStyle: 'italic', fillColor: [255, 247, 237] },
+        },
+      ]);
+    }
+
     autoTable(doc, {
       startY: y,
       margin: { left: margin, right: margin },
       theme: 'grid',
       styles: { fontSize: 6.8, textColor: [30, 41, 59], cellPadding: 2 },
-      body: [
-        [
-          { content: 'Houve Abordagem?', styles: { fontStyle: 'bold', fillColor: [255, 237, 213], cellWidth: 32 } },
-          oc.abordagem.houveAbordagem || 'Sim',
-          { content: 'Data/Hora e Local:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213], cellWidth: 34 } },
-          `${formatDataBR(oc.abordagem.data)} ${oc.abordagem.hora || ''} - ${oc.abordagem.local || oc.local || 'Área da Loja'}`,
-        ],
-        [
-          { content: 'Agentes Responsáveis:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
-          `${oc.abordagem.responsaveis || 'Fiscal de Loja / Segurança'} (Fiscal de Loja / Segurança)`,
-          { content: 'Recuperação Itens:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
-          oc.abordagem.recuperacaoMercadorias || 'Sim - Total',
-        ],
-        [
-          { content: 'Conduta / Comportamento:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
-          oc.abordagem.comportamento || 'Pacífico / Cooperativo',
-          { content: 'Polícia / Boletim:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
-          `${oc.abordagem.acionamentoPolicial || 'Não'} ${oc.abordagem.numeroBoletim ? `(B.O.: ${oc.abordagem.numeroBoletim})` : ''}`,
-        ],
-        ...(oc.abordagem.relatoAbordagem
-          ? [
-              [
-                {
-                  content: `Relato da Abordagem:\n${oc.abordagem.relatoAbordagem}`,
-                  colSpan: 4,
-                  styles: { fontStyle: 'italic', fillColor: [255, 247, 237] },
-                },
-              ],
-            ]
-          : []),
-      ],
+      body: abordagemBody,
     });
 
     y = doc.lastAutoTable.finalY + 4;
   }
 
   // --- QUEBRA DE PÁGINA ESTRUTURADA PARA PAINEL DE AUDITORIA, CUSTÓDIA & RESPONSABILIDADES ---
-  // Se estiver próximo do fim da página 1 (mais de 190mm), cria página 2 limpa para evidências e assinaturas
   if (y > pageHeight - 85) {
     doc.addPage();
     y = 14;
@@ -300,13 +338,14 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
     const linhasEvidencias = listaEvidencias.map((ev, i) => {
       const tipoLabel = ev.tipo === 'Imagem' ? '📷 Imagem' : ev.tipo === 'Vídeo' ? '📹 Vídeo' : `📁 ${ev.tipo || 'Arquivo'}`;
       const horario = ev.horaFim ? `${ev.horaInicio || ''} às ${ev.horaFim}` : ev.horaInicio || '-';
+      const detalheStr = ev.descricaoEvidencia ? ` (Info: ${ev.descricaoEvidencia})` : '';
       return [
         ev.numeroSequencial || `#${String(i + 1).padStart(3, '0')}`,
         tipoLabel,
         ev.camera || 'CAM CFTV',
-        ev.local || oc.local || 'Loja',
+        `${ev.local || oc.local || 'Loja'}${detalheStr}`,
         `${formatDataBR(ev.data || oc.data)} (${horario})`,
-        ev.arquivoNome || 'midia_custodia.mp4',
+        `${ev.arquivoNome || 'midia_custodia.mp4'} ${ev.tamanhoStr ? `[${ev.tamanhoStr}]` : ''}`,
         `${ev.adicionadoPor || 'Operador'} (${formatDataHoraBR(ev.dataHoraUpload || oc.data)})`,
       ];
     });
@@ -317,7 +356,7 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
       theme: 'grid',
       headStyles: { fillColor: [2, 132, 199], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 6.8 },
       styles: { fontSize: 6.8, textColor: [30, 41, 59], cellPadding: 1.8 },
-      head: [['Item', 'Tipo de Mídia', 'Câmera / Fonte', 'Local', 'Data / Período Gravado', 'Arquivo Vinculado', 'Adicionado por']],
+      head: [['Item', 'Tipo de Mídia', 'Câmera / Fonte', 'Local / Ponto', 'Data / Período Gravado', 'Arquivo Vinculado', 'Adicionado por']],
       body: linhasEvidencias,
       showHead: 'everyPage',
     });
@@ -343,7 +382,7 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
 
     y = renderSectionHeader('7. RASTREABILIDADE DA CADEIA DE CUSTÓDIA', y);
 
-    const linhasCustodia = oc.historicoCustodia.slice(0, 12).map((h) => [
+    const linhasCustodia = oc.historicoCustodia.map((h) => [
       formatDataHoraBR(h.dataHora),
       h.usuario || 'Sistema',
       h.acao || '-',
