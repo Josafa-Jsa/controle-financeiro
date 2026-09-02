@@ -69,7 +69,8 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(56, 189, 248);
-  doc.text('JSA SOLUÇÕES TECNOLÓGICAS • DEPARTAMENTO DE PREVENÇÃO DE PERDAS', margin + 6, 24);
+  // doc.text('JSA SOLUÇÕES TECNOLÓGICAS • DEPARTAMENTO DE PREVENÇÃO DE PERDAS', margin + 6, 24);
+  doc.text('BIG MASTER • DEPARTAMENTO DE PREVENÇÃO DE PERDAS E ROUBOS', margin + 6, 24);
 
   // Metadados à direita
   doc.setFont('helvetica', 'bold');
@@ -297,10 +298,10 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
         oc.abordagem.conducaoSalaReservada || 'Não',
       ],
       [
-        { content: 'Polícia / Boletim:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
-        `${oc.abordagem.acionamentoPolicial || 'Não'} ${oc.abordagem.numeroBoletim ? `(B.O.: ${oc.abordagem.numeroBoletim})` : ''}`,
-        { content: 'Status de Custódia:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
-        oc.status || 'Em Aberto',
+        { content: 'Polícia / B.O. CISC:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
+        `${oc.abordagem.acionamentoPolicial || 'Não'} ${oc.abordagem.numeroBoletimCisc || oc.abordagem.numeroBoletim ? `(B.O. CISC: ${oc.abordagem.numeroBoletimCisc || oc.abordagem.numeroBoletim})` : ''}`,
+        { content: 'Anexo do Boletim:', styles: { fontStyle: 'bold', fillColor: [255, 237, 213] } },
+        oc.abordagem.boletimArquivo ? `Sim: ${oc.abordagem.boletimArquivo.nome}` : 'Nenhum anexo',
       ],
     ];
 
@@ -373,36 +374,7 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
     y = doc.lastAutoTable.finalY + 4;
   }
 
-  // --- 7. RASTREABILIDADE DA CADEIA DE CUSTÓDIA PROBATÓRIA ---
-  if (Array.isArray(oc.historicoCustodia) && oc.historicoCustodia.length > 0) {
-    if (y > pageHeight - 65) {
-      doc.addPage();
-      y = 14;
-    }
-
-    y = renderSectionHeader('7. RASTREABILIDADE DA CADEIA DE CUSTÓDIA', y);
-
-    const linhasCustodia = oc.historicoCustodia.map((h) => [
-      formatDataHoraBR(h.dataHora),
-      h.usuario || 'Sistema',
-      h.acao || '-',
-    ]);
-
-    autoTable(doc, {
-      startY: y,
-      margin: { left: margin, right: margin },
-      theme: 'grid',
-      headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 6.8 },
-      styles: { fontSize: 6.8, textColor: [30, 41, 59], cellPadding: 1.8 },
-      head: [['Data e Horário', 'Operador / Usuário', 'Ação / Despacho Probatório Registrado']],
-      body: linhasCustodia,
-      showHead: 'everyPage',
-    });
-
-    y = doc.lastAutoTable.finalY + 4;
-  }
-
-  // --- 8. MATRIZ DE RESPONSABILIDADES DO INCIDENTE ---
+  // --- 7. MATRIZ DE RESPONSABILIDADES DO INCIDENTE ---
   if (y > pageHeight - 55) {
     doc.addPage();
     y = 14;
@@ -410,7 +382,7 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
 
   const resp = oc.responsaveisRegistro || {};
 
-  y = renderSectionHeader('8. MATRIZ DE RESPONSABILIDADES DO INCIDENTE', y);
+  y = renderSectionHeader('7. MATRIZ DE RESPONSABILIDADES DO INCIDENTE', y);
 
   autoTable(doc, {
     startY: y,
@@ -432,7 +404,7 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
 
   y = doc.lastAutoTable.finalY + 8;
 
-  // --- 9. TERMOS DE ENCERRAMENTO E ASSINATURAS FORMAIS ---
+  // --- 8. TERMOS DE ENCERRAMENTO E ASSINATURAS FORMAIS ---
   if (y > pageHeight - 32) {
     doc.addPage();
     y = 20;
@@ -487,7 +459,8 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `JSA Soluções Tecnológicas • Gestão de Prevenção de Perdas | Ocorrência: ${oc.numero || '-'} | Página ${i} de ${totalPages}`,
+      // `JSA Soluções Tecnológicas • Gestão de Prevenção de Perdas | Ocorrência: ${oc.numero || '-'} | Página ${i} de ${totalPages}`,
+      `BIG MASTER • Gestão de Prevenção de Perdas | Ocorrência: ${oc.numero || '-'} | Página ${i} de ${totalPages}`,
       pageWidth / 2,
       pageHeight - 4.5,
       { align: 'center' }

@@ -14,16 +14,23 @@ export async function listPrevencao(req, res) {
     const params = [];
 
     if (!isAdmin && (userEmail || userId || userLogin)) {
-      query += ` WHERE 
-        (LOWER(user_email) = LOWER(?) AND ? IS NOT NULL) OR 
-        (user_id = ? AND ? IS NOT NULL) OR 
-        (LOWER(user_login) = LOWER(?) AND ? IS NOT NULL) OR 
-        user_email IS NULL OR user_email = ""`;
-      params.push(
-        userEmail || null, userEmail || null,
-        userId || null, userId || null,
-        userLogin || null, userLogin || null
-      );
+      const conds = [];
+      if (userEmail) {
+        conds.push('LOWER(user_email) = LOWER(?)');
+        params.push(userEmail);
+      }
+      if (userId) {
+        conds.push('user_id = ?');
+        params.push(userId);
+      }
+      if (userLogin) {
+        conds.push('LOWER(user_login) = LOWER(?)');
+        params.push(userLogin);
+      }
+      conds.push('user_email IS NULL');
+      conds.push('user_email = ""');
+
+      query += ` WHERE (${conds.join(' OR ')})`;
     }
 
     query += ' ORDER BY created_at DESC LIMIT 500';

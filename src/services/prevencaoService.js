@@ -60,6 +60,39 @@ function safeWrite(list) {
   }
 }
 
+function _checkPertenceAoUsuario(oc, u) {
+  if (!oc || !u) return true;
+  if (u.isUserAdmin) return true;
+
+  const ocEmail = String(oc.userEmail || '').trim().toLowerCase();
+  const ocUser = String(oc.userLogin || '').trim().toLowerCase();
+  const ocId = oc.userId ? String(oc.userId) : null;
+  const ocNome = String(oc.registradoPor || oc.responsaveisRegistro?.emitidoPor?.nome || '').trim().toLowerCase();
+
+  const uEmail = String(u.email || '').trim().toLowerCase();
+  const uUser = String(u.username || '').trim().toLowerCase();
+  const uId = u.id ? String(u.id) : null;
+  const uNome = String(u.name || '').trim().toLowerCase();
+
+  // Match por email, login ou ID
+  if (uEmail && ocEmail && uEmail === ocEmail) return true;
+  if (uUser && ocUser && uUser === ocUser) return true;
+  if (uId && ocId && String(uId) === String(ocId)) return true;
+
+  // Match por nome
+  if (uNome && ocNome) {
+    if (ocNome === uNome || ocNome.includes(uNome) || uNome.includes(ocNome)) return true;
+    const pU = uNome.split(' ')[0];
+    const pOc = ocNome.split(' ')[0];
+    if (pU && pOc && pU.length >= 3 && pU === pOc) return true;
+  }
+
+  // Ocorrências criadas na sessão local sem email/id explícitos
+  if (!ocEmail && !ocUser && !ocId) return true;
+
+  return false;
+}
+
 // Sincroniza em segundo plano com o banco de dados MySQL
 export async function sincronizarPrevencaoDoServidor(customUser = null) {
   const u = _resolveUser(customUser);
@@ -77,41 +110,27 @@ export async function sincronizarPrevencaoDoServidor(customUser = null) {
     if (Array.isArray(res.data)) {
       const serverList = res.data;
       const localList = safeRead();
+      const map = new Map();
 
       if (u.isUserAdmin) {
-        // ADMIN: o banco de dados MySQL é a fonte autoritativa total
-        safeWrite(serverList);
-        return listarOcorrencias(customUser);
-      } else {
-        // OPERADOR:
-        // Remove do cache local qualquer ocorrência do operador que foi excluída pelo admin no servidor
-        const outrosUsuarios = localList.filter((l) => {
-          const ocEmail = String(l.userEmail || '').trim().toLowerCase();
-          const ocUser = String(l.userLogin || '').trim().toLowerCase();
-          const ocId = l.userId ? String(l.userId) : null;
-          const ocNome = String(l.registradoPor || l.responsaveisRegistro?.emitidoPor?.nome || '').trim().toLowerCase();
-
-          const pertenceAoUsuario =
-            (u.email && ocEmail && ocEmail === u.email) ||
-            (u.username && ocUser && ocUser === u.username) ||
-            (u.id && ocId && ocId === String(u.id)) ||
-            (u.name && ocNome && (ocNome.includes(u.name.toLowerCase()) || u.name.toLowerCase().includes(ocNome)));
-
-          return !pertenceAoUsuario;
-        });
-
-        // Junta as ocorrências ativas do servidor (excluídas já sumiram) com eventuais outros registros
-        const map = new Map();
+        // ADMIN: o banco MySQL é a fonte autoritativa total
         serverList.forEach((s) => map.set(String(s.numero || s.id), s));
-        outrosUsuarios.forEach((o) => {
-          const key = String(o.numero || o.id);
-          if (!map.has(key)) map.set(key, o);
+        localList.forEach((l) => {
+          const key = String(l.numero || l.id);
+          if (!map.has(key)) map.set(key, l);
         });
-
-        const merged = Array.from(map.values());
-        safeWrite(merged);
-        return listarOcorrencias(customUser);
+      } else {
+        // OPERADOR: mantém todos os registros do servidor e preserva os locais
+        serverList.forEach((s) => map.set(String(s.numero || s.id), s));
+        localList.forEach((l) => {
+          const key = String(l.numero || l.id);
+          if (!map.has(key)) map.set(key, l);
+        });
       }
+
+      const merged = Array.from(map.values());
+      safeWrite(merged);
+      return listarOcorrencias(customUser);
     }
   } catch (err) {
     console.warn('[Prevencao Sync] Servidor indisponível:', err.message);
@@ -129,27 +148,8 @@ export function listarOcorrencias(customUser = null) {
       return list;
     }
 
-    // OPERADOR COMUM: Visualiza apenas as ocorrências registradas por ele mesmo
-    return list.filter((oc) => {
-      const ocEmail = String(oc.userEmail || '').trim().toLowerCase();
-      const ocUser = String(oc.userLogin || '').trim().toLowerCase();
-      const ocId = oc.userId ? String(oc.userId) : null;
-      const ocNome = String(oc.registradoPor || oc.responsaveisRegistro?.emitidoPor?.nome || '').trim().toLowerCase();
-
-      if (ocEmail || ocUser || ocId) {
-        return (
-          (u.email && ocEmail && ocEmail === u.email) ||
-          (u.username && ocUser && ocUser === u.username) ||
-          (u.id && ocId && ocId === String(u.id))
-        );
-      }
-
-      if (u.name && ocNome) {
-        return ocNome.includes(u.name.toLowerCase()) || u.name.toLowerCase().includes(ocNome);
-      }
-
-      return true;
-    });
+    // OPERADOR COMUM: Visualiza todas as ocorrências registradas por ele
+    return list.filter((oc) => _checkPertenceAoUsuario(oc, u));
   } catch (e) {
     console.error('Erro ao listar ocorrências de prevenção:', e);
     return [];
@@ -450,23 +450,50 @@ export function salvarAbordagem(id, dadosAbordagem, usuario = 'Operador') {
         comportamento: dadosAbordagem.comportamento || 'Pacífico / Cooperativo',
         recuperacaoMercadorias: dadosAbordagem.recuperacaoMercadorias || 'Sim - Total',
         acionamentoPolicial: dadosAbordagem.acionamentoPolicial || 'Não',
-        numeroBoletim: dadosAbordagem.numeroBoletim || '',
+        numeroBoletim: dadosAbordagem.numeroBoletimCisc || dadosAbordagem.numeroBoletim || '',
+        numeroBoletimCisc: dadosAbordagem.numeroBoletimCisc || dadosAbordagem.numeroBoletim || '',
         conducaoSalaReservada: dadosAbordagem.conducaoSalaReservada || 'Não',
         relatoAbordagem: dadosAbordagem.relatoAbordagem || '',
+        boletimArquivo: dadosAbordagem.boletimArquivo || null,
         registradoEm: nowIso,
       };
+
+      // Se houver arquivo do B.O. anexado, vincula também na lista de evidências
+      let evidenciasAtualizadas = Array.isArray(oc.evidencias) ? [...oc.evidencias] : [];
+      if (dadosAbordagem.boletimArquivo && dadosAbordagem.boletimArquivo.nome) {
+        const jaExiste = evidenciasAtualizadas.some((e) => e.arquivoNome === dadosAbordagem.boletimArquivo.nome);
+        if (!jaExiste) {
+          evidenciasAtualizadas.unshift({
+            id: Date.now(),
+            numeroSequencial: `#${String(evidenciasAtualizadas.length + 1).padStart(3, '0')}`,
+            tipo: 'Boletim de Ocorrência (B.O. CISC)',
+            camera: 'Polícia Civil / CISC',
+            local: dadosAbordagem.local || oc.local || 'Delegacia / Loja',
+            data: dadosAbordagem.data || oc.data,
+            horaInicio: dadosAbordagem.hora || '',
+            horaFim: '',
+            arquivoNome: dadosAbordagem.boletimArquivo.nome,
+            tamanhoStr: dadosAbordagem.boletimArquivo.tamanhoStr || 'PDF/Img',
+            arquivoUrl: dadosAbordagem.boletimArquivo.arquivoUrl || '',
+            adicionadoPor: usuario,
+            dataHoraUpload: nowIso,
+            descricaoEvidencia: `Cópia do Boletim de Ocorrência nº ${dadosAbordagem.numeroBoletimCisc || dadosAbordagem.numeroBoletim || 'S/N'}`,
+          });
+        }
+      }
 
       historico.unshift({
         id: Date.now(),
         dataHora: nowIso,
         usuario,
-        acao: `${usuario} registrou o relatório de abordagem da ocorrência`,
+        acao: `${usuario} registrou o relatório de abordagem${dadosAbordagem.numeroBoletimCisc ? ` e B.O. CISC nº ${dadosAbordagem.numeroBoletimCisc}` : ''}`,
         tipo: 'abordagem',
       });
 
       lista[idx] = {
         ...oc,
         abordagem: abordagemFormatada,
+        evidencias: evidenciasAtualizadas,
         historicoCustodia: historico,
         updatedAt: nowIso,
       };

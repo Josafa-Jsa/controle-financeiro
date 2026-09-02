@@ -19,8 +19,8 @@
     "deleteRequestId": null,
     "motivoExclusao": null,
     "baixas": [],
-    "createdAt": "2026-09-02T19:49:18.705Z",
-    "updatedAt": "2026-09-02T19:49:18.705Z"
+    "createdAt": "2026-09-02T20:28:35.815Z",
+    "updatedAt": "2026-09-02T20:28:35.815Z"
   },
   {
     "id": 4,
@@ -42,8 +42,8 @@
     "deleteRequestId": null,
     "motivoExclusao": null,
     "baixas": [],
-    "createdAt": "2026-09-02T19:49:18.729Z",
-    "updatedAt": "2026-09-02T19:49:18.729Z"
+    "createdAt": "2026-09-02T20:28:35.876Z",
+    "updatedAt": "2026-09-02T20:28:35.876Z"
   },
   {
     "id": 6,
@@ -60,8 +60,8 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-02T19:49:18.649Z",
-    "updatedAt": "2026-09-02T19:49:18.649Z"
+    "createdAt": "2026-09-02T20:28:35.760Z",
+    "updatedAt": "2026-09-02T20:28:35.760Z"
   },
   {
     "id": 7,
@@ -84,8 +84,8 @@
         "obs": "chegada"
       }
     ],
-    "createdAt": "2026-09-01T22:05:40.123Z",
-    "updatedAt": "2026-09-01T22:05:40.123Z",
+    "createdAt": "2026-09-02T20:28:35.207Z",
+    "updatedAt": "2026-09-02T20:28:35.207Z",
     "dataPagamento": "2026-09-01"
   },
   {
@@ -175,8 +175,8 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-02T19:49:18.686Z",
-    "updatedAt": "2026-09-02T19:49:18.686Z"
+    "createdAt": "2026-09-02T20:28:35.809Z",
+    "updatedAt": "2026-09-02T20:28:35.809Z"
   },
   {
     "id": 3,
@@ -193,8 +193,8 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-02T19:49:18.705Z",
-    "updatedAt": "2026-09-02T19:49:18.705Z"
+    "createdAt": "2026-09-02T20:28:35.810Z",
+    "updatedAt": "2026-09-02T20:28:35.810Z"
   },
   {
     "id": 1,
@@ -211,7 +211,7 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-02T19:49:18.645Z",
-    "updatedAt": "2026-09-02T19:49:18.645Z"
+    "createdAt": "2026-09-02T20:28:35.690Z",
+    "updatedAt": "2026-09-02T20:28:35.690Z"
   }
 ]
