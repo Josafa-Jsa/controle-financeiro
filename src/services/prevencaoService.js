@@ -61,25 +61,29 @@ function safeWrite(list) {
 }
 
 function _checkPertenceAoUsuario(oc, u) {
-  if (!oc || !u) return true;
+  if (!oc || !u) return false;
   if (u.isUserAdmin) return true;
 
-  const ocEmail = String(oc.userEmail || '').trim().toLowerCase();
-  const ocUser = String(oc.userLogin || '').trim().toLowerCase();
-  const ocId = oc.userId ? String(oc.userId) : null;
-  const ocNome = String(oc.registradoPor || oc.responsaveisRegistro?.emitidoPor?.nome || '').trim().toLowerCase();
+  const ocEmail = String(oc.userEmail || oc.user_email || '').trim().toLowerCase();
+  const ocUser = String(oc.userLogin || oc.user_login || '').trim().toLowerCase();
+  const ocId = oc.userId || oc.user_id ? String(oc.userId || oc.user_id) : null;
+  const ocNome = String(oc.registradoPor || oc.registrado_por || oc.responsaveisRegistro?.emitidoPor?.nome || '').trim().toLowerCase();
 
   const uEmail = String(u.email || '').trim().toLowerCase();
   const uUser = String(u.username || '').trim().toLowerCase();
   const uId = u.id ? String(u.id) : null;
   const uNome = String(u.name || '').trim().toLowerCase();
 
-  // Match por email, login ou ID
+  // 1. Match exato por Email, Login ou ID numérico
   if (uEmail && ocEmail && uEmail === ocEmail) return true;
   if (uUser && ocUser && uUser === ocUser) return true;
   if (uId && ocId && String(uId) === String(ocId)) return true;
 
-  // Match por nome
+  // 2. Match normalizado de login (sem caracteres especiais)
+  const clean = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (clean(uUser) && clean(ocUser) && clean(uUser) === clean(ocUser)) return true;
+
+  // 3. Match por nome completo ou primeiro nome
   if (uNome && ocNome) {
     if (ocNome === uNome || ocNome.includes(uNome) || uNome.includes(ocNome)) return true;
     const pU = uNome.split(' ')[0];
@@ -87,14 +91,12 @@ function _checkPertenceAoUsuario(oc, u) {
     if (pU && pOc && pU.length >= 3 && pU === pOc) return true;
   }
 
-  // Ocorrências criadas na sessão local sem email/id explícitos
-  if (!ocEmail && !ocUser && !ocId) return true;
-
   return false;
 }
 
 // Sincroniza em segundo plano com o banco de dados MySQL
 export async function sincronizarPrevencaoDoServidor(customUser = null) {
+  const u = _resolveUser(customUser);
   try {
     const res = await api.get('/prevencao');
     if (Array.isArray(res.data)) {
@@ -112,17 +114,26 @@ export async function sincronizarPrevencaoDoServidor(customUser = null) {
 
       const merged = Array.from(map.values());
       safeWrite(merged);
-      return merged;
+      return listarOcorrencias(customUser);
     }
   } catch (err) {
     console.warn('[Prevencao Sync] Servidor indisponível:', err.message);
   }
-  return safeRead();
+  return listarOcorrencias(customUser);
 }
 
 export function listarOcorrencias(customUser = null) {
   try {
-    return safeRead();
+    const u = _resolveUser(customUser);
+    const list = safeRead();
+
+    // ADMIN: Visualiza TODAS as ocorrências de todos os usuários
+    if (u.isUserAdmin) {
+      return list;
+    }
+
+    // USUÁRIO COMUM: Visualiza SOMENTE as ocorrências registradas por ele mesmo
+    return list.filter((oc) => _checkPertenceAoUsuario(oc, u));
   } catch (e) {
     console.error('Erro ao listar ocorrências de prevenção:', e);
     return [];
