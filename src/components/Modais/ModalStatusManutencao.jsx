@@ -7,12 +7,12 @@ import '../Visual/modal.css';
 
 const OPCOES_TELAS = [
   'Prevenção de Perdas',
-  'Contas a Pagar / Receber',
-  'Emissão de Notas Fiscais',
+  'Gestão de Contas',
+  'Notas Fiscais',
   'Ordens de Serviço',
   'Controle de Estoque',
   'Central de Chamados',
-  'Simulador Financeiro',
+  'Simulador de Créditos',
   'Gestão de Contratos',
   'Painel Administrativo',
   'Geral do Sistema (Todas as Telas)',
