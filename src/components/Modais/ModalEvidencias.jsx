@@ -87,30 +87,111 @@ export default function ModalEvidencias({
     setNovaEvidencia((prev) => ({ ...prev, [campo]: valor }));
   };
 
-  // Upload simulado ou real via FileReader
-  const handleFileUpload = (e) => {
+  const compressImage = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.72);
+            resolve(compressed);
+          } else {
+            resolve(e.target.result);
+          }
+        };
+        img.onerror = () => resolve(e.target.result);
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Upload protegido contra estouro de memória
+  const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setNovaEvidencia((prev) => ({
-        ...prev,
-        arquivoNome: file.name,
-        arquivoUrl: event.target.result,
-      }));
-      toast.success(`Arquivo "${file.name}" pronto para inclusão.`);
+    const formatSize = (bytes) => {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     };
 
-    if (file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')) {
-      reader.readAsDataURL(file);
-    } else {
+    const tamanhoStr = formatSize(file.size);
+
+    if (file.type.startsWith('image/')) {
+      try {
+        const compressedBase64 = await compressImage(file);
+        setNovaEvidencia((prev) => ({
+          ...prev,
+          arquivoNome: file.name,
+          arquivoUrl: compressedBase64,
+          tamanho: tamanhoStr,
+        }));
+        toast.success(`Imagem "${file.name}" (${tamanhoStr}) otimizada com sucesso.`);
+      } catch (err) {
+        console.error(err);
+        setNovaEvidencia((prev) => ({
+          ...prev,
+          arquivoNome: file.name,
+          arquivoUrl: '',
+          tamanho: tamanhoStr,
+        }));
+      }
+    } else if (file.type.startsWith('video/')) {
+      // Para vídeos: usamos Blob Object URL para preview em memória sem converter para string base64 pesada
+      let objectUrl = '';
+      try {
+        objectUrl = URL.createObjectURL(file);
+      } catch {}
+
       setNovaEvidencia((prev) => ({
         ...prev,
         arquivoNome: file.name,
-        arquivoUrl: '',
+        arquivoUrl: objectUrl,
+        tamanho: tamanhoStr,
       }));
+      toast.success(`Vídeo "${file.name}" (${tamanhoStr}) registrado.`);
+    } else {
+      let objectUrl = '';
+      try {
+        objectUrl = URL.createObjectURL(file);
+      } catch {}
+
+      setNovaEvidencia((prev) => ({
+        ...prev,
+        arquivoNome: file.name,
+        arquivoUrl: objectUrl,
+        tamanho: tamanhoStr,
+      }));
+      toast.success(`Arquivo "${file.name}" (${tamanhoStr}) registrado.`);
     }
+
+    e.target.value = '';
   };
 
   const handleAdicionarEvidencia = (e) => {
@@ -130,6 +211,7 @@ export default function ModalEvidencias({
       horaFim: novaEvidencia.horaFim,
       arquivoNome: nomePadraoArquivo,
       arquivoUrl: novaEvidencia.arquivoUrl || '',
+      tamanho: novaEvidencia.tamanho || '',
       adicionadoPor: nomeOperador,
       dataHoraUpload: new Date().toISOString(),
       observacao: novaEvidencia.observacao.trim(),
@@ -154,6 +236,7 @@ export default function ModalEvidencias({
       horaFim: '',
       arquivoNome: '',
       arquivoUrl: '',
+      tamanho: '',
       observacao: '',
     }));
   };

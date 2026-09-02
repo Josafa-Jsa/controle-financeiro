@@ -25,12 +25,27 @@ function _resolveUser(provided = null) {
   return { id, email, username, name: fullName, isUserAdmin };
 }
 
+function sanitizeList(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map((oc) => {
+    if (!oc || !Array.isArray(oc.evidencias)) return oc;
+    const cleanEvs = oc.evidencias.map((ev) => {
+      // Se arquivoUrl for um base64 gigantesco (> 500KB), remove o blob pesado para preservar a memória
+      if (ev && typeof ev.arquivoUrl === 'string' && ev.arquivoUrl.length > 500_000) {
+        return { ...ev, arquivoUrl: '' };
+      }
+      return ev;
+    });
+    return { ...oc, evidencias: cleanEvs };
+  });
+}
+
 function safeRead() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return sanitizeList(parsed);
   } catch {
     return [];
   }
@@ -38,7 +53,8 @@ function safeRead() {
 
 function safeWrite(list) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    const sanitizada = sanitizeList(list);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizada));
   } catch (e) {
     console.warn('Erro ao salvar no storage:', e);
   }

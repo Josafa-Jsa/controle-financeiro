@@ -19,8 +19,8 @@
     "deleteRequestId": null,
     "motivoExclusao": null,
     "baixas": [],
-    "createdAt": "2026-09-02T00:26:41.439Z",
-    "updatedAt": "2026-09-02T00:26:41.439Z"
+    "createdAt": "2026-09-02T16:19:00.046Z",
+    "updatedAt": "2026-09-02T16:19:00.046Z"
   },
   {
     "id": 4,
@@ -42,8 +42,8 @@
     "deleteRequestId": null,
     "motivoExclusao": null,
     "baixas": [],
-    "createdAt": "2026-09-02T00:26:41.442Z",
-    "updatedAt": "2026-09-02T00:26:41.442Z"
+    "createdAt": "2026-09-02T16:19:00.100Z",
+    "updatedAt": "2026-09-02T16:19:00.100Z"
   },
   {
     "id": 6,
@@ -60,8 +60,8 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-02T00:26:41.361Z",
-    "updatedAt": "2026-09-02T00:26:41.361Z"
+    "createdAt": "2026-09-02T16:18:59.959Z",
+    "updatedAt": "2026-09-02T16:18:59.959Z"
   },
   {
     "id": 7,
@@ -175,26 +175,8 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-02T00:26:41.362Z",
-    "updatedAt": "2026-09-02T00:26:41.362Z"
-  },
-  {
-    "id": 1,
-    "codigo": "000001",
-    "codigoConta": "000001",
-    "userEmail": "jsa@jsa.com",
-    "userId": "9773",
-    "tipo": "Receber",
-    "descricao": "combustível",
-    "observacao": "",
-    "valor": 50,
-    "vencimento": "2026-07-29",
-    "status": "Pendente",
-    "referenciaTipo": null,
-    "referenciaId": null,
-    "baixas": [],
-    "createdAt": "2026-09-02T00:26:41.337Z",
-    "updatedAt": "2026-09-02T00:26:41.337Z"
+    "createdAt": "2026-09-02T16:18:59.962Z",
+    "updatedAt": "2026-09-02T16:18:59.962Z"
   },
   {
     "id": 3,
@@ -211,7 +193,25 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-02T00:26:41.363Z",
-    "updatedAt": "2026-09-02T00:26:41.363Z"
+    "createdAt": "2026-09-02T16:18:59.966Z",
+    "updatedAt": "2026-09-02T16:18:59.966Z"
+  },
+  {
+    "id": 1,
+    "codigo": "000001",
+    "codigoConta": "000001",
+    "userEmail": "jsa@jsa.com",
+    "userId": "9773",
+    "tipo": "Receber",
+    "descricao": "combustível",
+    "observacao": "",
+    "valor": 50,
+    "vencimento": "2026-07-29",
+    "status": "Pendente",
+    "referenciaTipo": null,
+    "referenciaId": null,
+    "baixas": [],
+    "createdAt": "2026-09-02T16:18:59.919Z",
+    "updatedAt": "2026-09-02T16:18:59.919Z"
   }
 ]
