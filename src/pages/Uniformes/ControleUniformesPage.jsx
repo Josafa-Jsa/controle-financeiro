@@ -1,16 +1,17 @@
 // src/pages/Uniformes/ControleUniformesPage.jsx
 import React, { useEffect, useState, useMemo } from 'react';
-import { toast } from 'react-toastify';
 import {
   listarEstoqueUniformes,
   listarMovimentacoesUniformes,
   cadastrarEntradaUniforme,
+  cadastrarSaidaUniforme,
   DEPARTAMENTOS_PADRAO,
   TAMANHOS_PADRAO,
   FABRICANTES_PADRAO,
 } from '../../services/uniformesService';
 import ModalEntradaUniforme from '../../components/Modais/ModalEntradaUniforme';
 import ModalDepartamentosUniformes from '../../components/Modais/ModalDepartamentosUniformes';
+import ModalEntregaUniforme from '../../components/Modais/ModalEntregaUniforme';
 import { getUser, isAdmin } from '../../auth/auth';
 import './uniformes.css';
 
@@ -18,6 +19,7 @@ export default function ControleUniformesPage() {
   const [estoque, setEstoque] = useState([]);
   const [movimentacoes, setMovimentacoes] = useState([]);
   const [modalEntradaAberto, setModalEntradaAberto] = useState(false);
+  const [modalEntregaAberto, setModalEntregaAberto] = useState(false);
   const [modalDepartamentosAberto, setModalDepartamentosAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState('consolidado'); // 'consolidado', 'novos', 'usados', 'movimentacoes'
 
@@ -50,6 +52,11 @@ export default function ControleUniformesPage() {
 
   const handleSalvarEntrada = async (dados) => {
     await cadastrarEntradaUniforme(dados);
+    await carregarDados();
+  };
+
+  const handleSalvarEntrega = async (dados) => {
+    await cadastrarSaidaUniforme(dados);
     await carregarDados();
   };
 
@@ -156,6 +163,29 @@ export default function ControleUniformesPage() {
             onClick={() => setModalEntradaAberto(true)}
           >
             <span>➕</span> Cadastrar Entrada de Uniforme
+          </button>
+
+          <button
+            type="button"
+            className="btn-entrega-uniforme"
+            onClick={() => setModalEntregaAberto(true)}
+            style={{
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              border: '1px solid #34d399',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              fontSize: '13.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.25s ease',
+              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+            }}
+          >
+            <span>📦</span> Entrega de Uniforme
           </button>
         </div>
       </div>
@@ -406,6 +436,13 @@ export default function ControleUniformesPage() {
         isOpen={modalEntradaAberto}
         onClose={() => setModalEntradaAberto(false)}
         onSave={handleSalvarEntrada}
+      />
+
+      {/* Modal de Entrega de Uniforme ao Colaborador */}
+      <ModalEntregaUniforme
+        isOpen={modalEntregaAberto}
+        onClose={() => setModalEntregaAberto(false)}
+        onSave={handleSalvarEntrega}
       />
 
       {/* Modal de Visão Geral por Departamentos */}

@@ -157,7 +157,7 @@ export async function cadastrarEntradaUniforme(dados) {
   }
 }
 
-// Cadastra Saída de Uniformes
+// Cadastra Saída / Entrega de Uniformes
 export async function cadastrarSaidaUniforme(dados) {
   const user = getUser();
   const responsavel = user?.name || user?.nome || user?.email || 'Operador';
@@ -167,10 +167,42 @@ export async function cadastrarSaidaUniforme(dados) {
     tamanho: dados.tamanho,
     quantidade: parseInt(dados.quantidade, 10),
     estado: dados.estado || 'Novo',
-    colaborador: dados.colaborador || '',
+    colaborador: dados.colaborador || dados.nome || '',
+    cpf: dados.cpf || '',
+    matricula: dados.matricula || '',
+    trocaDevolucao: !!dados.trocaDevolucao,
     responsavel,
-    observacoes: dados.observacoes || '',
+    observacoes: dados.observacoes || (dados.trocaDevolucao ? 'Troca com devolução do usado' : 'Retirada regular'),
+    assinatura: dados.assinatura || '',
   };
+
+  // Atualização otimista no cache local
+  const movs = safeRead(STORAGE_MOV_KEY);
+  const novaMov = {
+    id: Date.now(),
+    tipo: 'SAIDA',
+    ...payload,
+    created_at: new Date().toISOString(),
+  };
+  movs.unshift(novaMov);
+  safeWrite(STORAGE_MOV_KEY, movs);
+
+  // Subtrai do estoque local
+  const estoque = safeRead(STORAGE_ESTOQUE_KEY);
+  const idx = estoque.findIndex(
+    (item) => item.departamento === payload.departamento && item.tamanho === payload.tamanho
+  );
+
+  const isNovo = payload.estado === 'Novo';
+  if (idx !== -1) {
+    estoque[idx] = {
+      ...estoque[idx],
+      estado_novo_qtd: Math.max(0, (estoque[idx].estado_novo_qtd || 0) - (isNovo ? payload.quantidade : 0)),
+      estado_usado_qtd: Math.max(0, (estoque[idx].estado_usado_qtd || 0) - (isNovo ? 0 : payload.quantidade)),
+      total_qtd: Math.max(0, (estoque[idx].total_qtd || 0) - payload.quantidade),
+    };
+    safeWrite(STORAGE_ESTOQUE_KEY, estoque);
+  }
 
   try {
     const res = await api.post('/uniformes/saida', payload);

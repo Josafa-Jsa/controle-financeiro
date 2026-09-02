@@ -152,6 +152,9 @@ export async function cadastrarSaida(req, res) {
       quantidade,
       estado = 'Novo',
       colaborador = '',
+      cpf = '',
+      matricula = '',
+      trocaDevolucao = false,
       responsavel = 'Operador',
       observacoes = '',
     } = req.body || {};
@@ -165,12 +168,21 @@ export async function cadastrarSaida(req, res) {
     const isNovo = estadoUniforme === 'Novo';
 
     // 1. Registra a movimentação de Saída
-    const motivoSaida = colaborador ? `Entrega para ${colaborador}` : 'Saída de Estoque';
+    const infoColaborador = [
+      colaborador ? `Colaborador: ${colaborador}` : '',
+      cpf ? `CPF: ${cpf}` : '',
+      matricula ? `Matrícula: ${matricula}` : '',
+      trocaDevolucao ? '[Troca c/ Devolução de Usado]' : '[Entrega Regular]',
+    ].filter(Boolean).join(' • ');
+
+    const motivoSaida = infoColaborador || 'Saída de Estoque';
+    const obsFinal = observacoes ? `${observacoes} | ${infoColaborador}` : infoColaborador;
+
     const [movResult] = await pool.query(
       `INSERT INTO uniformes_movimentacoes 
         (tipo, departamento, tamanho, quantidade, estado, responsavel, motivo, observacoes)
        VALUES ('SAIDA', ?, ?, ?, ?, ?, ?, ?)`,
-      [departamento, tamanho, qtd, estadoUniforme, responsavel || 'Operador', motivoSaida, observacoes]
+      [departamento, tamanho, qtd, estadoUniforme, responsavel || 'Operador', motivoSaida, obsFinal]
     );
 
     // 2. Subtrai do estoque
