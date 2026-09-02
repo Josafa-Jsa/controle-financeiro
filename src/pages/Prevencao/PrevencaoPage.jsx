@@ -62,6 +62,26 @@ export default function PrevencaoPage() {
 
   useEffect(() => {
     carregarOcorrencias();
+
+    const handleStorageOrCustomEvent = (e) => {
+      if (e.type === 'ocorrencia_excluida_evento' || (e.key && e.key === 'ocorrencia_excluida_evento')) {
+        carregarOcorrencias();
+      }
+    };
+
+    window.addEventListener('ocorrencia_excluida_evento', handleStorageOrCustomEvent);
+    window.addEventListener('storage', handleStorageOrCustomEvent);
+
+    // Sincronização periódica suave em segundo plano para refletir exclusões/atualizações feitas pelo admin
+    const intervalId = window.setInterval(() => {
+      carregarOcorrencias();
+    }, 6_000);
+
+    return () => {
+      window.removeEventListener('ocorrencia_excluida_evento', handleStorageOrCustomEvent);
+      window.removeEventListener('storage', handleStorageOrCustomEvent);
+      window.clearInterval(intervalId);
+    };
   }, [usuario?.email, usuario?.id, isUserAdmin]);
 
   const carregarOcorrencias = async () => {
@@ -369,16 +389,22 @@ export default function PrevencaoPage() {
     setModalExcluirAberto(true);
   };
 
-  const handleConfirmarExclusao = () => {
+  const handleConfirmarExclusao = async () => {
     if (!ocorrenciaParaExcluir) return;
 
     try {
-      excluirOcorrencia(ocorrenciaParaExcluir.id);
-      toast.success(`Ocorrência ${ocorrenciaParaExcluir.numero} excluída com sucesso.`);
+      const idParaExcluir = ocorrenciaParaExcluir.id;
+      const numeroParaExcluir = ocorrenciaParaExcluir.numero;
+
+      // Remove imediatamente da interface local
+      setOcorrencias((prev) => prev.filter((o) => String(o.id) !== String(idParaExcluir) && o.numero !== numeroParaExcluir));
+
+      await excluirOcorrencia(idParaExcluir);
+      toast.success(`Ocorrência ${numeroParaExcluir} excluída com sucesso.`);
       logEvent({
         type: 'prevencao',
         title: 'Ocorrência excluída pelo Administrador',
-        details: { id: ocorrenciaParaExcluir.id, numero: ocorrenciaParaExcluir.numero, admin: nomeOperador },
+        details: { id: idParaExcluir, numero: numeroParaExcluir, admin: nomeOperador },
       });
       carregarOcorrencias();
       setModalExcluirAberto(false);

@@ -77,18 +77,41 @@ export async function sincronizarPrevencaoDoServidor(customUser = null) {
     if (Array.isArray(res.data)) {
       const serverList = res.data;
       const localList = safeRead();
-      const map = new Map();
 
-      // Prioriza dados do servidor
-      serverList.forEach((s) => map.set(s.numero || s.id, s));
-      localList.forEach((l) => {
-        const key = l.numero || l.id;
-        if (!map.has(key)) map.set(key, l);
-      });
+      if (u.isUserAdmin) {
+        // ADMIN: o banco de dados MySQL é a fonte autoritativa total
+        safeWrite(serverList);
+        return listarOcorrencias(customUser);
+      } else {
+        // OPERADOR:
+        // Remove do cache local qualquer ocorrência do operador que foi excluída pelo admin no servidor
+        const outrosUsuarios = localList.filter((l) => {
+          const ocEmail = String(l.userEmail || '').trim().toLowerCase();
+          const ocUser = String(l.userLogin || '').trim().toLowerCase();
+          const ocId = l.userId ? String(l.userId) : null;
+          const ocNome = String(l.registradoPor || l.responsaveisRegistro?.emitidoPor?.nome || '').trim().toLowerCase();
 
-      const merged = Array.from(map.values());
-      safeWrite(merged);
-      return listarOcorrencias(customUser);
+          const pertenceAoUsuario =
+            (u.email && ocEmail && ocEmail === u.email) ||
+            (u.username && ocUser && ocUser === u.username) ||
+            (u.id && ocId && ocId === String(u.id)) ||
+            (u.name && ocNome && (ocNome.includes(u.name.toLowerCase()) || u.name.toLowerCase().includes(ocNome)));
+
+          return !pertenceAoUsuario;
+        });
+
+        // Junta as ocorrências ativas do servidor (excluídas já sumiram) com eventuais outros registros
+        const map = new Map();
+        serverList.forEach((s) => map.set(String(s.numero || s.id), s));
+        outrosUsuarios.forEach((o) => {
+          const key = String(o.numero || o.id);
+          if (!map.has(key)) map.set(key, o);
+        });
+
+        const merged = Array.from(map.values());
+        safeWrite(merged);
+        return listarOcorrencias(customUser);
+      }
     }
   } catch (err) {
     console.warn('[Prevencao Sync] Servidor indisponível:', err.message);
@@ -661,15 +684,23 @@ export function atualizarOcorrencia(ocorrencia) {
   }
 }
 
-export function excluirOcorrencia(id) {
+export async function excluirOcorrencia(id) {
   try {
     const lista = safeRead();
     const filtrada = lista.filter((o) => String(o.id) !== String(id) && o.numero !== id);
     safeWrite(filtrada);
 
+    // Emite evento em tempo real para sincronização entre abas e usuários
     try {
-      api.delete(`/prevencao/${id}`).catch(() => {});
+      localStorage.setItem('ocorrencia_excluida_evento', JSON.stringify({ id, timestamp: Date.now() }));
+      window.dispatchEvent(new CustomEvent('ocorrencia_excluida_evento', { detail: { id } }));
     } catch {}
+
+    try {
+      await api.delete(`/prevencao/${id}`);
+    } catch (err) {
+      console.warn('[Prevencao API DELETE error]', err.message);
+    }
 
     return true;
   } catch (e) {
