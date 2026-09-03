@@ -1,7 +1,6 @@
 // src/utils/gerarComprovanteUniformePDF.js
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import bigMasterLogo from '../assets/big.jpg';
 
 export function gerarComprovanteUniformePDF(dadosEntrega) {
   const doc = new jsPDF({
@@ -19,26 +18,19 @@ export function gerarComprovanteUniformePDF(dadosEntrega) {
   doc.setFillColor(15, 23, 42); // #0f172a
   doc.roundedRect(margin, currentY, contentWidth, 18, 2, 2, 'F');
 
-  // Logo ou Marca
-  try {
-    if (bigMasterLogo) {
-      doc.addImage(bigMasterLogo, 'JPEG', margin + 3, currentY + 2.5, 13, 13);
-    }
-  } catch {}
-
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
-  doc.text('BIG MASTER SUPERMERCADOS • GESTÃO OPERACIONAL', margin + 18, currentY + 7);
+  doc.text('BIG MASTER SUPERMERCADOS • GESTÃO OPERACIONAL', margin + 6, currentY + 7);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
-  doc.text('TERMO OFICIAL DE ENTREGA E RETIRADA DE UNIFORME PROFISSIONAL', margin + 18, currentY + 13);
+  doc.text('TERMO OFICIAL DE ENTREGA E RETIRADA DE UNIFORME PROFISSIONAL', margin + 6, currentY + 13);
 
   const dataAtual = new Date().toLocaleString('pt-BR');
   doc.setFontSize(7.5);
-  doc.text(`Emissão: ${dataAtual}`, pageWidth - margin - 4, currentY + 10, { align: 'right' });
+  doc.text(`Emissão: ${dataAtual}`, pageWidth - margin - 6, currentY + 10, { align: 'right' });
 
   currentY += 23;
 
