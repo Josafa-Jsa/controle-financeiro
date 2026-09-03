@@ -28,6 +28,7 @@ export default function ControleUniformesPage() {
   const [modalEnvioEmMassaAberto, setModalEnvioEmMassaAberto] = useState(false);
   const [modalDepartamentosAberto, setModalDepartamentosAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState('consolidado'); // 'consolidado', 'novos', 'usados', 'movimentacoes'
+  const [modoVisual, setModoVisual] = useState('dashboard'); // 'dashboard' (grade de containers) ou 'tabela'
 
   const [busca, setBusca] = useState('');
   const [filtroDepartamento, setFiltroDepartamento] = useState('');
