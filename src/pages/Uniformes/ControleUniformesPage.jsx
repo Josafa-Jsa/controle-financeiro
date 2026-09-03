@@ -244,28 +244,7 @@ export default function ControleUniformesPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="btn-departamentos-uniforme"
-            onClick={() => setModalDepartamentosAberto(true)}
-            style={{
-              background: '#0f172a',
-              color: '#38bdf8',
-              border: '1px solid #38bdf8',
-              padding: '10px 18px',
-              borderRadius: '8px',
-              fontSize: '13.5px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <span>🏢</span> Departamentos
-          </button>
-
+          {/* 1. Cadastrar Entrada de Uniforme */}
           <button
             type="button"
             className="btn-cadastrar-uniforme"
@@ -274,6 +253,7 @@ export default function ControleUniformesPage() {
             <span>➕</span> Cadastrar Entrada de Uniforme
           </button>
 
+          {/* 2. Entrega de Uniforme */}
           <button
             type="button"
             className="btn-entrega-uniforme"
@@ -297,29 +277,7 @@ export default function ControleUniformesPage() {
             <span>📦</span> Entrega de Uniforme
           </button>
 
-          <button
-            type="button"
-            className="btn-saida-descarte-uniforme"
-            onClick={() => setModalSaidaDescarteAberto(true)}
-            style={{
-              background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
-              color: '#ffffff',
-              border: '1px solid #f87171',
-              padding: '10px 18px',
-              borderRadius: '8px',
-              fontSize: '13.5px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.25s ease',
-              boxShadow: '0 4px 14px rgba(220, 38, 38, 0.35)',
-            }}
-          >
-            <span>🗑️</span> Saída de Uniforme
-          </button>
-
+          {/* 3. Envio de Uniformes em Massa */}
           <button
             type="button"
             className="btn-envio-massa-uniforme"
@@ -341,6 +299,53 @@ export default function ControleUniformesPage() {
             }}
           >
             <span>🚚</span> Envio de Uniformes em Massa
+          </button>
+
+          {/* 4. Departamentos */}
+          <button
+            type="button"
+            className="btn-departamentos-uniforme"
+            onClick={() => setModalDepartamentosAberto(true)}
+            style={{
+              background: '#0f172a',
+              color: '#38bdf8',
+              border: '1px solid #38bdf8',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              fontSize: '13.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span>🏢</span> Departamentos
+          </button>
+
+          {/* 5. Saída de Uniforme */}
+          <button
+            type="button"
+            className="btn-saida-descarte-uniforme"
+            onClick={() => setModalSaidaDescarteAberto(true)}
+            style={{
+              background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+              color: '#ffffff',
+              border: '1px solid #f87171',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              fontSize: '13.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.25s ease',
+              boxShadow: '0 4px 14px rgba(220, 38, 38, 0.35)',
+            }}
+          >
+            <span>🗑️</span> Saída de Uniforme
           </button>
         </div>
       </div>
