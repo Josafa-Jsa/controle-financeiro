@@ -1,8 +1,8 @@
 {
-  "emManutencao": false,
-  "tela": "",
-  "mensagem": "",
+  "emManutencao": true,
+  "tela": "Geral do Sistema (Todas as Telas)",
+  "mensagem": "HAVERÁ PERDA DE COMUNICAÇÃO",
   "tipo": "ajuste",
-  "updatedAt": "2026-09-02T19:51:33.846Z",
+  "updatedAt": "2026-09-03T01:38:24.390Z",
   "updatedBy": "JSA Admin"
 }

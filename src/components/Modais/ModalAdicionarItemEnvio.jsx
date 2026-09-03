@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import {
-  DEPARTAMENTOS_PADRAO,
+  getListaDepartamentos,
   TAMANHOS_PADRAO,
   getTamanhosPorDepartamento,
 } from '../../services/uniformesService';
@@ -118,7 +118,7 @@ export default function ModalAdicionarItemEnvio({
               style={{ height: '36px', fontSize: '13px' }}
               required
             >
-              {DEPARTAMENTOS_PADRAO.map((dep) => (
+              {getListaDepartamentos().map((dep) => (
                 <option key={dep} value={dep}>
                   {dep}
                 </option>

@@ -6,7 +6,7 @@ import {
   cadastrarEntradaUniforme,
   cadastrarSaidaUniforme,
   cadastrarEnvioEmMassaUniforme,
-  DEPARTAMENTOS_PADRAO,
+  getListaDepartamentos,
   TAMANHOS_PADRAO,
   FABRICANTES_PADRAO,
   getTamanhosPorDepartamento,
@@ -92,7 +92,7 @@ export default function ControleUniformesPage() {
 
   const totalDepartamentos = useMemo(() => {
     const deps = new Set(estoque.map((i) => i.departamento).filter(Boolean));
-    return deps.size || DEPARTAMENTOS_PADRAO.length;
+    return deps.size || getListaDepartamentos().length;
   }, [estoque]);
 
   // Ícones e cores para cada setor
@@ -120,9 +120,10 @@ export default function ControleUniformesPage() {
   // Agrupamento em Tempo Real por Departamentos (Dashboard Containers)
   const resumoPorDepartamento = useMemo(() => {
     const map = {};
+    const listaDepsOficiais = getListaDepartamentos();
 
     // Inicializa todos os departamentos oficiais
-    DEPARTAMENTOS_PADRAO.forEach((dep) => {
+    listaDepsOficiais.forEach((dep) => {
       map[dep] = {
         departamento: dep,
         totalNovos: 0,
@@ -491,7 +492,7 @@ export default function ControleUniformesPage() {
             onChange={(e) => setFiltroDepartamento(e.target.value)}
           >
             <option value="">🏢 Todos os Departamentos</option>
-            {DEPARTAMENTOS_PADRAO.map((d) => (
+            {getListaDepartamentos().map((d) => (
               <option key={d} value={d}>
                 {d}
               </option>
@@ -808,6 +809,9 @@ export default function ControleUniformesPage() {
         onSelecionarDepartamento={(dep) => {
           setFiltroDepartamento(dep);
           setAbaAtiva('consolidado');
+        }}
+        onDepartamentoCadastrado={() => {
+          carregarDados();
         }}
       />
     </div>

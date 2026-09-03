@@ -4,6 +4,7 @@ import { getUser } from '../auth/auth';
 
 const STORAGE_ESTOQUE_KEY = 'jsa_uniformes_estoque';
 const STORAGE_MOV_KEY = 'jsa_uniformes_movimentacoes';
+const STORAGE_CUSTOM_DEPS_KEY = 'jsa_uniformes_custom_departamentos';
 
 export const DEPARTAMENTOS_PADRAO = [
   'Hortifruti',
@@ -23,8 +24,29 @@ export const DEPARTAMENTOS_PADRAO = [
   'TI',
   'Manutenção/Elétrica',
   'Prevenção de Perdas',
-  'Outro',
 ];
+
+// Retorna todos os departamentos unificados (padrão + cadastrados dinamicamente sem o "Outro")
+export function getListaDepartamentos() {
+  const custom = safeRead(STORAGE_CUSTOM_DEPS_KEY);
+  const unicos = new Set([...DEPARTAMENTOS_PADRAO, ...custom]);
+  unicos.delete('Outro');
+  unicos.delete('outro');
+  return Array.from(unicos);
+}
+
+// Cadastra um novo departamento no sistema
+export function cadastrarNovoDepartamento(nomeDepartamento) {
+  const nomeLimpo = String(nomeDepartamento || '').trim();
+  if (!nomeLimpo || nomeLimpo.toLowerCase() === 'outro') return null;
+
+  const custom = safeRead(STORAGE_CUSTOM_DEPS_KEY);
+  if (!custom.includes(nomeLimpo) && !DEPARTAMENTOS_PADRAO.includes(nomeLimpo)) {
+    custom.push(nomeLimpo);
+    safeWrite(STORAGE_CUSTOM_DEPS_KEY, custom);
+  }
+  return nomeLimpo;
+}
 
 export const TAMANHOS_PADRAO = [
   'PP',

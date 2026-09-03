@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import {
-  DEPARTAMENTOS_PADRAO,
+  getListaDepartamentos,
   TAMANHOS_PADRAO,
   getTamanhosPorDepartamento,
 } from '../../services/uniformesService';
@@ -364,7 +364,7 @@ export default function ModalEntregaUniforme({
                 style={{ height: '36px', fontSize: '13px' }}
                 required
               >
-                {DEPARTAMENTOS_PADRAO.map((d) => (
+                {getListaDepartamentos().map((d) => (
                   <option key={d} value={d}>
                     {d}
                   </option>

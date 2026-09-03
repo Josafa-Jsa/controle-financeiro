@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import {
-  DEPARTAMENTOS_PADRAO,
+  getListaDepartamentos,
   TAMANHOS_PADRAO,
   FABRICANTES_PADRAO,
   getTamanhosPorDepartamento,
@@ -20,11 +20,10 @@ export default function ModalEntradaUniforme({
     quantidade: '1',
     estado: 'Novo',
     fabricante: 'Jucicler',
+    outroFabricante: '',
     observacoes: '',
   });
 
-  const [tamanhoCustom, setTamanhoCustom] = useState('');
-  const [fabricanteCustom, setFabricanteCustom] = useState('');
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -35,10 +34,9 @@ export default function ModalEntradaUniforme({
         quantidade: '1',
         estado: 'Novo',
         fabricante: 'Jucicler',
+        outroFabricante: '',
         observacoes: '',
       });
-      setTamanhoCustom('');
-      setFabricanteCustom('');
     }
   }, [isOpen]);
 
@@ -57,54 +55,48 @@ export default function ModalEntradaUniforme({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const tamanhoFinal =
-      formData.tamanho === 'Outro' || formData.tamanho === 'Personalizado'
-        ? tamanhoCustom.trim()
-        : formData.tamanho;
-
-    const fabricanteFinal =
-      formData.fabricante === 'Outro'
-        ? fabricanteCustom.trim()
-        : formData.fabricante;
-
-    const qtd = parseInt(formData.quantidade, 10);
-
     if (!formData.departamento) {
       toast.warn('Selecione o departamento.');
       return;
     }
-
-    if (!tamanhoFinal) {
-      toast.warn('Informe o tamanho do uniforme.');
+    if (!formData.tamanho) {
+      toast.warn('Selecione o tamanho.');
       return;
     }
-
+    const qtd = parseInt(formData.quantidade, 10);
     if (!qtd || qtd <= 0) {
-      toast.warn('A quantidade deve ser maior que zero.');
+      toast.warn('Informe uma quantidade maior que zero.');
       return;
     }
-
-    if (!fabricanteFinal) {
-      toast.warn('Informe a empresa responsável pela fabricação.');
+    if (formData.fabricante === 'Outro' && !formData.outroFabricante.trim()) {
+      toast.warn('Informe o nome do fabricante.');
       return;
     }
 
     setSalvando(true);
     try {
-      await onSave({
+      const fabricanteFinal =
+        formData.fabricante === 'Outro'
+          ? formData.outroFabricante.trim()
+          : formData.fabricante;
+
+      const payload = {
         departamento: formData.departamento,
-        tamanho: tamanhoFinal,
+        tamanho: formData.tamanho,
         quantidade: qtd,
         estado: formData.estado,
         fabricante: fabricanteFinal,
         observacoes: formData.observacoes.trim(),
-      });
-      toast.success(`Entrada de ${qtd} uniforme(s) (${formData.estado}) registrada com sucesso!`);
+      };
+
+      await onSave(payload);
+      toast.success(
+        `Entrada de ${qtd} uniforme(s) para ${formData.departamento} cadastrada com sucesso!`
+      );
       onClose();
     } catch (err) {
       console.error('Erro ao cadastrar entrada de uniforme:', err);
-      toast.error('Erro ao registrar entrada de uniforme.');
+      toast.error('Erro ao salvar a entrada do uniforme.');
     } finally {
       setSalvando(false);
     }
@@ -113,15 +105,38 @@ export default function ModalEntradaUniforme({
   return (
     <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div
-        className="modal-box modal-lg"
+        className="modal-box modal-md"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '620px', width: '92%' }}
+        style={{ maxWidth: '580px', width: '92%' }}
       >
         {/* Cabeçalho */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #283340', paddingBottom: '10px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '16px',
+            borderBottom: '1px solid #1e293b',
+            paddingBottom: '12px',
+          }}
+        >
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '8px',
+              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '20px',
+            }}
+          >
+            ➕
+          </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '18px', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>👔</span> Cadastrar Entrada de Uniforme
+            <h2 style={{ margin: 0, fontSize: '17px', color: '#f8fafc' }}>
+              Cadastrar Entrada de Uniforme
             </h2>
             <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
               Registre o recebimento e abastecimento de uniformes novos ou usados no estoque.
@@ -143,7 +158,7 @@ export default function ModalEntradaUniforme({
                 style={{ height: '36px', fontSize: '13px' }}
                 required
               >
-                {DEPARTAMENTOS_PADRAO.map((dep) => (
+                {getListaDepartamentos().map((dep) => (
                   <option key={dep} value={dep}>
                     {dep}
                   </option>

@@ -1,6 +1,10 @@
 // src/components/Modais/ModalDepartamentosUniformes.jsx
-import React, { useEffect } from 'react';
-import { DEPARTAMENTOS_PADRAO } from '../../services/uniformesService';
+import React, { useEffect, useState, useMemo } from 'react';
+import { toast } from 'react-toastify';
+import {
+  getListaDepartamentos,
+  cadastrarNovoDepartamento,
+} from '../../services/uniformesService';
 import '../Visual/modal.css';
 
 export default function ModalDepartamentosUniformes({
@@ -8,7 +12,20 @@ export default function ModalDepartamentosUniformes({
   onClose,
   estoque = [],
   onSelecionarDepartamento,
+  onDepartamentoCadastrado,
 }) {
+  const [listaDeps, setListaDeps] = useState(getListaDepartamentos());
+  const [formNovoAberto, setFormNovoAberto] = useState(false);
+  const [novoNome, setNovoNome] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setListaDeps(getListaDepartamentos());
+      setFormNovoAberto(false);
+      setNovoNome('');
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     const onEsc = (e) => e.key === 'Escape' && isOpen && onClose();
     window.addEventListener('keydown', onEsc);
@@ -17,13 +34,40 @@ export default function ModalDepartamentosUniformes({
 
   if (!isOpen) return null;
 
+  const handleSalvarNovoDepartamento = (e) => {
+    e.preventDefault();
+    const nomeLimpo = novoNome.trim();
+    if (!nomeLimpo) {
+      toast.warn('Informe o nome do novo departamento.');
+      return;
+    }
+    if (nomeLimpo.toLowerCase() === 'outro') {
+      toast.warn('Não é permitido cadastrar o nome "Outro".');
+      return;
+    }
+    if (listaDeps.some((d) => d.toLowerCase() === nomeLimpo.toLowerCase())) {
+      toast.warn('Este departamento já está cadastrado.');
+      return;
+    }
+
+    cadastrarNovoDepartamento(nomeLimpo);
+    const atualizada = getListaDepartamentos();
+    setListaDeps(atualizada);
+    setNovoNome('');
+    setFormNovoAberto(false);
+    toast.success(`Departamento "${nomeLimpo}" cadastrado com sucesso!`);
+    if (onDepartamentoCadastrado) {
+      onDepartamentoCadastrado(nomeLimpo);
+    }
+  };
+
   // Total geral de uniformes de todos os departamentos
   const totalGeralEmpresa = estoque.reduce((acc, item) => acc + (Number(item.total_qtd) || 0), 0);
   const totalNovosEmpresa = estoque.reduce((acc, item) => acc + (Number(item.estado_novo_qtd) || 0), 0);
   const totalUsadosEmpresa = estoque.reduce((acc, item) => acc + (Number(item.estado_usado_qtd) || 0), 0);
 
-  // Mapeamento e cálculo de cada departamento da lista oficial
-  const dadosDepartamentos = DEPARTAMENTOS_PADRAO.map((depNome) => {
+  // Mapeamento e cálculo de cada departamento da lista
+  const dadosDepartamentos = listaDeps.map((depNome) => {
     const itensDep = estoque.filter((i) => i.departamento === depNome);
     const novos = itensDep.reduce((acc, i) => acc + (Number(i.estado_novo_qtd) || 0), 0);
     const usados = itensDep.reduce((acc, i) => acc + (Number(i.estado_usado_qtd) || 0), 0);
@@ -73,20 +117,114 @@ export default function ModalDepartamentosUniformes({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setFormNovoAberto((prev) => !prev)}
+              style={{
+                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                color: '#ffffff',
+                border: '1px solid #38bdf8',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontSize: '12.5px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>➕</span> {formNovoAberto ? 'Fechar Cadastro' : 'Cadastrar Departamento'}
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#94a3b8',
+                fontSize: '20px',
+                cursor: 'pointer',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Formulário Inline para Cadastrar Novo Departamento */}
+        {formNovoAberto && (
+          <form
+            onSubmit={handleSalvarNovoDepartamento}
             style={{
-              background: 'none',
-              border: 'none',
-              color: '#94a3b8',
-              fontSize: '20px',
-              cursor: 'pointer',
+              background: '#0b0f19',
+              border: '1px solid #38bdf8',
+              borderRadius: '8px',
+              padding: '12px 14px',
+              marginBottom: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              boxShadow: '0 4px 14px rgba(56, 189, 248, 0.2)',
             }}
           >
-            ✕
-          </button>
-        </div>
+            <span style={{ fontSize: '18px' }}>🏢</span>
+            <input
+              type="text"
+              placeholder="Digite o nome do novo departamento (Ex: Segurança do Trabalho, Encarregados...)"
+              value={novoNome}
+              onChange={(e) => setNovoNome(e.target.value)}
+              style={{
+                flex: 1,
+                height: '36px',
+                background: '#111827',
+                border: '1px solid #334155',
+                color: '#f8fafc',
+                borderRadius: '6px',
+                padding: '0 12px',
+                fontSize: '13px',
+              }}
+              autoFocus
+              required
+            />
+            <button
+              type="submit"
+              style={{
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: '#ffffff',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                fontSize: '12.5px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              💾 Salvar Departamento
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormNovoAberto(false);
+                setNovoNome('');
+              }}
+              style={{
+                background: '#1e293b',
+                color: '#94a3b8',
+                border: '1px solid #334155',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                fontSize: '12.5px',
+                cursor: 'pointer',
+              }}
+            >
+              Cancelar
+            </button>
+          </form>
+        )}
 
         {/* Barra de Totais Gerais */}
         <div

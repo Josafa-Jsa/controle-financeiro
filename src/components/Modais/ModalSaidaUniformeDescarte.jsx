@@ -1,8 +1,7 @@
-// src/components/Modais/ModalSaidaUniformeDescarte.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import {
-  DEPARTAMENTOS_PADRAO,
+  getListaDepartamentos,
   TAMANHOS_PADRAO,
   getTamanhosPorDepartamento,
 } from '../../services/uniformesService';
@@ -27,6 +26,7 @@ export default function ModalSaidaUniformeDescarte({
 }) {
   const [formData, setFormData] = useState({
     motivo: 'Rasgado',
+    outroMotivoTexto: '',
     departamento: 'Hortifruti',
     tamanho: 'M',
     estado: 'Usado',
@@ -40,6 +40,7 @@ export default function ModalSaidaUniformeDescarte({
     if (isOpen) {
       setFormData({
         motivo: 'Rasgado',
+        outroMotivoTexto: '',
         departamento: 'Hortifruti',
         tamanho: 'M',
         estado: 'Usado',
@@ -78,6 +79,10 @@ export default function ModalSaidaUniformeDescarte({
       toast.warn('Selecione o motivo da baixa / descarte.');
       return false;
     }
+    if (formData.motivo === 'Outro Motivo' && !formData.outroMotivoTexto.trim()) {
+      toast.warn('Por favor, informe e descreva o motivo no campo "Especifique o Outro Motivo".');
+      return false;
+    }
     if (!formData.departamento) {
       toast.warn('Selecione o departamento.');
       return false;
@@ -100,16 +105,21 @@ export default function ModalSaidaUniformeDescarte({
     return true;
   };
 
+  const motivoFormatado = formData.motivo === 'Outro Motivo'
+    ? `Outro: ${formData.outroMotivoTexto.trim()}`
+    : formData.motivo;
+
   // Ação Gerar Relatório de Baixas em PDF
   const handleGerarRelatorio = () => {
     if (!validarCampos()) return;
     const user = getUser();
     const dadosParaPDF = {
       ...formData,
+      motivo: motivoFormatado,
       responsavel: user?.name || user?.nome || 'Operador / Estoquista',
     };
     const doc = gerarRelatorioBaixasUniformePDF(dadosParaPDF);
-    doc.save(`Laudo_Baixa_Uniforme_${formData.departamento}_${formData.motivo}_${Date.now()}.pdf`);
+    doc.save(`Laudo_Baixa_Uniforme_${formData.departamento}_${Date.now()}.pdf`);
     toast.info('📄 Relatório de Baixa e Descarte de Uniforme gerado com sucesso!');
   };
 
@@ -126,14 +136,14 @@ export default function ModalSaidaUniformeDescarte({
         tamanho: formData.tamanho,
         quantidade: parseInt(formData.quantidade, 10),
         estado: formData.estado,
-        colaborador: `Baixa por ${formData.motivo}`,
+        colaborador: `Baixa por ${motivoFormatado}`,
         responsavel: user?.name || user?.nome || 'Operador',
-        observacoes: `[BAIXA/DESCARTE • ${formData.motivo.toUpperCase()}] ${formData.observacoes.trim()}`,
+        observacoes: `[BAIXA/DESCARTE • ${motivoFormatado.toUpperCase()}] ${formData.observacoes.trim()}`,
       };
 
       await onSalvarBaixa(payload);
       toast.success(
-        `Baixa de ${formData.quantidade} uniforme(s) (${formData.motivo}) registrada e abatida do estoque com sucesso!`
+        `Baixa de ${formData.quantidade} uniforme(s) (${motivoFormatado}) registrada e abatida do estoque com sucesso!`
       );
       onClose();
     } catch (err) {
@@ -216,6 +226,30 @@ export default function ModalSaidaUniformeDescarte({
             </div>
           </div>
 
+          {/* Campo Condicional: Especificação Obrigatória do Outro Motivo */}
+          {formData.motivo === 'Outro Motivo' && (
+            <div className="form-row" style={{ animation: 'fadeInPage 0.2s ease' }}>
+              <label className="required" style={{ fontSize: '12px', color: '#fca5a5', fontWeight: 700 }}>
+                📝 Especifique o Outro Motivo (Obrigatório):
+              </label>
+              <input
+                type="text"
+                name="outroMotivoTexto"
+                placeholder="Descreva exatamente o motivo da baixa (Ex: Extraviado na lavanderia, Queimado por ferro...)"
+                value={formData.outroMotivoTexto}
+                onChange={handleChange}
+                style={{
+                  height: '38px',
+                  fontSize: '13px',
+                  border: '1px solid #ef4444',
+                  background: '#181114',
+                }}
+                autoFocus
+                required
+              />
+            </div>
+          )}
+
           {/* Linha 2: Departamento Referente ao Uniforme */}
           <div className="form-row">
             <label className="required" style={{ fontSize: '12px', color: '#fed7aa', fontWeight: 600 }}>
@@ -228,7 +262,7 @@ export default function ModalSaidaUniformeDescarte({
               style={{ height: '38px', fontSize: '13px' }}
               required
             >
-              {DEPARTAMENTOS_PADRAO.map((dep) => (
+              {getListaDepartamentos().map((dep) => (
                 <option key={dep} value={dep}>
                   {dep}
                 </option>
