@@ -103,13 +103,6 @@ export default function ModalAdicionarItemEnvio({
               Selecione o departamento, tamanho e a quantidade a enviar
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '18px', cursor: 'pointer' }}
-          >
-            ✕
-          </button>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

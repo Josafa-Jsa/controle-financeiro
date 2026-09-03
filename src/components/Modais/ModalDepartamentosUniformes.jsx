@@ -137,20 +137,6 @@ export default function ModalDepartamentosUniformes({
             >
               <span>➕</span> {formNovoAberto ? 'Fechar Cadastro' : 'Cadastrar Departamento'}
             </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#94a3b8',
-                fontSize: '20px',
-                cursor: 'pointer',
-              }}
-            >
-              ✕
-            </button>
           </div>
         </div>
 

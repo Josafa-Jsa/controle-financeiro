@@ -136,23 +136,6 @@ export default function ModalFiltroOS({
               Busque por Nome, CPF, Telefone ou Número da OS para preencher dados ou filtrar
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#a1a1aa',
-              fontSize: '1.4rem',
-              cursor: 'pointer',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              transition: 'color 0.2s',
-            }}
-            title="Fechar"
-          >
-            ✕
-          </button>
         </div>
 
         {/* Campos de Filtro / Busca */}

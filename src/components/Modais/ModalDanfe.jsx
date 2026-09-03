@@ -114,24 +114,6 @@ export default function ModalDanfe({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#94a3b8',
-              fontSize: '1.5rem',
-              cursor: 'pointer',
-              lineHeight: 1,
-              padding: '4px 8px',
-              borderRadius: '4px',
-              transition: 'color 0.2s',
-            }}
-            title="Fechar (ESC)"
-          >
-            ✕
-          </button>
         </div>
 
         {/* Corpo do Modal com Visualizador PDF Embutido */}

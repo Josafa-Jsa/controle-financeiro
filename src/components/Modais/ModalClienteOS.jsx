@@ -146,21 +146,6 @@ export default function ModalClienteOS({
               </span>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#a1a1aa',
-              fontSize: '1.4rem',
-              cursor: 'pointer',
-              padding: '4px 8px',
-            }}
-          >
-            ✕
-          </button>
         </div>
 
         {/* Formulário */}

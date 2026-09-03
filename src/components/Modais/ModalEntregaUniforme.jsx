@@ -288,13 +288,6 @@ export default function ModalEntregaUniforme({
               Preencha os dados do colaborador, colha a assinatura digital e emita o recibo oficial.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '20px', cursor: 'pointer' }}
-          >
-            ✕
-          </button>
         </div>
 
         {/* ALERTA DE REGRA DE TROCA */}

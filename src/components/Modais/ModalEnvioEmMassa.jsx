@@ -156,19 +156,12 @@ export default function ModalEnvioEmMassa({
         >
           <div>
             <h2 style={{ margin: 0, fontSize: '18px', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>🚚</span> Envio de Uniformes em Massa para Filiais
+              <span>🚚</span> Envio de Uniformes em Massa (Transferência para Filiais)
             </h2>
             <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#94a3b8' }}>
               Configure a transferência de lotes de uniformes para Filial 2, Filial 3, Filial 5 ou outras unidades
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '20px', cursor: 'pointer' }}
-          >
-            ✕
-          </button>
         </div>
 
         {/* Linha 1: Filial e Motorista */}

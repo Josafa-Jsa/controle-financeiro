@@ -125,20 +125,6 @@ export default function ModalProdutoOS({
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#a1a1aa',
-              fontSize: '1.4rem',
-              cursor: 'pointer',
-              padding: '4px 8px',
-            }}
-          >
-            ✕
-          </button>
         </div>
 
         {/* Alerta de Auto-busca ou Sucesso */}

@@ -181,19 +181,12 @@ export default function ModalSaidaUniformeDescarte({
         >
           <div>
             <h2 style={{ margin: 0, fontSize: '18px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>🗑️</span> Saída de Uniforme (Baixa / Descarte)
+              <span>🗑️</span> Saída de Uniforme (Baixa / Avaria)
             </h2>
             <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#94a3b8' }}>
               Registre a baixa de uniformes rasgados, manchados ou impróprios para o uso abatendo do estoque.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '20px', cursor: 'pointer' }}
-          >
-            ✕
-          </button>
         </div>
 
         <form onSubmit={handleSalvar} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
