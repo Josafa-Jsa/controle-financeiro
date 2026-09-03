@@ -5,7 +5,11 @@ import {
   TAMANHOS_PADRAO,
   getTamanhosPorDepartamento,
 } from '../../services/uniformesService';
-import { gerarRelatorioBaixasUniformePDF } from '../../utils/gerarRelatorioBaixasUniformePDF';
+import {
+  gerarRelatorioBaixasUniformePDF,
+  gerarRelatorioBaixasUniformeBlob,
+} from '../../utils/gerarRelatorioBaixasUniformePDF';
+import ModalVisualizadorDocumento from './ModalVisualizadorDocumento';
 import { getUser } from '../../auth/auth';
 import '../Visual/modal.css';
 
@@ -35,6 +39,8 @@ export default function ModalSaidaUniformeDescarte({
   });
 
   const [salvando, setSalvando] = useState(false);
+  const [modalRelatorioAberto, setModalRelatorioAberto] = useState(false);
+  const [relatorioBlob, setRelatorioBlob] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -47,6 +53,8 @@ export default function ModalSaidaUniformeDescarte({
         quantidade: '1',
         observacoes: '',
       });
+      setModalRelatorioAberto(false);
+      setRelatorioBlob(null);
     }
   }, [isOpen]);
 
@@ -96,12 +104,6 @@ export default function ModalSaidaUniformeDescarte({
       toast.warn('Informe uma quantidade maior que zero.');
       return false;
     }
-    if (qtd > saldoDisponivel) {
-      const confirmExcedente = window.confirm(
-        `Atenção: A quantidade informada (${qtd} un) é maior que o saldo em estoque (${saldoDisponivel} un). Deseja registrar a baixa mesmo assim?`
-      );
-      if (!confirmExcedente) return false;
-    }
     return true;
   };
 
@@ -109,7 +111,7 @@ export default function ModalSaidaUniformeDescarte({
     ? `Outro: ${formData.outroMotivoTexto.trim()}`
     : formData.motivo;
 
-  // Ação Gerar Relatório de Baixas em PDF
+  // Ação Gerar Relatório de Baixas no Modal do Sistema
   const handleGerarRelatorio = () => {
     if (!validarCampos()) return;
     const user = getUser();
@@ -118,9 +120,14 @@ export default function ModalSaidaUniformeDescarte({
       motivo: motivoFormatado,
       responsavel: user?.name || user?.nome || 'Operador / Estoquista',
     };
-    const doc = gerarRelatorioBaixasUniformePDF(dadosParaPDF);
-    doc.save(`Laudo_Baixa_Uniforme_${formData.departamento}_${Date.now()}.pdf`);
-    toast.info('📄 Relatório de Baixa e Descarte de Uniforme gerado com sucesso!');
+    try {
+      const blob = gerarRelatorioBaixasUniformeBlob(dadosParaPDF);
+      setRelatorioBlob(blob);
+      setModalRelatorioAberto(true);
+    } catch (err) {
+      console.error('Erro ao gerar laudo em PDF:', err);
+      toast.error('Erro ao abrir o relatório.');
+    }
   };
 
   // Ação Salvar Baixa
@@ -430,6 +437,16 @@ export default function ModalSaidaUniformeDescarte({
           </div>
         </form>
       </div>
+
+      {/* Modal de Visualização Nativa do Laudo de Baixa e Descarte */}
+      <ModalVisualizadorDocumento
+        isOpen={modalRelatorioAberto}
+        onClose={() => setModalRelatorioAberto(false)}
+        titulo="Laudo Oficial de Baixa & Descarte de Uniformes"
+        subtitulo={`Departamento: ${formData.departamento} • Motivo: ${motivoFormatado} • Quantidade: ${formData.quantidade} un`}
+        blob={relatorioBlob}
+        nomeArquivo={`Laudo_Baixa_Uniforme_${formData.departamento}_${Date.now()}.pdf`}
+      />
     </div>
   );
 }

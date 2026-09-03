@@ -6,7 +6,11 @@ import {
   TAMANHOS_PADRAO,
   getTamanhosPorDepartamento,
 } from '../../services/uniformesService';
-import { gerarComprovanteUniformePDF } from '../../utils/gerarComprovanteUniformePDF';
+import {
+  gerarComprovanteUniformePDF,
+  gerarComprovanteUniformeBlob,
+} from '../../utils/gerarComprovanteUniformePDF';
+import ModalVisualizadorDocumento from './ModalVisualizadorDocumento';
 import { getUser } from '../../auth/auth';
 import '../Visual/modal.css';
 
@@ -24,11 +28,13 @@ export default function ModalEntregaUniforme({
     tamanho: 'M',
     estado: 'Novo',
     quantidade: '1',
-    trocaDevolucao: false,
+    trocaComDevolucao: true,
     observacoes: '',
   });
 
   const [salvando, setSalvando] = useState(false);
+  const [modalTermoAberto, setModalTermoAberto] = useState(false);
+  const [termoBlob, setTermoBlob] = useState(null);
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -199,7 +205,7 @@ export default function ModalEntregaUniforme({
     return true;
   };
 
-  // Ação Imprimir Termo / Recibo em PDF
+  // Ação Imprimir Termo / Recibo em Modal Nativo do Sistema
   const handleImprimir = () => {
     if (!validarCampos()) return;
     const user = getUser();
@@ -209,9 +215,14 @@ export default function ModalEntregaUniforme({
       assinatura: getSignatureDataUrl(),
     };
 
-    const doc = gerarComprovanteUniformePDF(dadosParaPDF);
-    doc.save(`Termo_Uniforme_${formData.nome.replace(/\s+/g, '_')}.pdf`);
-    toast.info('📄 Termo de Entrega de Uniforme gerado com sucesso!');
+    try {
+      const blob = gerarComprovanteUniformeBlob(dadosParaPDF);
+      setTermoBlob(blob);
+      setModalTermoAberto(true);
+    } catch (err) {
+      console.error('Erro ao gerar termo de entrega em PDF:', err);
+      toast.error('Erro ao abrir visualização do termo.');
+    }
   };
 
   // Ação Salvar Entrega
@@ -597,6 +608,16 @@ export default function ModalEntregaUniforme({
           </div>
         </form>
       </div>
+
+      {/* Modal de Visualização Nativa do Termo de Entrega com Assinatura */}
+      <ModalVisualizadorDocumento
+        isOpen={modalTermoAberto}
+        onClose={() => setModalTermoAberto(false)}
+        titulo="Termo Oficial de Entrega de Uniforme"
+        subtitulo={`Colaborador(a): ${formData.nome} • Departamento: ${formData.departamento} • Tamanho: ${formData.tamanho}`}
+        blob={termoBlob}
+        nomeArquivo={`Termo_Entrega_Uniforme_${(formData.nome || 'Colaborador').replace(/\s+/g, '_')}.pdf`}
+      />
     </div>
   );
 }

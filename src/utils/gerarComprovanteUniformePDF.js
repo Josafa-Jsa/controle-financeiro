@@ -190,3 +190,8 @@ export function gerarComprovanteUniformePDF(dadosEntrega) {
 
   return doc;
 }
+
+export function gerarComprovanteUniformeBlob(dadosEntrega) {
+  const doc = gerarComprovanteUniformePDF(dadosEntrega);
+  return doc.output('blob');
+}

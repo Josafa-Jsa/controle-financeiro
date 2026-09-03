@@ -165,3 +165,8 @@ export function gerarRelatorioBaixasUniformePDF(dadosBaixa) {
 
   return doc;
 }
+
+export function gerarRelatorioBaixasUniformeBlob(dadosBaixa) {
+  const doc = gerarRelatorioBaixasUniformePDF(dadosBaixa);
+  return doc.output('blob');
+}
