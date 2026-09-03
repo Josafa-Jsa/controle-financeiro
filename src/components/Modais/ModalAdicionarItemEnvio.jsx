@@ -6,6 +6,7 @@ import {
   TAMANHOS_PADRAO,
   getTamanhosPorDepartamento,
 } from '../../services/uniformesService';
+import ModalConfirmacaoSistema from './ModalConfirmacaoSistema';
 import '../Visual/modal.css';
 
 export default function ModalAdicionarItemEnvio({
@@ -18,6 +19,7 @@ export default function ModalAdicionarItemEnvio({
   const [tamanho, setTamanho] = useState('M');
   const [estado, setEstado] = useState('Novo');
   const [quantidade, setQuantidade] = useState('1');
+  const [modalConfirmarExcedenteAberto, setModalConfirmarExcedenteAberto] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -25,6 +27,7 @@ export default function ModalAdicionarItemEnvio({
       setTamanho('M');
       setEstado('Novo');
       setQuantidade('1');
+      setModalConfirmarExcedenteAberto(false);
     }
   }, [isOpen]);
 
@@ -45,6 +48,20 @@ export default function ModalAdicionarItemEnvio({
 
   if (!isOpen) return null;
 
+  const executarInclusao = (qtd) => {
+    onAdicionar({
+      id: `${departamento}_${tamanho}_${estado}_${Date.now()}`,
+      departamento,
+      tamanho,
+      estado,
+      quantidade: qtd,
+      fabricante: 'Jucicler / Stamp',
+    });
+
+    toast.success(`Adicionado: ${qtd}x ${departamento} (Tam: ${tamanho} - ${estado})`);
+    onClose();
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const qtd = parseInt(quantidade, 10);
@@ -63,23 +80,11 @@ export default function ModalAdicionarItemEnvio({
     }
 
     if (qtd > saldoDisponivel) {
-      const confirmExcedente = window.confirm(
-        `Atenção: A quantidade informada (${qtd} un) é maior que o saldo atual em estoque (${saldoDisponivel} un). Deseja incluir mesmo assim?`
-      );
-      if (!confirmExcedente) return;
+      setModalConfirmarExcedenteAberto(true);
+      return;
     }
 
-    onAdicionar({
-      id: `${departamento}_${tamanho}_${estado}_${Date.now()}`,
-      departamento,
-      tamanho,
-      estado,
-      quantidade: qtd,
-      fabricante: 'Jucicler / Stamp',
-    });
-
-    toast.success(`Adicionado: ${qtd}x ${departamento} (Tam: ${tamanho} - ${estado})`);
-    onClose();
+    executarInclusao(qtd);
   };
 
   return (
@@ -216,6 +221,27 @@ export default function ModalAdicionarItemEnvio({
           </div>
         </form>
       </div>
+
+      {/* Modal de Confirmação Nativo do Sistema */}
+      <ModalConfirmacaoSistema
+        isOpen={modalConfirmarExcedenteAberto}
+        onClose={() => setModalConfirmarExcedenteAberto(false)}
+        onConfirmar={() => executarInclusao(parseInt(quantidade, 10))}
+        titulo="Quantidade Superior ao Estoque"
+        tipo="alerta"
+        mensagem={
+          <div>
+            <p style={{ margin: '0 0 6px 0' }}>
+              A quantidade solicitada (<strong>{quantidade} un</strong>) de uniformes para <strong>{departamento}</strong> (Tam: {tamanho} - {estado}) é maior que o saldo atual registrado em estoque (<strong>{saldoDisponivel} un</strong>).
+            </p>
+            <p style={{ margin: 0, color: '#f59e0b', fontSize: '12px' }}>
+              Deseja incluir este item no envio mesmo assim?
+            </p>
+          </div>
+        }
+        textoConfirmar="Incluir Mesmo Assim"
+        textoCancelar="Voltar e Corrigir"
+      />
     </div>
   );
 }

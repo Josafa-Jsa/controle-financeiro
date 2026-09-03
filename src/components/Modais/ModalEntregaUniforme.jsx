@@ -11,6 +11,7 @@ import {
   gerarComprovanteUniformeBlob,
 } from '../../utils/gerarComprovanteUniformePDF';
 import ModalVisualizadorDocumento from './ModalVisualizadorDocumento';
+import ModalConfirmacaoSistema from './ModalConfirmacaoSistema';
 import { getUser } from '../../auth/auth';
 import '../Visual/modal.css';
 
@@ -34,6 +35,7 @@ export default function ModalEntregaUniforme({
 
   const [salvando, setSalvando] = useState(false);
   const [modalTermoAberto, setModalTermoAberto] = useState(false);
+  const [modalConfirmarSemAssinaturaAberto, setModalConfirmarSemAssinaturaAberto] = useState(false);
   const [termoBlob, setTermoBlob] = useState(null);
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -225,18 +227,7 @@ export default function ModalEntregaUniforme({
     }
   };
 
-  // Ação Salvar Entrega
-  const handleSalvar = async (e) => {
-    e.preventDefault();
-    if (!validarCampos()) return;
-
-    if (!hasSignature) {
-      const confirmSemAssinatura = window.confirm(
-        'O colaborador ainda não assinou a retirada no campo digital. Deseja registrar a entrega mesmo assim?'
-      );
-      if (!confirmSemAssinatura) return;
-    }
-
+  const executarSalvarEntrega = async () => {
     setSalvando(true);
     try {
       const user = getUser();
@@ -256,6 +247,19 @@ export default function ModalEntregaUniforme({
     } finally {
       setSalvando(false);
     }
+  };
+
+  // Ação Salvar Entrega
+  const handleSalvar = async (e) => {
+    e.preventDefault();
+    if (!validarCampos()) return;
+
+    if (!hasSignature) {
+      setModalConfirmarSemAssinaturaAberto(true);
+      return;
+    }
+
+    await executarSalvarEntrega();
   };
 
   return (
@@ -617,6 +621,27 @@ export default function ModalEntregaUniforme({
         subtitulo={`Colaborador(a): ${formData.nome} • Departamento: ${formData.departamento} • Tamanho: ${formData.tamanho}`}
         blob={termoBlob}
         nomeArquivo={`Termo_Entrega_Uniforme_${(formData.nome || 'Colaborador').replace(/\s+/g, '_')}.pdf`}
+      />
+
+      {/* Modal de Confirmação Nativo do Sistema para Entrega Sem Assinatura */}
+      <ModalConfirmacaoSistema
+        isOpen={modalConfirmarSemAssinaturaAberto}
+        onClose={() => setModalConfirmarSemAssinaturaAberto(false)}
+        onConfirmar={executarSalvarEntrega}
+        titulo="Retirada Sem Assinatura Digital"
+        tipo="alerta"
+        mensagem={
+          <div>
+            <p style={{ margin: '0 0 6px 0' }}>
+              O colaborador <strong>{formData.nome || 'informado'}</strong> ainda não assinou a retirada no campo digital.
+            </p>
+            <p style={{ margin: 0, color: '#f59e0b', fontSize: '12px' }}>
+              Deseja registrar e concluir a entrega no sistema mesmo sem a assinatura digital?
+            </p>
+          </div>
+        }
+        textoConfirmar="Registrar Sem Assinatura"
+        textoCancelar="Voltar e Assinar"
       />
     </div>
   );
