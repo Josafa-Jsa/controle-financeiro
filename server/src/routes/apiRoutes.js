@@ -92,4 +92,9 @@ router.post('/uniformes/entrada', uniformesController.cadastrarEntrada);
 router.post('/uniformes/saida', uniformesController.cadastrarSaida);
 router.delete('/uniformes/movimentacoes/:id', uniformesController.deleteMovimentacao);
 
+// API de Integração Externa (Prevenção de Perdas & Uniformes)
+import integracaoExternaRoutes from './integracaoExternaRoutes.js';
+router.use('/v1/integracao', integracaoExternaRoutes);
+router.use('/integracao', integracaoExternaRoutes);
+
 export default router;
