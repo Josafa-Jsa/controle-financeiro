@@ -403,11 +403,7 @@ export default function ModalEntregaUniforme({
                 name="estado"
                 value={formData.estado}
                 onChange={handleChange}
-                style={{
-                  height: '36px',
-                  fontSize: '13px',
-                  background: formData.estado === 'Novo' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                }}
+                style={{ height: '36px', fontSize: '13px' }}
                 required
               >
                 <option value="Novo">✨ Novo</option>

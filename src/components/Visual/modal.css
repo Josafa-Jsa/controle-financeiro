@@ -153,30 +153,43 @@ body:has(.modal-overlay) {
   color: #ccc;
 }
 
-/* Estilização dos Inputs e Selects */
 .form-row input[type="text"],
 .form-row input[type="email"],
 .form-row input[type="tel"],
 .form-row input[type="password"],
 .form-row input[type="number"],
 .form-row input[type="date"],
-.form-row select {
+.form-row select,
+select {
   width: 100%;
-  height: 42px;
+  height: 40px;
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid #2b2b2e;
-  background: #121214;
-  color: #fff;
+  border: 1px solid #334155 !important;
+  background: #111827 !important;
+  background-color: #111827 !important;
+  color: #f8fafc !important;
   outline: none;
   box-sizing: border-box;
-  font-size: 14px;
+  font-size: 13.5px;
+}
+
+.form-row select option,
+.modal-box select option,
+.modal-card select option,
+select option {
+  background: #111827 !important;
+  background-color: #111827 !important;
+  color: #f8fafc !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
 }
 
 .form-row input:focus,
-.form-row select:focus {
-  border-color: var(--ub-500);
-  box-shadow: 0 0 0 3px rgba(25, 197, 216, 0.18);
+.form-row select:focus,
+select:focus {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2) !important;
 }
 
 .modal-hint {
