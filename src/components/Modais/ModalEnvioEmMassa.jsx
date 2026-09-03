@@ -1,21 +1,28 @@
 // src/components/Modais/ModalEnvioEmMassa.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import ModalAdicionarItemEnvio from './ModalAdicionarItemEnvio';
 import { gerarGuiaTransferenciaUniformePDF } from '../../utils/gerarGuiaTransferenciaUniformePDF';
-import { getUser } from '../../auth/auth';
+import { getUser, isAdmin } from '../../auth/auth';
 import '../Visual/modal.css';
 
-export const FILIAIS_ENVIO = [
+export const FILIAIS_BASE = [
+  'Filial 1',
   'Filial 2',
   'Filial 3',
-  'Filial 5',
-  'Filial 1',
   'Filial 4',
+  'Filial 5',
   'Filial 6',
   'Filial 7',
-  'Filial Particular',
 ];
+
+export function getFiliaisDisponiveis(user) {
+  const isAdm = isAdmin(user);
+  if (isAdm) {
+    return [...FILIAIS_BASE, 'Filial Particular'];
+  }
+  return FILIAIS_BASE;
+}
 
 export default function ModalEnvioEmMassa({
   isOpen,
@@ -25,8 +32,9 @@ export default function ModalEnvioEmMassa({
 }) {
   const user = getUser();
   const usuarioNomePadrao = user?.name || user?.nome || 'Operador';
+  const filiaisDisponiveis = useMemo(() => getFiliaisDisponiveis(user), [user]);
 
-  const [filial, setFilial] = useState('Filial 2');
+  const [filial, setFilial] = useState('Filial 1');
   const [enviadoPor, setEnviadoPor] = useState(usuarioNomePadrao);
   const [quemIraReceber, setQuemIraReceber] = useState('');
   const [motorista, setMotorista] = useState('');
@@ -38,7 +46,7 @@ export default function ModalEnvioEmMassa({
   useEffect(() => {
     if (isOpen) {
       const u = getUser();
-      setFilial('Filial 2');
+      setFilial('Filial 1');
       setEnviadoPor(u?.name || u?.nome || 'Operador');
       setQuemIraReceber('');
       setMotorista('');
@@ -176,9 +184,9 @@ export default function ModalEnvioEmMassa({
               style={{ height: '38px', fontSize: '13.5px', fontWeight: 700 }}
               required
             >
-              {FILIAIS_ENVIO.map((f) => (
+              {filiaisDisponiveis.map((f) => (
                 <option key={f} value={f}>
-                  {f}
+                  {f === 'Filial Particular' ? '⭐ ' : '🏢 '}{f}
                 </option>
               ))}
             </select>
