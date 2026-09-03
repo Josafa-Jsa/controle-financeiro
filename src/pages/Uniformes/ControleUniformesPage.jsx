@@ -428,23 +428,24 @@ export default function ControleUniformesPage() {
 
           {/* Alternador de Modo Visual (Dashboard de Containers vs Tabela) */}
           {abaAtiva !== 'movimentacoes' && (
-            <div style={{ display: 'flex', background: '#111827', padding: '3px', borderRadius: '8px', border: '1px solid #334155', gap: '4px' }}>
+            <div style={{ display: 'flex', background: '#0b0f19', padding: '4px', borderRadius: '8px', border: '1px solid #1e293b', gap: '6px' }}>
               <button
                 type="button"
                 onClick={() => setModoVisual('dashboard')}
                 style={{
                   background: modoVisual === 'dashboard' ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' : 'transparent',
-                  color: modoVisual === 'dashboard' ? '#fff' : '#94a3b8',
-                  border: 'none',
-                  padding: '6px 12px',
+                  color: modoVisual === 'dashboard' ? '#ffffff' : '#94a3b8',
+                  border: modoVisual === 'dashboard' ? '1px solid #38bdf8' : '1px solid transparent',
+                  padding: '7px 14px',
                   borderRadius: '6px',
-                  fontSize: '12.5px',
+                  fontSize: '13px',
                   fontWeight: 700,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                   transition: 'all 0.2s ease',
+                  boxShadow: modoVisual === 'dashboard' ? '0 2px 10px rgba(56, 189, 248, 0.4)' : 'none',
                 }}
               >
                 <span>📊</span> Containers Dashboard
@@ -454,17 +455,18 @@ export default function ControleUniformesPage() {
                 onClick={() => setModoVisual('tabela')}
                 style={{
                   background: modoVisual === 'tabela' ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' : 'transparent',
-                  color: modoVisual === 'tabela' ? '#fff' : '#94a3b8',
-                  border: 'none',
-                  padding: '6px 12px',
+                  color: modoVisual === 'tabela' ? '#ffffff' : '#94a3b8',
+                  border: modoVisual === 'tabela' ? '1px solid #38bdf8' : '1px solid transparent',
+                  padding: '7px 14px',
                   borderRadius: '6px',
-                  fontSize: '12.5px',
+                  fontSize: '13px',
                   fontWeight: 700,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                   transition: 'all 0.2s ease',
+                  boxShadow: modoVisual === 'tabela' ? '0 2px 10px rgba(56, 189, 248, 0.4)' : 'none',
                 }}
               >
                 <span>📋</span> Tabela Detalhada
