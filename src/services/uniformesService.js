@@ -21,6 +21,7 @@ export const DEPARTAMENTOS_PADRAO = [
   'Fiscal de Caixa',
   'Administrativo',
   'TI',
+  'Manutenção/Elétrica',
   'Prevenção de Perdas',
   'Outro',
 ];
@@ -45,6 +46,17 @@ export const TAMANHOS_PADRAO = [
   '54',
   'Único',
 ];
+
+// Boné é item/tamanho exclusivo para os setores de Frios e Açougue
+export function getTamanhosPorDepartamento(departamento) {
+  const dep = String(departamento || '').trim().toLowerCase();
+  const permiteBone = dep === 'frios' || dep === 'açougue' || dep === 'acougue';
+
+  if (permiteBone) {
+    return ['Boné (Único)', ...TAMANHOS_PADRAO];
+  }
+  return TAMANHOS_PADRAO;
+}
 
 export const FABRICANTES_PADRAO = ['Jucicler', 'Stamp', 'Outro'];
 

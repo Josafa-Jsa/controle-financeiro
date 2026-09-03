@@ -9,6 +9,7 @@ import {
   DEPARTAMENTOS_PADRAO,
   TAMANHOS_PADRAO,
   FABRICANTES_PADRAO,
+  getTamanhosPorDepartamento,
 } from '../../services/uniformesService';
 import ModalEntradaUniforme from '../../components/Modais/ModalEntradaUniforme';
 import ModalDepartamentosUniformes from '../../components/Modais/ModalDepartamentosUniformes';
@@ -361,9 +362,9 @@ export default function ControleUniformesPage() {
             onChange={(e) => setFiltroTamanho(e.target.value)}
           >
             <option value="">📏 Todos os Tamanhos</option>
-            {TAMANHOS_PADRAO.map((t) => (
+            {getTamanhosPorDepartamento(filtroDepartamento).map((t) => (
               <option key={t} value={t}>
-                {t}
+                {t.startsWith('Boné') ? '🧢 ' : ''}{t}
               </option>
             ))}
           </select>

@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import {
   DEPARTAMENTOS_PADRAO,
   TAMANHOS_PADRAO,
+  getTamanhosPorDepartamento,
 } from '../../services/uniformesService';
 import { gerarRelatorioBaixasUniformePDF } from '../../utils/gerarRelatorioBaixasUniformePDF';
 import { getUser } from '../../auth/auth';
@@ -248,9 +249,10 @@ export default function ModalSaidaUniformeDescarte({
                 style={{ height: '36px', fontSize: '13px' }}
                 required
               >
-                {TAMANHOS_PADRAO.map((tam) => (
+                {getTamanhosPorDepartamento(formData.departamento).map((tam) => (
                   <option key={tam} value={tam}>
-                    Tamanho: {tam}
+                    {tam.startsWith('Boné') ? '🧢 ' : 'Tamanho: '}
+                    {tam}
                   </option>
                 ))}
               </select>

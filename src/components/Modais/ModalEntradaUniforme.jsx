@@ -5,6 +5,7 @@ import {
   DEPARTAMENTOS_PADRAO,
   TAMANHOS_PADRAO,
   FABRICANTES_PADRAO,
+  getTamanhosPorDepartamento,
 } from '../../services/uniformesService';
 import '../Visual/modal.css';
 
@@ -180,9 +181,10 @@ export default function ModalEntradaUniforme({
                 style={{ height: '36px', fontSize: '13px' }}
                 required
               >
-                {TAMANHOS_PADRAO.map((tam) => (
+                {getTamanhosPorDepartamento(formData.departamento).map((tam) => (
                   <option key={tam} value={tam}>
-                    Tamanho: {tam}
+                    {tam.startsWith('Boné') ? '🧢 ' : 'Tamanho: '}
+                    {tam}
                   </option>
                 ))}
                 <option value="Personalizado">Outro Tamanho (Digitar)...</option>

@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import {
   DEPARTAMENTOS_PADRAO,
   TAMANHOS_PADRAO,
+  getTamanhosPorDepartamento,
 } from '../../services/uniformesService';
 import { gerarComprovanteUniformePDF } from '../../utils/gerarComprovanteUniformePDF';
 import { getUser } from '../../auth/auth';
@@ -382,9 +383,10 @@ export default function ModalEntregaUniforme({
                 style={{ height: '36px', fontSize: '13px' }}
                 required
               >
-                {TAMANHOS_PADRAO.map((t) => (
+                {getTamanhosPorDepartamento(formData.departamento).map((t) => (
                   <option key={t} value={t}>
-                    Tamanho: {t}
+                    {t.startsWith('Boné') ? '🧢 ' : 'Tamanho: '}
+                    {t}
                   </option>
                 ))}
               </select>

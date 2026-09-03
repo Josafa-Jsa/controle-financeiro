@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import {
   DEPARTAMENTOS_PADRAO,
   TAMANHOS_PADRAO,
+  getTamanhosPorDepartamento,
 } from '../../services/uniformesService';
 import '../Visual/modal.css';
 
@@ -136,8 +137,9 @@ export default function ModalAdicionarItemEnvio({
                 style={{ height: '36px', fontSize: '13px' }}
                 required
               >
-                {TAMANHOS_PADRAO.map((tam) => (
+                {getTamanhosPorDepartamento(departamento).map((tam) => (
                   <option key={tam} value={tam}>
+                    {tam.startsWith('Boné') ? '🧢 ' : 'Tamanho: '}
                     {tam}
                   </option>
                 ))}
