@@ -91,8 +91,99 @@ export default function ControleUniformesPage() {
 
   const totalDepartamentos = useMemo(() => {
     const deps = new Set(estoque.map((i) => i.departamento).filter(Boolean));
-    return deps.size;
+    return deps.size || DEPARTAMENTOS_PADRAO.length;
   }, [estoque]);
+
+  // Ícones e cores para cada setor
+  const getIconeDepartamento = (dep) => {
+    const d = String(dep || '').toLowerCase();
+    if (d.includes('hortifruti')) return { icon: '🥦', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' };
+    if (d.includes('caixa')) return { icon: '💳', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)' };
+    if (d.includes('pacote')) return { icon: '🛍️', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' };
+    if (d.includes('padaria')) return { icon: '🍞', color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.15)' };
+    if (d.includes('lanchonete')) return { icon: '🍔', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)' };
+    if (d.includes('mercearia')) return { icon: '🛒', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.15)' };
+    if (d.includes('frios')) return { icon: '❄️', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)' };
+    if (d.includes('açougue') || d.includes('acougue')) return { icon: '🥩', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' };
+    if (d.includes('cozinha')) return { icon: '🍳', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.15)' };
+    if (d.includes('confeitaria')) return { icon: '🎂', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.15)' };
+    if (d.includes('deposito')) return { icon: '📦', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)' };
+    if (d.includes('recebimento')) return { icon: '🚚', color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.15)' };
+    if (d.includes('manutenção') || d.includes('eletrica') || d.includes('manutencao')) return { icon: '🛠️', color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)' };
+    if (d.includes('administrativo')) return { icon: '💼', color: '#64748b', bg: 'rgba(100, 116, 139, 0.15)' };
+    if (d.includes('ti')) return { icon: '💻', color: '#00d2ff', bg: 'rgba(0, 210, 255, 0.15)' };
+    if (d.includes('prevenção') || d.includes('prevencao')) return { icon: '🛡️', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)' };
+    return { icon: '👔', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' };
+  };
+
+  // Agrupamento em Tempo Real por Departamentos (Dashboard Containers)
+  const resumoPorDepartamento = useMemo(() => {
+    const map = {};
+
+    // Inicializa todos os departamentos oficiais
+    DEPARTAMENTOS_PADRAO.forEach((dep) => {
+      map[dep] = {
+        departamento: dep,
+        totalNovos: 0,
+        totalUsados: 0,
+        totalGeral: 0,
+        tamanhos: {},
+      };
+    });
+
+    // Popula com dados reais do estoque em tempo real
+    estoque.forEach((item) => {
+      const dep = item.departamento || 'Outro';
+      if (!map[dep]) {
+        map[dep] = {
+          departamento: dep,
+          totalNovos: 0,
+          totalUsados: 0,
+          totalGeral: 0,
+          tamanhos: {},
+        };
+      }
+
+      const novos = Number(item.estado_novo_qtd) || 0;
+      const usados = Number(item.estado_usado_qtd) || 0;
+      const total = Number(item.total_qtd) || (novos + usados);
+
+      map[dep].totalNovos += novos;
+      map[dep].totalUsados += usados;
+      map[dep].totalGeral += total;
+
+      if (total > 0 || novos > 0 || usados > 0) {
+        map[dep].tamanhos[item.tamanho] = {
+          novos,
+          usados,
+          total,
+        };
+      }
+    });
+
+    let lista = Object.values(map);
+
+    // Filtros
+    if (filtroDepartamento) {
+      lista = lista.filter((d) => d.departamento === filtroDepartamento);
+    }
+
+    if (busca.trim()) {
+      const term = busca.toLowerCase();
+      lista = lista.filter((d) =>
+        d.departamento.toLowerCase().includes(term) ||
+        Object.keys(d.tamanhos).some((t) => t.toLowerCase().includes(term))
+      );
+    }
+
+    if (abaAtiva === 'novos') {
+      lista = lista.filter((d) => d.totalNovos > 0);
+    } else if (abaAtiva === 'usados') {
+      lista = lista.filter((d) => d.totalUsados > 0);
+    }
+
+    return lista;
+  }, [estoque, filtroDepartamento, busca, abaAtiva]);
 
   // Filtros aplicados no Estoque
   const estoqueFiltrado = useMemo(() => {
@@ -143,10 +234,10 @@ export default function ControleUniformesPage() {
       {/* Cabeçalho */}
       <div className="uniformes-header">
         <div className="uniformes-header-title">
-          <div style={{ fontSize: '32px' }}>👔</div>
+          <span style={{ fontSize: '34px' }}>👔</span>
           <div>
-            <h1>Controle de Estoque de Uniformes</h1>
-            <p>Gerencie entradas, saídas, tamanhos, fabricantes e disponibilidade por departamento</p>
+            <h1>Controle de Uniformes • Big Master</h1>
+            <p>Gerenciamento de estoque de uniformes novos e usados por departamento, entradas, entregas e transferências.</p>
           </div>
         </div>
 
@@ -156,7 +247,7 @@ export default function ControleUniformesPage() {
             className="btn-departamentos-uniforme"
             onClick={() => setModalDepartamentosAberto(true)}
             style={{
-              background: '#1e293b',
+              background: '#0f172a',
               color: '#38bdf8',
               border: '1px solid #38bdf8',
               padding: '10px 18px',
@@ -293,7 +384,7 @@ export default function ControleUniformesPage() {
             🏢
           </div>
           <div className="uniformes-stat-info">
-            <span className="uniformes-stat-title">Departamentos</span>
+            <span className="uniformes-stat-title">Departamentos Ativos</span>
             <span className="uniformes-stat-value">{totalDepartamentos}</span>
           </div>
         </div>
@@ -301,36 +392,84 @@ export default function ControleUniformesPage() {
 
       {/* Controles, Abas e Filtros */}
       <div className="uniformes-controls">
-        {/* Abas */}
-        <div className="uniformes-tabs">
-          <button
-            type="button"
-            className={`uniformes-tab-btn ${abaAtiva === 'consolidado' ? 'active' : ''}`}
-            onClick={() => setAbaAtiva('consolidado')}
-          >
-            📦 Visão Consolidada ({estoque.length})
-          </button>
-          <button
-            type="button"
-            className={`uniformes-tab-btn ${abaAtiva === 'novos' ? 'active' : ''}`}
-            onClick={() => setAbaAtiva('novos')}
-          >
-            ✨ Uniformes Novos ({totalNovos} un)
-          </button>
-          <button
-            type="button"
-            className={`uniformes-tab-btn ${abaAtiva === 'usados' ? 'active' : ''}`}
-            onClick={() => setAbaAtiva('usados')}
-          >
-            🔄 Uniformes Usados ({totalUsados} un)
-          </button>
-          <button
-            type="button"
-            className={`uniformes-tab-btn ${abaAtiva === 'movimentacoes' ? 'active' : ''}`}
-            onClick={() => setAbaAtiva('movimentacoes')}
-          >
-            📥 Histórico de Entradas ({movimentacoes.length})
-          </button>
+        {/* Linha Superior com Abas e Alternador de Visualização */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', borderBottom: '1px solid #1e293b', paddingBottom: '12px' }}>
+          <div className="uniformes-tabs" style={{ borderBottom: 'none', paddingBottom: 0, margin: 0 }}>
+            <button
+              type="button"
+              className={`uniformes-tab-btn ${abaAtiva === 'consolidado' ? 'active' : ''}`}
+              onClick={() => setAbaAtiva('consolidado')}
+            >
+              📦 Visão Consolidada ({resumoPorDepartamento.length} setores)
+            </button>
+            <button
+              type="button"
+              className={`uniformes-tab-btn ${abaAtiva === 'novos' ? 'active' : ''}`}
+              onClick={() => setAbaAtiva('novos')}
+            >
+              ✨ Uniformes Novos ({totalNovos} un)
+            </button>
+            <button
+              type="button"
+              className={`uniformes-tab-btn ${abaAtiva === 'usados' ? 'active' : ''}`}
+              onClick={() => setAbaAtiva('usados')}
+            >
+              🔄 Uniformes Usados ({totalUsados} un)
+            </button>
+            <button
+              type="button"
+              className={`uniformes-tab-btn ${abaAtiva === 'movimentacoes' ? 'active' : ''}`}
+              onClick={() => setAbaAtiva('movimentacoes')}
+            >
+              📥 Histórico de Entradas ({movimentacoes.length})
+            </button>
+          </div>
+
+          {/* Alternador de Modo Visual (Dashboard de Containers vs Tabela) */}
+          {abaAtiva !== 'movimentacoes' && (
+            <div style={{ display: 'flex', background: '#111827', padding: '3px', borderRadius: '8px', border: '1px solid #334155', gap: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setModoVisual('dashboard')}
+                style={{
+                  background: modoVisual === 'dashboard' ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' : 'transparent',
+                  color: modoVisual === 'dashboard' ? '#fff' : '#94a3b8',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span>📊</span> Containers Dashboard
+              </button>
+              <button
+                type="button"
+                onClick={() => setModoVisual('tabela')}
+                style={{
+                  background: modoVisual === 'tabela' ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' : 'transparent',
+                  color: modoVisual === 'tabela' ? '#fff' : '#94a3b8',
+                  border: 'none',
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12.5px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span>📋</span> Tabela Detalhada
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Filtros */}
@@ -386,58 +525,192 @@ export default function ControleUniformesPage() {
 
       {/* Conteúdo das Abas */}
       {abaAtiva !== 'movimentacoes' ? (
-        <div className="uniformes-table-container">
-          <table className="uniformes-table">
-            <thead>
-              <tr>
-                <th>Departamento</th>
-                <th>Tamanho</th>
-                <th>Fabricante Principal</th>
-                <th style={{ textAlign: 'center' }}>✨ Qtd. Novos</th>
-                <th style={{ textAlign: 'center' }}>🔄 Qtd. Usados</th>
-                <th style={{ textAlign: 'center' }}>Total em Estoque</th>
-                <th style={{ textAlign: 'center' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {estoqueFiltrado.length === 0 ? (
+        modoVisual === 'dashboard' ? (
+          /* GRADE DE CONTAINERS INDIVIDUAIS DA DASHBOARD (CÁLCULO EM TEMPO REAL) */
+          <div className="uniformes-dashboard-grid">
+            {resumoPorDepartamento.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '48px', color: '#94a3b8', background: '#0f172a', borderRadius: '12px', border: '1px solid #1e293b' }}>
+                <span style={{ fontSize: '32px' }}>🔍</span>
+                <p style={{ marginTop: '8px', fontSize: '14px' }}>Nenhum departamento ou uniforme encontrado para os filtros ativos.</p>
+              </div>
+            ) : (
+              resumoPorDepartamento.map((depData) => {
+                const info = getIconeDepartamento(depData.departamento);
+                const temEstoque = depData.totalGeral > 0;
+                const tamanhosEntries = Object.entries(depData.tamanhos);
+
+                return (
+                  <div key={depData.departamento} className="dep-container-card">
+                    {/* Topo do Container */}
+                    <div>
+                      <div className="dep-container-header">
+                        <div className="dep-container-title">
+                          <div className="dep-container-icon" style={{ background: info.bg, color: info.color }}>
+                            {info.icon}
+                          </div>
+                          <div>
+                            <div className="dep-container-name">{depData.departamento}</div>
+                            <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>
+                              {tamanhosEntries.length} tamanho(s) registrado(s)
+                            </span>
+                          </div>
+                        </div>
+
+                        <span
+                          className="dep-container-status"
+                          style={{
+                            background: temEstoque ? (depData.totalGeral > 5 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)') : 'rgba(239, 68, 68, 0.15)',
+                            color: temEstoque ? (depData.totalGeral > 5 ? '#34d399' : '#fbbf24') : '#f87171',
+                            border: `1px solid ${temEstoque ? (depData.totalGeral > 5 ? '#10b981' : '#f59e0b') : '#ef4444'}`,
+                          }}
+                        >
+                          {temEstoque ? (depData.totalGeral > 5 ? '● Saudável' : '⚠️ Estoque Baixo') : '○ Esgotado'}
+                        </span>
+                      </div>
+
+                      {/* Métricas Reais em Tempo Real */}
+                      <div className="dep-container-metrics">
+                        <div className="dep-metric-item">
+                          <span className="dep-metric-label">Total Geral</span>
+                          <span className="dep-metric-val" style={{ color: temEstoque ? '#38bdf8' : '#64748b' }}>
+                            {depData.totalGeral} un
+                          </span>
+                        </div>
+                        <div className="dep-metric-item">
+                          <span className="dep-metric-label">✨ Novos</span>
+                          <span className="dep-metric-val" style={{ color: '#34d399' }}>
+                            {depData.totalNovos} un
+                          </span>
+                        </div>
+                        <div className="dep-metric-item">
+                          <span className="dep-metric-label">🔄 Usados</span>
+                          <span className="dep-metric-val" style={{ color: '#fbbf24' }}>
+                            {depData.totalUsados} un
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Detalhamento de Tamanhos Disponíveis */}
+                      <div className="dep-tamanhos-section">
+                        <div className="dep-tamanhos-title">
+                          <span>Disponibilidade por Tamanho:</span>
+                          <span style={{ color: '#38bdf8' }}>{tamanhosEntries.length > 0 ? `${tamanhosEntries.length} variações` : 'Sem peças'}</span>
+                        </div>
+                        <div className="dep-tamanhos-chips">
+                          {tamanhosEntries.length === 0 ? (
+                            <span style={{ fontSize: '11.5px', color: '#64748b', fontStyle: 'italic' }}>
+                              Nenhum tamanho com estoque atualmente.
+                            </span>
+                          ) : (
+                            tamanhosEntries.map(([tam, dadosTam]) => (
+                              <div key={tam} className="tamanho-chip" title={`Novos: ${dadosTam.novos} | Usados: ${dadosTam.usados}`}>
+                                <span style={{ fontWeight: 700 }}>{tam.startsWith('Boné') ? '🧢 Boné' : tam}:</span>
+                                <span className="tamanho-chip-qty">{dadosTam.total} un</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ações Rápidas por Departamento */}
+                    <div className="dep-container-actions">
+                      <button
+                        type="button"
+                        className="dep-action-btn entrada"
+                        onClick={() => {
+                          setFiltroDepartamento(depData.departamento);
+                          setModalEntradaAberto(true);
+                        }}
+                        title={`Cadastrar entrada para ${depData.departamento}`}
+                      >
+                        <span>➕</span> Entrada
+                      </button>
+
+                      <button
+                        type="button"
+                        className="dep-action-btn entrega"
+                        onClick={() => {
+                          setFiltroDepartamento(depData.departamento);
+                          setModalEntregaAberto(true);
+                        }}
+                        title={`Entregar uniforme de ${depData.departamento}`}
+                      >
+                        <span>📦</span> Entrega
+                      </button>
+
+                      <button
+                        type="button"
+                        className="dep-action-btn baixa"
+                        onClick={() => {
+                          setFiltroDepartamento(depData.departamento);
+                          setModalSaidaDescarteAberto(true);
+                        }}
+                        title={`Dar baixa por avaria em ${depData.departamento}`}
+                      >
+                        <span>🗑️</span> Baixa
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        ) : (
+          /* TABELA DETALHADA */
+          <div className="uniformes-table-container">
+            <table className="uniformes-table">
+              <thead>
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '32px', color: '#94a3b8' }}>
-                    Nenhum registro de uniforme encontrado para os filtros selecionados.
-                  </td>
+                  <th>Departamento</th>
+                  <th>Tamanho</th>
+                  <th>Fabricante Principal</th>
+                  <th style={{ textAlign: 'center' }}>✨ Qtd. Novos</th>
+                  <th style={{ textAlign: 'center' }}>🔄 Qtd. Usados</th>
+                  <th style={{ textAlign: 'center' }}>Total em Estoque</th>
+                  <th style={{ textAlign: 'center' }}>Status</th>
                 </tr>
-              ) : (
-                estoqueFiltrado.map((item) => (
-                  <tr key={`${item.departamento}_${item.tamanho}`}>
-                    <td>
-                      <span className="badge-dep">{item.departamento}</span>
-                    </td>
-                    <td>
-                      <span className="badge-tam">{item.tamanho}</span>
-                    </td>
-                    <td>{item.fabricante_principal || 'Jucicler'}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <span className="badge-novo">{item.estado_novo_qtd || 0} un</span>
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <span className="badge-usado">{item.estado_usado_qtd || 0} un</span>
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: 800, color: '#f8fafc', fontSize: '14px' }}>
-                      {item.total_qtd || 0} un
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      {(item.total_qtd || 0) > 0 ? (
-                        <span style={{ color: '#34d399', fontSize: '12px', fontWeight: 700 }}>● Disponível</span>
-                      ) : (
-                        <span style={{ color: '#f87171', fontSize: '12px', fontWeight: 700 }}>○ Esgotado</span>
-                      )}
+              </thead>
+              <tbody>
+                {estoqueFiltrado.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '32px', color: '#94a3b8' }}>
+                      Nenhum registro de uniforme encontrado para os filtros selecionados.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  estoqueFiltrado.map((item) => (
+                    <tr key={`${item.departamento}_${item.tamanho}`}>
+                      <td>
+                        <span className="badge-dep">{item.departamento}</span>
+                      </td>
+                      <td>
+                        <span className="badge-tam">{item.tamanho}</span>
+                      </td>
+                      <td>{item.fabricante_principal || 'Jucicler'}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className="badge-novo">{item.estado_novo_qtd || 0} un</span>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className="badge-usado">{item.estado_usado_qtd || 0} un</span>
+                      </td>
+                      <td style={{ textAlign: 'center', fontWeight: 800, color: '#f8fafc', fontSize: '14px' }}>
+                        {item.total_qtd || 0} un
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        {(item.total_qtd || 0) > 0 ? (
+                          <span style={{ color: '#34d399', fontSize: '12px', fontWeight: 700 }}>● Disponível</span>
+                        ) : (
+                          <span style={{ color: '#f87171', fontSize: '12px', fontWeight: 700 }}>○ Esgotado</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )
       ) : (
         <div className="uniformes-table-container">
           <table className="uniformes-table">
