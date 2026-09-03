@@ -116,7 +116,7 @@ export default function ModalRelatorioPrevencao({
           </div>
 
           {/* Botões de Ação */}
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
               type="button"
               className="quick-action-btn"
@@ -124,13 +124,19 @@ export default function ModalRelatorioPrevencao({
               style={{
                 background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                 color: '#fff',
-                borderColor: '#38bdf8',
-                padding: '6px 14px',
+                border: '1px solid #38bdf8',
+                padding: '8px 16px',
+                borderRadius: '8px',
                 fontWeight: 700,
-                fontSize: '12px',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(2, 132, 199, 0.35)',
               }}
             >
-              🖨️ Imprimir Relatório
+              <span>🖨️</span> Imprimir
             </button>
 
             <button
@@ -140,22 +146,37 @@ export default function ModalRelatorioPrevencao({
               style={{
                 background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
                 color: '#fff',
-                borderColor: '#10b981',
-                padding: '6px 14px',
+                border: '1px solid #10b981',
+                padding: '8px 16px',
+                borderRadius: '8px',
                 fontWeight: 700,
-                fontSize: '12px',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.35)',
               }}
             >
-              📥 Baixar em PDF
+              <span>💾</span> Salvar PDF
             </button>
 
             <button
               type="button"
               className="cancela"
               onClick={onClose}
-              style={{ padding: '6px 12px', fontSize: '12px' }}
+              style={{
+                background: '#1e293b',
+                border: '1px solid #334155',
+                color: '#cbd5e1',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
             >
-              ✕ Fechar
+              Fechar
             </button>
           </div>
         </div>
