@@ -1,17 +1,7 @@
 import React from 'react';
-import { getUser } from '../auth/auth';
 
 const Footer = () => {
   const anoAtual = new Date().getFullYear();
-  const u = getUser() || {};
-  const perms = Array.isArray(u.permissions || u.permissoes)
-    ? (u.permissions || u.permissoes)
-    : [];
-  const isBigMaster =
-    perms.includes('prevencao') ||
-    perms.includes('uniformes') ||
-    perms.includes('controle-uniformes') ||
-    perms.includes('controle-notas');
 
   return (
     <footer
@@ -27,9 +17,9 @@ const Footer = () => {
         boxSizing: 'border-box',
       }}
     >
-      Copyright © {anoAtual}{' '}
-      <strong style={{ color: isBigMaster ? '#00d2ff' : '#ff5252' }}>
-        {isBigMaster ? '🛒 Big Master Supermercados' : 'JSA Soluções Tecnológicas'}
+      Copyright © {anoAtual || 2026}{' '}
+      <strong style={{ color: '#ff5252' }}>
+        JSA Soluções Tecnológicas
       </strong>
       . All rights reserved.
     </footer>

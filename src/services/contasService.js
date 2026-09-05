@@ -42,12 +42,8 @@ export function unregisterDeletedContaId(id) {
   }
 }
 
-const ADMIN_EMAILS = ["jsa@jsa.com", "jsa.admin@gmail.com", "josafa.santos.jss@gmail.com"];
-
-// Filtra uma lista de contas estritamente para o usuário atualmente logado
-function filtrarParaUsuarioAtual(contas = []) {
-  const curUser = getCurrentUser();
-  if (!curUser) return [];
+function _resolveUser(provided = null) {
+  const curUser = provided || getCurrentUser() || getUser() || {};
   const emailLogado = String(
     curUser.email ||
     curUser.user_email ||
@@ -70,29 +66,32 @@ function filtrarParaUsuarioAtual(contas = []) {
 
   const isAdminUser =
     isAdmin(curUser) ||
-    ADMIN_EMAILS.includes(emailLogado) ||
+    (emailLogado && ADMIN_EMAILS.includes(emailLogado)) ||
     curUser.role === "ADMIN" ||
     curUser.role === "admin";
 
-  // Administrador tem acesso irrestrito a todas as contas do sistema financeiro
-  if (isAdminUser) {
-    return contas;
-  }
+  return { email: emailLogado, id: idLogado, username: usernameLogado, isUserAdmin: isAdminUser };
+}
 
-  // Usuário comum visualiza ESTRITAMENTE as contas pertencentes a si próprio
-  return contas.filter((c) => {
-    const cEmail = String(c.userEmail || "").trim().toLowerCase();
-    const cId = String(c.userId || "").trim();
+// Filtra uma lista de contas estritamente para o usuário atualmente logado
+function filtrarParaUsuarioAtual(contas = [], customUser = null) {
+  const u = _resolveUser(customUser);
+  if (!u.email && !u.id) return [];
+
+  // Cada usuário (inclusive o Administrador em sua tela pessoal de contas) visualiza ESTRITAMENTE as contas pertencentes a si próprio
+  return (contas || []).filter((c) => {
+    const cEmail = String(c.userEmail || c.user_email || "").trim().toLowerCase();
+    const cId = String(c.userId || c.user_id || "").trim();
     const cUsername = String(c.username || "").trim().toLowerCase();
 
     // 1. Se possui e-mail associado, deve bater exatamente com o e-mail do usuário logado
-    if (cEmail && emailLogado && cEmail === emailLogado) return true;
+    if (cEmail && u.email && cEmail === u.email) return true;
 
     // 2. Se possui ID associado, deve bater exatamente com o ID do usuário logado
-    if (cId && idLogado && cId === idLogado) return true;
+    if (cId && u.id && cId === u.id) return true;
 
     // 3. Se possui username associado, deve bater exatamente com o username do usuário logado
-    if (cUsername && usernameLogado && cUsername === usernameLogado) return true;
+    if (cUsername && u.username && cUsername === u.username) return true;
 
     // Não pertence a este usuário: não exibe
     return false;
@@ -100,36 +99,21 @@ function filtrarParaUsuarioAtual(contas = []) {
 }
 
 // Sincroniza ativamente com o servidor (garante consistência com isolamento estrito por usuário)
-export async function sincronizarContasDoServidor() {
+export async function sincronizarContasDoServidor(customUser = null) {
+  const u = _resolveUser(customUser);
   try {
-    const curUser = getCurrentUser();
-    const emailLogado = String(
-      curUser?.email ||
-      curUser?.user_email ||
-      localStorage.getItem("usuario_email") ||
-      ""
-    ).trim().toLowerCase();
-    const idLogado = String(
-      curUser?.id ||
-      curUser?.userId ||
-      localStorage.getItem("usuario_id") ||
-      ""
-    ).trim();
-    const usernameLogado = String(
-      curUser?.username ||
-      localStorage.getItem("usuario_login") ||
-      ""
-    ).trim().toLowerCase();
-    const isAdminUser =
-      isAdmin(curUser) ||
-      ADMIN_EMAILS.includes(emailLogado) ||
-      curUser?.role === "ADMIN" ||
-      curUser?.role === "admin";
+    const params = {
+      userEmail: u.email,
+      user_email: u.email,
+      userId: u.id,
+      user_id: u.id,
+    };
 
     const resp = await api.get("/contas", {
-      params: {
-        userEmail: emailLogado,
-        userId: idLogado,
+      params,
+      headers: {
+        "x-user-email": u.email,
+        "x-user-id": u.id,
       },
     });
 
@@ -151,14 +135,14 @@ export async function sincronizarContasDoServidor() {
       for (const lc of localContas) {
         if (lc && lc.id != null && !deletedIds.has(String(lc.id)) && !mapa.has(String(lc.id))) {
           // Se não for admin, não mescla nem envia contas de outro usuário para o servidor
-          if (!isAdminUser) {
-            const lcEmail = String(lc.userEmail || "").trim().toLowerCase();
-            const lcId = String(lc.userId || "").trim();
+          if (!u.isUserAdmin) {
+            const lcEmail = String(lc.userEmail || lc.user_email || "").trim().toLowerCase();
+            const lcId = String(lc.userId || lc.user_id || "").trim();
             const lcUsername = String(lc.username || "").trim().toLowerCase();
             const belongsToCurUser =
-              (lcEmail && emailLogado && lcEmail === emailLogado) ||
-              (lcId && idLogado && lcId === idLogado) ||
-              (lcUsername && usernameLogado && lcUsername === usernameLogado);
+              (lcEmail && u.email && lcEmail === u.email) ||
+              (lcId && u.id && lcId === u.id) ||
+              (lcUsername && u.username && lcUsername === u.username);
 
             if (!belongsToCurUser) {
               continue;
@@ -196,12 +180,12 @@ export async function sincronizarContasDoServidor() {
       safeWrite(listaMesclada);
 
       // Retorna estritamente as contas pertencentes ao usuário logado
-      return filtrarParaUsuarioAtual(listaMesclada);
+      return filtrarParaUsuarioAtual(listaMesclada, u);
     }
   } catch (e) {
     console.warn("[contasService] Modo offline / aviso ao sincronizar:", e.message);
   }
-  return listarContas();
+  return listarContas(u);
 }
 
 /* ================= Helpers internos ================= */
@@ -285,7 +269,8 @@ export function gerarCodigoAleatorio6Digitos(lista = []) {
   return codigo;
 }
 
-function normalizeConta(c, lista = []) {
+function normalizeConta(c, lista = [], customUser = null) {
+  const u = _resolveUser(customUser);
   const hojeISO = new Date().toISOString().slice(0, 10);
   const valorNumerico = parseToBackendFloat(c.valor);
   const codigoExistente =
@@ -294,15 +279,8 @@ function normalizeConta(c, lista = []) {
     (c.id ? String(c.id).slice(-6).padStart(6, "0") : null) ||
     gerarCodigoAleatorio6Digitos(lista);
 
-  const curUser = getCurrentUser();
-  const emailPadrao = (
-    curUser?.email ||
-    curUser?.user_email ||
-    localStorage.getItem("usuario_email") ||
-    "jsa@jsa.com"
-  ).toLowerCase();
-  const userEmail = c.userEmail ? String(c.userEmail).toLowerCase() : emailPadrao;
-  const userId = c.userId || (curUser?.id ? String(curUser.id) : (localStorage.getItem("usuario_id") || "1"));
+  const userEmail = (c.userEmail || c.user_email || u.email || "").trim().toLowerCase();
+  const userId = String(c.userId || c.user_id || u.id || "").trim();
 
   return {
     id: c.id ?? null,

@@ -195,22 +195,42 @@ export async function heartbeat(req, res) {
 
     await Promise.all(queries);
 
-    let forceDisconnect = 0;
+    let userRow = null;
     if (userId) {
-      const [r] = await pool.query('SELECT force_disconnect FROM users WHERE id = ? LIMIT 1', [userId]);
-      if (r[0]) forceDisconnect = Number(r[0].force_disconnect) || 0;
-      if (forceDisconnect === 1) {
-        await pool.query('UPDATE users SET force_disconnect = 0, is_online = 0 WHERE id = ?', [userId]).catch(() => {});
-      }
-    } else if (email) {
-      const [r] = await pool.query('SELECT force_disconnect FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1', [String(email).trim()]);
-      if (r[0]) forceDisconnect = Number(r[0].force_disconnect) || 0;
-      if (forceDisconnect === 1) {
-        await pool.query('UPDATE users SET force_disconnect = 0, is_online = 0 WHERE LOWER(email) = LOWER(?)', [String(email).trim()]).catch(() => {});
-      }
+      const [r] = await pool.query('SELECT * FROM users WHERE id = ? LIMIT 1', [userId]);
+      userRow = r[0];
+    }
+    if (!userRow && email) {
+      const [r] = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1', [String(email).trim()]);
+      userRow = r[0];
+    }
+    if (!userRow && username) {
+      const [r] = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER(?) LIMIT 1', [String(username).trim()]);
+      userRow = r[0];
     }
 
-    res.json({ ok: true, forceDisconnect: forceDisconnect === 1 });
+    let forceDisconnect = userRow ? Number(userRow.force_disconnect) || 0 : 0;
+    if (forceDisconnect === 1 && userRow) {
+      await pool.query('UPDATE users SET force_disconnect = 0, is_online = 0 WHERE id = ?', [userRow.id]).catch(() => {});
+    }
+
+    let permissions = [];
+    if (userRow?.permissions) {
+      try {
+        permissions = typeof userRow.permissions === 'string' ? JSON.parse(userRow.permissions) : userRow.permissions;
+      } catch {
+        permissions = [];
+      }
+    }
+    const isUserAdmin = userRow ? (String(userRow.email || '').toLowerCase() === 'josafa.santos.jss@gmail.com' || userRow.role === 'admin' || userRow.role === 'ADMIN' || userRow.name === 'JSA Admin') : false;
+
+    res.json({
+      ok: true,
+      forceDisconnect: forceDisconnect === 1,
+      role: isUserAdmin ? 'admin' : (userRow?.role || 'user'),
+      filial: userRow?.filial || 'Filial 1',
+      permissions: isUserAdmin ? ['*'] : (Array.isArray(permissions) ? permissions : []),
+    });
   } catch (error) {
     console.warn('Aviso no heartbeat:', error.message);
     res.status(200).json({ ok: false });
@@ -407,7 +427,11 @@ export async function updateUser(req, res) {
     if (telefone !== undefined) { fields.push('telefone = ?'); values.push(telefone); }
     if (role !== undefined) { fields.push('role = ?'); values.push(role); }
     if (filial !== undefined) { fields.push('filial = ?'); values.push(filial); }
-    if (permissions !== undefined) { fields.push('permissions = ?'); values.push(JSON.stringify(permissions)); }
+    if (permissions !== undefined) {
+      const permsVal = Array.isArray(permissions) ? JSON.stringify(permissions) : (typeof permissions === 'string' ? permissions : JSON.stringify([]));
+      fields.push('permissions = ?');
+      values.push(permsVal);
+    }
     if (avatar !== undefined) { fields.push('avatar = ?'); values.push(avatar); }
     if (blocked !== undefined) { fields.push('blocked = ?'); values.push(blocked ? 1 : 0); }
     if (must_change_password !== undefined) { fields.push('must_change_password = ?'); values.push(must_change_password ? 1 : 0); }
@@ -421,9 +445,24 @@ export async function updateUser(req, res) {
 
     if (fields.length > 0) {
       const cleanEmail = email ? String(email).trim().toLowerCase() : (String(id).includes('@') ? String(id).trim().toLowerCase() : null);
-      
+      const cleanUsername = username ? String(username).trim().toLowerCase() : (!String(id).includes('@') && isNaN(Number(id)) ? String(id).trim().toLowerCase() : null);
+      const cleanName = name ? String(name).trim().toLowerCase() : null;
+      const idNum = !isNaN(Number(id)) ? Number(id) : null;
+
       let updatedRows = 0;
-      if (cleanEmail) {
+
+      // 1. Tenta atualizar pelo ID numérico
+      if (idNum) {
+        const updateIdValues = [...values, idNum];
+        const [resId] = await pool.query(
+          `UPDATE users SET ${fields.join(', ')} WHERE id = ?`,
+          updateIdValues
+        );
+        updatedRows = resId.affectedRows;
+      }
+
+      // 2. Se não encontrou por ID, tenta por email
+      if (updatedRows === 0 && cleanEmail) {
         const updateValues = [...values, cleanEmail];
         const [resEmail] = await pool.query(
           `UPDATE users SET ${fields.join(', ')} WHERE LOWER(email) = LOWER(?)`,
@@ -432,35 +471,46 @@ export async function updateUser(req, res) {
         updatedRows = resEmail.affectedRows;
       }
 
-      if (updatedRows === 0) {
-        const idNum = Number(id);
-        if (!isNaN(idNum) && idNum < 2147483647) {
-          const updateIdValues = [...values, idNum];
-          const [resId] = await pool.query(
-            `UPDATE users SET ${fields.join(', ')} WHERE id = ?`,
-            updateIdValues
-          );
-          updatedRows = resId.affectedRows;
-        }
+      // 3. Se não encontrou por email, tenta por username
+      if (updatedRows === 0 && cleanUsername) {
+        const updateValues = [...values, cleanUsername];
+        const [resUser] = await pool.query(
+          `UPDATE users SET ${fields.join(', ')} WHERE LOWER(username) = LOWER(?)`,
+          updateValues
+        );
+        updatedRows = resUser.affectedRows;
       }
 
-      // Se ainda não existia no MySQL, insere o registro com os dados atualizados
-      if (updatedRows === 0 && cleanEmail) {
-        const cleanRole = cleanEmail === 'josafa.santos.jss@gmail.com' ? 'admin' : (role || 'user');
+      // 4. Se não encontrou, tenta por nome
+      if (updatedRows === 0 && cleanName) {
+        const updateValues = [...values, cleanName];
+        const [resName] = await pool.query(
+          `UPDATE users SET ${fields.join(', ')} WHERE LOWER(name) = LOWER(?)`,
+          updateValues
+        );
+        updatedRows = resName.affectedRows;
+      }
+
+      // 5. Se ainda não existia no MySQL, insere o registro com os dados atualizados
+      if (updatedRows === 0 && (cleanEmail || cleanUsername || cleanName)) {
+        const targetEmail = cleanEmail || `${(cleanUsername || cleanName || 'usuario').replace(/\s+/g, '')}@sistema.local`;
+        const targetUser = cleanUsername || (cleanName ? cleanName.replace(/\s+/g, '.') : targetEmail.split('@')[0]);
+        const cleanRole = targetEmail === 'josafa.santos.jss@gmail.com' ? 'admin' : (role || 'user');
         await pool.query(
-          `INSERT INTO users (name, surname, email, password, whatsapp, telefone, role, filial, permissions, avatar)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE permissions = VALUES(permissions), role = VALUES(role), filial = VALUES(filial)`,
+          `INSERT INTO users (name, surname, username, email, password, whatsapp, telefone, role, filial, permissions, avatar)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE permissions = VALUES(permissions), role = VALUES(role), filial = VALUES(filial), avatar = VALUES(avatar)`,
           [
-            name || cleanEmail.split('@')[0],
+            name || targetUser,
             surname || null,
-            cleanEmail,
+            targetUser,
+            targetEmail,
             password || '123456',
             whatsapp || null,
             telefone || null,
             cleanRole,
             filial || 'Filial 1',
-            JSON.stringify(permissions || []),
+            Array.isArray(permissions) ? JSON.stringify(permissions) : JSON.stringify([]),
             avatar || null,
           ]
         ).catch(() => {});

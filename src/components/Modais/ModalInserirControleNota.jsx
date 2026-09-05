@@ -3,11 +3,41 @@ import { formatarMoedaInput, converterMoedaParaNumero } from '../../utils/number
 import { formatarChaveBlocos, limparChave } from '../../services/consultaNFeService';
 import { extrairCnpjLimpo, formatarCnpj, obterPadraoCnpj, obterPadraoCnpjAsync, salvarPadraoCnpj } from '../../services/memoriaCnpjService';
 import { decodificarChaveControle } from '../../services/controleNotasService';
-import { getUser } from '../../auth/auth';
+import { getUser, isAdmin } from '../../auth/auth';
+import { normalizarNomeFilial, LISTA_FILIAIS_SISTEMA } from '../../utils/filialUtils';
 import ModalCadastrarFornecedor from './ModalCadastrarFornecedor';
 import ModalPerguntaAnexarDanfe from './ModalPerguntaAnexarDanfe';
 import ModalAnexarDanfe from './ModalAnexarDanfe';
 import '../Visual/modal.css';
+
+export const FILIAIS_SISTEMA = LISTA_FILIAIS_SISTEMA;
+
+export const OPCOES_SITUACAO_NOTA = [
+  'Liberada',
+  'Tributação',
+  'Vincular pedido',
+  'Cadastro',
+  'Custo',
+  'Quantidade',
+  'Item sem pedido',
+  'Sem pedido',
+  'Tributação comercial',
+  'Em lançamento',
+  'Fornecedor bloqueado',
+  'Divergente',
+  'Guia',
+  'Liberar',
+];
+
+export const OPCOES_RESPONSAVEL_LIBERACAO = [
+  'Comercial',
+  'Tributação',
+  'Pré-Entrada',
+  'Cadastro',
+  'CPD',
+  'FLV',
+  'Comercial Frios',
+];
 
 export default function ModalInserirControleNota({
   isOpen = false,
@@ -16,17 +46,19 @@ export default function ModalInserirControleNota({
   notaParaEditar = null,
 }) {
   const usuarioLogado = getUser();
+  const isUserAdmin = isAdmin(usuarioLogado);
   const nomeUsuarioLogado =
     usuarioLogado?.name ||
     usuarioLogado?.nome ||
     usuarioLogado?.username ||
     'Usuário Atual';
   const emailUsuarioLogado = usuarioLogado?.email || '';
-  const filialUsuarioLogado =
+  const filialUsuarioLogado = normalizarNomeFilial(
     usuarioLogado?.filial ||
     usuarioLogado?.user_filial ||
     localStorage.getItem('usuario_filial') ||
-    'Filial 1';
+    'Filial 1'
+  );
 
   const getAgoraIsoDateTime = () => {
     const agora = new Date();
@@ -50,6 +82,9 @@ export default function ModalInserirControleNota({
       quemRecebeuEmail: emailUsuarioLogado,
       observacoes: '',
       status: 'Recebida',
+      situacaoNota: '',
+      responsavelLiberacao: '',
+      dataHoraLiberacao: null,
       anexoDanfe: null,
     }),
     [nomeUsuarioLogado, emailUsuarioLogado, filialUsuarioLogado]
@@ -88,6 +123,9 @@ export default function ModalInserirControleNota({
           quemRecebeuEmail: notaParaEditar.quemRecebeuEmail || emailUsuarioLogado,
           observacoes: notaParaEditar.observacoes || '',
           status: notaParaEditar.status || 'Recebida',
+          situacaoNota: notaParaEditar.situacaoNota || '',
+          responsavelLiberacao: notaParaEditar.responsavelLiberacao || '',
+          dataHoraLiberacao: notaParaEditar.dataHoraLiberacao || null,
           anexoDanfe: notaParaEditar.anexoDanfe || null,
         });
       } else {
@@ -335,6 +373,9 @@ export default function ModalInserirControleNota({
       fornecedor: fornecedorMaiusculo,
       valor: valNumerico,
       status: form.status || 'Recebida',
+      situacaoNota: form.situacaoNota || '',
+      responsavelLiberacao: form.situacaoNota ? (form.responsavelLiberacao || '') : '',
+      dataHoraLiberacao: form.dataHoraLiberacao || (form.situacaoNota === 'Liberada' || form.situacaoNota === 'Liberar' ? new Date().toISOString() : null),
     };
 
     if (!payload.id) delete payload.id;
@@ -488,6 +529,63 @@ export default function ModalInserirControleNota({
                 >
                   {lookupMsg.text}
                 </div>
+              )}
+            </div>
+
+            {/* Linha da Filial da Nota */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#ccc' }}>
+                  🏢 Filial da Nota: <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                {isUserAdmin ? (
+                  <span style={{ fontSize: '0.7rem', color: '#fbbf24', fontWeight: 700 }}>⭐ Acesso Master (Selecione a Filial)</span>
+                ) : (
+                  <span style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 700 }}>🔒 Sua Filial ({filialUsuarioLogado})</span>
+                )}
+              </div>
+              {isUserAdmin ? (
+                <select
+                  value={form.filial}
+                  onChange={(e) => change('filial', e.target.value)}
+                  style={{
+                    height: '34px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #0284c7',
+                    backgroundColor: '#0f172a',
+                    color: '#38bdf8',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {FILIAIS_SISTEMA.map((f) => (
+                    <option key={f} value={f} style={{ backgroundColor: '#18181c', color: '#fff' }}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={form.filial}
+                  readOnly
+                  disabled
+                  style={{
+                    height: '34px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #334155',
+                    backgroundColor: '#0f172a',
+                    color: '#38bdf8',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    outline: 'none',
+                    cursor: 'not-allowed',
+                  }}
+                />
               )}
             </div>
 
@@ -703,6 +801,91 @@ export default function ModalInserirControleNota({
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Linha Nova: Situação da NOTA + Responsável da Liberação */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: form.situacaoNota ? '1.1fr 1fr' : '1fr',
+                gap: '8px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#ccc' }}>
+                  Situação da NOTA:
+                </label>
+                <select
+                  value={form.situacaoNota}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm((prev) => ({
+                      ...prev,
+                      situacaoNota: val,
+                      responsavelLiberacao: val ? prev.responsavelLiberacao : '',
+                      dataHoraLiberacao:
+                        val === 'Liberada' || val === 'Liberar'
+                          ? prev.dataHoraLiberacao || new Date().toISOString()
+                          : prev.dataHoraLiberacao,
+                    }));
+                  }}
+                  style={{
+                    height: '34px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: form.situacaoNota ? '1px solid #38bdf8' : '1px solid #334155',
+                    backgroundColor: '#111827',
+                    color: form.situacaoNota ? '#38bdf8' : '#94a3b8',
+                    fontWeight: form.situacaoNota ? 700 : 500,
+                    fontSize: '0.82rem',
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="">-- Selecione a Situação da Nota --</option>
+                  {OPCOES_SITUACAO_NOTA.map((opt) => (
+                    <option key={opt} value={opt} style={{ backgroundColor: '#18181c', color: '#fff' }}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Responsável da Liberação: lista de seleção de setores responsáveis */}
+              {form.situacaoNota && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', animation: 'fadeIn 0.2s ease-out' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#38bdf8' }}>
+                      Responsável da Liberação:
+                    </label>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>🏢 Setor</span>
+                  </div>
+                  <select
+                    value={form.responsavelLiberacao}
+                    onChange={(e) => change('responsavelLiberacao', e.target.value)}
+                    style={{
+                      height: '34px',
+                      padding: '0 10px',
+                      borderRadius: '6px',
+                      border: form.responsavelLiberacao ? '1px solid #0284c7' : '1px solid #334155',
+                      backgroundColor: '#0f172a',
+                      color: form.responsavelLiberacao ? '#38bdf8' : '#94a3b8',
+                      fontWeight: form.responsavelLiberacao ? 700 : 500,
+                      fontSize: '0.82rem',
+                      outline: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="">-- Selecione o Responsável --</option>
+                    {OPCOES_RESPONSAVEL_LIBERACAO.map((opt) => (
+                      <option key={opt} value={opt} style={{ backgroundColor: '#18181c', color: '#fff' }}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Linha 4: Observações Opcionais */}

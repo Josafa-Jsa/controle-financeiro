@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { buscarRelatorioControleNotasBanco } from '../../services/controleNotasService';
 import { getUser, isAdmin } from '../../auth/auth';
+import { normalizarNomeFilial } from '../../utils/filialUtils';
 import '../Visual/modal.css';
 
 export default function ModalSelecionarDataRelatorio({
@@ -11,11 +12,12 @@ export default function ModalSelecionarDataRelatorio({
 }) {
   const usuarioLogado = getUser();
   const isUserAdmin = isAdmin(usuarioLogado);
-  const filialUsuario =
+  const filialUsuario = normalizarNomeFilial(
     usuarioLogado?.filial ||
     usuarioLogado?.user_filial ||
     localStorage.getItem('usuario_filial') ||
-    'Filial 1';
+    'Filial 1'
+  );
 
   const getHojeIsoDate = () => {
     const agora = new Date();

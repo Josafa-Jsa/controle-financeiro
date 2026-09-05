@@ -4,6 +4,7 @@ import { parseToBackendFloat } from '../utils/numberUtils';
 import { limparChave, formatarChaveBlocos } from './consultaNFeService';
 import { extrairCnpjLimpo, formatarCnpj, obterPadraoCnpj } from './memoriaCnpjService';
 import { getUser, isAdmin } from '../auth/auth';
+import { normalizarNomeFilial } from '../utils/filialUtils';
 
 const KEY = 'jsa_controle_notas';
 
@@ -19,7 +20,7 @@ function _resolveUser(provided = null) {
 
   const isUserAdmin = isAdmin(u);
   const filialStorage = localStorage.getItem('usuario_filial');
-  const filial = (u.filial || u.user_filial || filialStorage || 'Filial 1').trim();
+  const filial = normalizarNomeFilial(u.filial || u.user_filial || filialStorage || 'Filial 1');
 
   return { id: u.id || null, email, name: fullName, isUserAdmin, filial };
 }
@@ -91,7 +92,7 @@ function normalizeControleNota(nota, customUser = null) {
   const cnpj = formatarCnpj(nota.cnpj || extrairCnpjLimpo(chave));
   const numero = String(nota.numero || '').trim();
   const valor = parseToBackendFloat(nota.valor) || 0;
-  const filial = (nota.filial || u.filial || 'Filial 1').trim();
+  const filial = normalizarNomeFilial(nota.filial || u.filial || 'Filial 1');
 
   return {
     ...nota,
@@ -108,6 +109,9 @@ function normalizeControleNota(nota, customUser = null) {
     valor,
     observacoes: nota.observacoes || '',
     status: nota.status || 'Recebida',
+    situacaoNota: nota.situacaoNota || nota.situacao_nota || '',
+    responsavelLiberacao: nota.responsavelLiberacao || nota.responsavel_liberacao || '',
+    dataHoraLiberacao: nota.dataHoraLiberacao || nota.data_hora_liberacao || null,
     anexoDanfe: nota.anexoDanfe || null,
     createdAt: nota.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -125,9 +129,9 @@ export function listarControleNotas(customUser = null) {
   }
 
   // Usuário de filial visualiza todas as notas inseridas por todos os usuários da sua filial (ex: Filial 4)
-  const userFilialNorm = String(u.filial || 'Filial 1').trim().toLowerCase();
+  const userFilialNorm = normalizarNomeFilial(u.filial || 'Filial 1').toLowerCase();
   return list.filter((n) => {
-    const notaFilialNorm = String(n.filial || 'Filial 1').trim().toLowerCase();
+    const notaFilialNorm = normalizarNomeFilial(n.filial || 'Filial 1').toLowerCase();
     return notaFilialNorm === userFilialNorm;
   });
 }
@@ -135,10 +139,24 @@ export function listarControleNotas(customUser = null) {
 export async function sincronizarControleNotasDoServidor(customUser = null) {
   const u = _resolveUser(customUser);
   try {
-    const params = u.isUserAdmin ? {} : { filial: u.filial };
-    const resp = await api.get('/controle-notas', { params });
+    const params = u.isUserAdmin ? { isAdmin: 'true' } : { filial: u.filial, isAdmin: 'false' };
+    const resp = await api.get('/controle-notas', {
+      params,
+      headers: {
+        'x-user-email': u.email,
+      },
+    });
     if (Array.isArray(resp.data)) {
-      persist(resp.data);
+      if (u.isUserAdmin) {
+        persist(resp.data);
+      } else {
+        const currentList = safeParse(localStorage.getItem(KEY));
+        const userFilialNorm = normalizarNomeFilial(u.filial || 'Filial 1').toLowerCase();
+        const otherBranches = currentList.filter(
+          (n) => normalizarNomeFilial(n.filial || '').toLowerCase() !== userFilialNorm
+        );
+        persist([...otherBranches, ...resp.data]);
+      }
       return listarControleNotas(u);
     }
   } catch (e) {
@@ -152,7 +170,7 @@ export async function sincronizarControleNotasDoServidor(customUser = null) {
  */
 export async function buscarRelatorioControleNotasBanco({ data, filial, customUser = null }) {
   const u = _resolveUser(customUser);
-  const filialFinal = filial || (u.isUserAdmin ? undefined : u.filial);
+  const filialFinal = filial ? normalizarNomeFilial(filial) : (u.isUserAdmin ? undefined : normalizarNomeFilial(u.filial));
   const dataFinal = data || new Date().toISOString().slice(0, 10);
 
   try {
@@ -181,10 +199,11 @@ export function salvarControleNota(nota, customUser = null) {
   const u = _resolveUser(customUser);
   const raw = localStorage.getItem(KEY);
   const list = safeParse(raw).map((n) => normalizeControleNota(n, u));
+  const filialNota = normalizarNomeFilial(nota.filial || u.filial || 'Filial 1');
   const nova = normalizeControleNota(
     {
       ...nota,
-      filial: nota.filial || u.filial || 'Filial 1',
+      filial: filialNota,
       quemRecebeu: nota.quemRecebeu || u.name,
       quemRecebeuEmail: nota.quemRecebeuEmail || u.email,
     },
@@ -236,3 +255,6 @@ export function excluirControleNota(id) {
 
   return true;
 }
+
+export { normalizarNomeFilial };
+

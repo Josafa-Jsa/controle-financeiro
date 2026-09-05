@@ -832,6 +832,7 @@ export function TopBarRight() {
 ========================================================= */
 import { api } from "./api/client";
 import { sincronizarContasDoServidor } from "./services/contasService";
+import ModalChatAtendimento, { playChatNotificationSound } from "./components/Modais/ModalChatAtendimento";
 
 function App() {
   const [ordens, setOrdens] = useState(() => {
@@ -841,6 +842,10 @@ function App() {
       return [];
     }
   });
+
+  // Estado global para Chat de Atendimento ao Vivo em tempo real
+  const [chatAtivoChamado, setChatAtivoChamado] = useState(null);
+  const [isChatMinimized, setIsChatMinimized] = useState(false);
 
   useEffect(() => {
     initAuthWatcher();
@@ -860,6 +865,257 @@ function App() {
 
     // Sincroniza contas do servidor (garante compartilhamento entre portas 5173 e 2515)
     sincronizarContasDoServidor().catch(() => {});
+  }, []);
+
+  // Listener global de mensagens e início de atendimento em tempo real
+  useEffect(() => {
+    const processarEventoChat = (evento) => {
+      if (!evento || !evento.chamadoId) return;
+
+      const currentUser = getUser();
+      if (!currentUser) return;
+
+      const myEmail = String(currentUser.email || "").toLowerCase().trim();
+      const myUsername = String(currentUser.username || "").toLowerCase().trim();
+      const myName = String(currentUser.name || currentUser.nome || "").toLowerCase().trim();
+      const isUserAdmin =
+        isAdmin(currentUser) ||
+        myEmail.includes("admin") ||
+        myEmail === "jsa@jsa.com" ||
+        myEmail === "jsa.admin@gmail.com";
+
+      const targetClientEmail = String(evento.clienteEmail || "").toLowerCase().trim();
+      const targetClientName = String(evento.clienteNome || "").toLowerCase().trim();
+
+      // Determina se a notificação é para o usuário logado
+      let isParaMim = false;
+      if (isUserAdmin) {
+        isParaMim = !!evento.isClientSender;
+      } else {
+        // Usuário comum / cliente:
+        if (evento.isAdminSender || evento.tipo === "INICIAR_ATENDIMENTO" || evento.tipo === "NOVA_MENSAGEM") {
+          // 1. Email do cliente bate
+          if (myEmail && targetClientEmail && (targetClientEmail === myEmail || targetClientEmail.includes(myEmail) || myEmail.includes(targetClientEmail))) {
+            isParaMim = true;
+          }
+          // 2. Username do cliente bate
+          else if (myUsername && targetClientEmail && (targetClientEmail === myUsername || targetClientEmail.includes(myUsername))) {
+            isParaMim = true;
+          }
+          // 3. Nome do cliente bate
+          else if (myName && targetClientName && (myName === targetClientName || myName.includes(targetClientName) || targetClientName.includes(myName))) {
+            isParaMim = true;
+          }
+          // 4. Chamado registrado no localStorage do cliente
+          else {
+            try {
+              const db = JSON.parse(localStorage.getItem("chamados_db") || "[]");
+              const meuChamado = db.find((c) => String(c.id) === String(evento.chamadoId));
+              if (meuChamado) {
+                const cEmail = String(meuChamado.clienteEmail || "").toLowerCase().trim();
+                const cName = String(meuChamado.clienteNome || "").toLowerCase().trim();
+                if (
+                  (myEmail && (cEmail === myEmail || cEmail.includes(myEmail))) ||
+                  (myUsername && (cEmail === myUsername || cEmail.includes(myUsername))) ||
+                  (myName && (cName === myName || cName.includes(myName))) ||
+                  (!cEmail && !myEmail)
+                ) {
+                  isParaMim = true;
+                }
+              } else {
+                // Se não há e-mail de destino especificado ou se o usuário não é admin
+                if (!targetClientEmail || targetClientEmail === myEmail) {
+                  isParaMim = true;
+                }
+              }
+            } catch {
+              isParaMim = true;
+            }
+          }
+        }
+      }
+
+      if (isParaMim) {
+        // Toca som de notificação
+        playChatNotificationSound();
+
+        // Obtém dados atualizados do chamado no localStorage ou cria objeto com a nova mensagem
+        let chamadoObj = null;
+        try {
+          const db = JSON.parse(localStorage.getItem("chamados_db") || "[]");
+          chamadoObj = db.find((c) => String(c.id) === String(evento.chamadoId));
+          if (chamadoObj && evento.mensagem) {
+            const hist = chamadoObj.respostas || chamadoObj.mensagens || [];
+            const jaExiste = hist.some(
+              (m) => m.mensagem === evento.mensagem && m.data === evento.data
+            );
+            if (!jaExiste) {
+              chamadoObj = {
+                ...chamadoObj,
+                status: "Em Atendimento",
+                respostas: [
+                  ...hist,
+                  {
+                    autor: evento.autor || "Suporte JSA",
+                    mensagem: evento.mensagem,
+                    data: evento.data || new Date().toLocaleString("pt-BR"),
+                    isAdmin: !!evento.isAdminSender,
+                    timestamp: evento.timestamp || Date.now(),
+                  },
+                ],
+              };
+              const novos = db.map((c) => (String(c.id) === String(chamadoObj.id) ? chamadoObj : c));
+              localStorage.setItem("chamados_db", JSON.stringify(novos));
+            }
+          }
+        } catch {}
+
+        if (!chamadoObj) {
+          chamadoObj = {
+            id: evento.chamadoId,
+            assunto: evento.assunto || "Atendimento JSA",
+            clienteEmail: targetClientEmail,
+            clienteNome: evento.clienteNome || "Cliente",
+            status: "Em Atendimento",
+            respostas: evento.mensagem
+              ? [
+                  {
+                    autor: evento.autor || "Suporte JSA",
+                    mensagem: evento.mensagem,
+                    data: evento.data || new Date().toLocaleString("pt-BR"),
+                    isAdmin: !!evento.isAdminSender,
+                    timestamp: evento.timestamp || Date.now(),
+                  },
+                ]
+              : [],
+          };
+        }
+
+        // Abre o modal do chat na tela do usuário automaticamente
+        setChatAtivoChamado(chamadoObj);
+        setIsChatMinimized(false);
+
+        // Toast informativo
+        if (evento.tipo === "INICIAR_ATENDIMENTO") {
+          toast.info(
+            `🎧 Atendimento Iniciado! O Suporte JSA iniciou o atendimento do Chamado #${evento.chamadoId}.`,
+            { autoClose: 6000 }
+          );
+        } else if (evento.tipo === "NOVA_MENSAGEM") {
+          toast.info(
+            `💬 ${evento.autor || "Suporte"}: "${(evento.mensagem || "").slice(0, 50)}${
+              (evento.mensagem || "").length > 50 ? "..." : ""
+            }"`,
+            { autoClose: 5000 }
+          );
+        }
+      }
+    };
+
+    let bc;
+    if (typeof BroadcastChannel !== "undefined") {
+      bc = new BroadcastChannel("jsa_chamados_chat");
+      bc.onmessage = (e) => processarEventoChat(e.data);
+    }
+
+    const handleStorage = (e) => {
+      if (e.key === "jsa_chat_last_event" && e.newValue) {
+        try {
+          const payload = JSON.parse(e.newValue);
+          processarEventoChat(payload);
+        } catch {}
+      }
+    };
+
+    const handleCustomEvent = (e) => {
+      if (e.detail) {
+        processarEventoChat(e.detail);
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("jsa_chat_event", handleCustomEvent);
+
+    // Polling ativo a cada 2s para sincronizar chamados e abrir chat caso haja nova mensagem do suporte
+    const pollInterval = setInterval(() => {
+      const currentUser = getUser();
+      if (!currentUser) return;
+
+      const myEmail = String(currentUser.email || "").toLowerCase().trim();
+      const myUsername = String(currentUser.username || "").toLowerCase().trim();
+      const myName = String(currentUser.name || currentUser.nome || "").toLowerCase().trim();
+      const isUserAdmin =
+        isAdmin(currentUser) ||
+        myEmail.includes("admin") ||
+        myEmail === "jsa@jsa.com" ||
+        myEmail === "jsa.admin@gmail.com";
+
+      if (isUserAdmin) return; // Polling dedicado para clientes
+
+      api.get("/chamados")
+        .then((resp) => {
+          if (Array.isArray(resp.data)) {
+            localStorage.setItem("chamados_db", JSON.stringify(resp.data));
+
+            const meusChamados = resp.data.filter((c) => {
+              const cEmail = String(c.clienteEmail || "").toLowerCase().trim();
+              const cName = String(c.clienteNome || "").toLowerCase().trim();
+              return (
+                (myEmail && (cEmail === myEmail || cEmail.includes(myEmail) || myEmail.includes(cEmail))) ||
+                (myUsername && (cEmail === myUsername || cEmail.includes(myUsername))) ||
+                (myName && (cName === myName || cName.includes(myName)))
+              );
+            });
+
+            meusChamados.forEach((c) => {
+              if (c.status === "Em Atendimento") {
+                const msgs = c.respostas || c.mensagens || [];
+                const keySeen = `jsa_seen_msgs_${c.id}`;
+                const keyOpened = `jsa_opened_ticket_${c.id}`;
+                const lastSeen = Number(sessionStorage.getItem(keySeen) || "0");
+                const jaAbriu = sessionStorage.getItem(keyOpened) === "true";
+
+                // Se ainda não abriu ou se chegou nova mensagem
+                if (!jaAbriu || msgs.length > lastSeen) {
+                  sessionStorage.setItem(keyOpened, "true");
+                  sessionStorage.setItem(keySeen, String(msgs.length));
+
+                  // Identifica se a última mensagem é do admin/suporte
+                  const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+                  const isFromAdmin =
+                    lastMsg &&
+                    (lastMsg.isAdmin ||
+                      String(lastMsg.autor).includes("Suporte") ||
+                      String(lastMsg.autor).includes("Admin"));
+
+                  if (isFromAdmin || !jaAbriu) {
+                    playChatNotificationSound();
+                    setChatAtivoChamado(c);
+                    setIsChatMinimized(false);
+
+                    if (lastMsg && isFromAdmin) {
+                      toast.info(
+                        `💬 ${lastMsg.autor}: "${(lastMsg.mensagem || "").slice(0, 45)}${
+                          (lastMsg.mensagem || "").length > 45 ? "..." : ""
+                        }"`,
+                        { autoClose: 5000 }
+                      );
+                    }
+                  }
+                }
+              }
+            });
+          }
+        })
+        .catch(() => {});
+    }, 2000);
+
+    return () => {
+      if (bc) bc.close();
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("jsa_chat_event", handleCustomEvent);
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const salvarLocal = (lista) => {
@@ -913,6 +1169,30 @@ function App() {
           adicionarOrdem={adicionarOrdem}
           excluirOrdem={excluirOrdem}
         />
+
+        {/* MODAL GLOBAL DE CHAT AO VIVO DE ATENDIMENTO */}
+        {chatAtivoChamado && !isChatMinimized && (
+          <ModalChatAtendimento
+            chamado={chatAtivoChamado}
+            onClose={() => setChatAtivoChamado(null)}
+            onMinimize={() => setIsChatMinimized(true)}
+            onUpdateChamado={(atualizado) => setChatAtivoChamado(atualizado)}
+          />
+        )}
+
+        {/* BOTÃO FLUTUANTE QUANDO CHAT MINIMIZADO */}
+        {chatAtivoChamado && isChatMinimized && (
+          <button
+            type="button"
+            className="chamados-floating-chat-btn"
+            onClick={() => setIsChatMinimized(false)}
+            title="Clique para reabrir o chat de atendimento"
+          >
+            <span>💬</span>
+            <span>Atendimento Ativo (#{chatAtivoChamado.id})</span>
+            <span className="chamados-floating-chat-badge">!</span>
+          </button>
+        )}
       </ErrorBoundary>
     </Router>
   );

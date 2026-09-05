@@ -91,17 +91,21 @@ const ContasPage = () => {
       let lista = Array.isArray(data) ? data : [];
 
       // Geração e cobrança de fatura SYS_Liberação e Manutenção automática
-      // aplicada EXCLUSIVAMENTE aos usuários cadastrados na "Filial Particular".
-      // Usuários das filiais de 1 a 7 (atuais e futuros) não geram essa cobrança automaticamente.
+      // aplicada EXCLUSIVAMENTE aos usuários cadastrados na "Filial Particular" e ao ADMIN.
+      // Usuários das filiais de 1 a 7 (atuais e futuros) não geram nem visualizam essa cobrança.
       const curUser = getCurrentUser() || {};
       const userFilial = String(
         curUser.filial ||
         localStorage.getItem("usuario_filial") ||
         ""
       ).trim();
+      const isAdminUser = isUserAdmin || curUser.role === 'ADMIN' || curUser.role === 'admin';
       const isFilialParticular = userFilial === "Filial Particular";
 
-      if (isFilialParticular) {
+      if (!isAdminUser && !isFilialParticular) {
+        // Remove ativamente qualquer fatura SYS das filiais 1 a 7
+        lista = lista.filter((c) => c.descricao !== NOME_CONTA_SYS);
+      } else {
         const hoje = new Date();
         const mesAnoAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
         const userEmailLogado = String(curUser.email || localStorage.getItem("usuario_email") || "").toLowerCase().trim();
@@ -145,7 +149,7 @@ const ContasPage = () => {
             cliente: usuarioLogado,
             userEmail: userEmailLogado,
             userId: userIdLogado,
-            filial: "Filial Particular",
+            filial: isFilialParticular ? "Filial Particular" : (userFilial || "Filial 1"),
             editada: false,
           };
 
@@ -297,19 +301,36 @@ const ContasPage = () => {
   };
 
   const contasFiltradas = useMemo(() => {
+    const curUser = getCurrentUser() || {};
+    const userFilial = String(curUser.filial || localStorage.getItem("usuario_filial") || "").trim();
+    const isAdminUser = isUserAdmin || curUser.role === 'ADMIN' || curUser.role === 'admin';
+    const isFilialParticular = userFilial === "Filial Particular";
+
     return contas.filter((c) => {
+      // Bloqueia exibição da cobrança SYS para usuários das filiais 1 a 7
+      if (!isAdminUser && !isFilialParticular && c.descricao === NOME_CONTA_SYS) {
+        return false;
+      }
       if (filtroTipo !== "Todos" && c.tipo !== filtroTipo) return false;
       if (filtroStatus !== "Todos" && c.status !== filtroStatus) return false;
       return true;
     });
-  }, [contas, filtroTipo, filtroStatus]);
+  }, [contas, filtroTipo, filtroStatus, isUserAdmin]);
 
   const resumoFinanceiro = useMemo(() => {
     let totalPagar = 0;
     let totalReceber = 0;
     let totalBaixas = 0;
 
+    const curUser = getCurrentUser() || {};
+    const userFilial = String(curUser.filial || localStorage.getItem("usuario_filial") || "").trim();
+    const isAdminUser = isUserAdmin || curUser.role === 'ADMIN' || curUser.role === 'admin';
+    const isFilialParticular = userFilial === "Filial Particular";
+
     contas.forEach((c) => {
+      if (!isAdminUser && !isFilialParticular && c.descricao === NOME_CONTA_SYS) {
+        return;
+      }
       const val = Number(c.valor) || 0;
       if (c.tipo === "Pagar") {
         totalPagar += val;
@@ -325,7 +346,7 @@ const ContasPage = () => {
       totalBaixas,
       saldoPreviso: totalReceber - totalPagar,
     };
-  }, [contas]);
+  }, [contas, isUserAdmin]);
 
   const handleSelectTipo = (tipo) => {
     setFiltroTipo(tipo);

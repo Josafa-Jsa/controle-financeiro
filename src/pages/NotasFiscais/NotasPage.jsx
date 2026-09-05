@@ -7,6 +7,8 @@ import {
   cancelarNota,
   excluirNota,
   chaveExiste,
+  numeroExiste,
+  deduplicarListaNotas,
   sincronizarNotasDoServidor,
 } from '../../services/notasService';
 
@@ -303,6 +305,7 @@ export default function NotasPage() {
 
   const pendentesRef = useRef({});
   const lastUpdateIdRef = useRef(0);
+  const salvandoRef = useRef(false);
 
   const handleConfirmarExclusaoNota = async (nota) => {
     if (!nota) return;
@@ -352,7 +355,7 @@ export default function NotasPage() {
 
   const carregarNotas = () => {
     const dados = listarNotas(usuarioLogado);
-    const limpos = (dados || []).map((n) => {
+    const limpos = deduplicarListaNotas(dados || []).map((n) => {
       if (n && n.exclusaoPendente) {
         const copy = { ...n };
         delete copy.exclusaoPendente;
@@ -361,7 +364,7 @@ export default function NotasPage() {
       }
       return n;
     });
-    setNotas(limpos);
+    setNotas(deduplicarListaNotas(limpos));
   };
 
   useEffect(() => {
@@ -369,7 +372,7 @@ export default function NotasPage() {
     sincronizarNotasDoServidor(usuarioLogado)
       .then((res) => {
         if (Array.isArray(res) && res.length) {
-          const limpos = res.map((n) => {
+          const limpos = deduplicarListaNotas(res).map((n) => {
             if (n && n.exclusaoPendente) {
               const copy = { ...n };
               delete copy.exclusaoPendente;
@@ -378,7 +381,7 @@ export default function NotasPage() {
             }
             return n;
           });
-          setNotas(limpos);
+          setNotas(deduplicarListaNotas(limpos));
         }
       })
       .catch(() => {});
@@ -716,12 +719,29 @@ export default function NotasPage() {
   };
 
   const handleSalvar = async (nota) => {
+    if (salvandoRef.current) return;
+    salvandoRef.current = true;
+
     try {
       const isEdicao = !!nota.id;
 
-      if (nota.chavedeacesso && chaveExiste(nota.chavedeacesso, nota.id)) {
-        toast.warn('Já existe uma nota com essa chave de acesso.');
-        return;
+      if (!isEdicao) {
+        const chaveNorm = String(nota.chavedeacesso || '').trim().replace(/\D+/g, '');
+        const numNorm = String(nota.numero || '').trim();
+
+        if (chaveNorm && chaveNorm.length >= 20 && chaveExiste(chaveNorm, null, usuarioLogado)) {
+          toast.warn('Já existe uma nota com essa chave de acesso cadastrada.');
+          return;
+        }
+        if (numNorm && numeroExiste(numNorm, null, usuarioLogado)) {
+          toast.warn(`Já existe uma nota com o número #${numNorm} cadastrada.`);
+          return;
+        }
+      } else {
+        if (nota.chavedeacesso && chaveExiste(nota.chavedeacesso, nota.id, usuarioLogado)) {
+          toast.warn('Já existe outra nota com essa chave de acesso.');
+          return;
+        }
       }
 
       const notaParaSalvar = {
@@ -758,6 +778,10 @@ export default function NotasPage() {
     } catch (e) {
       console.error('Erro ao salvar nota:', e);
       toast.error('Falha ao salvar nota fiscal.');
+    } finally {
+      setTimeout(() => {
+        salvandoRef.current = false;
+      }, 500);
     }
   };
 
@@ -999,26 +1023,8 @@ export default function NotasPage() {
 
       <div className="notas-header-bar">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <h1 className="page-title" style={{ margin: 0 }}>Notas Fiscais</h1>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 10px',
-                borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                background: isUserAdmin ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                color: isUserAdmin ? '#60a5fa' : '#34d399',
-                border: `1px solid ${isUserAdmin ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
-              }}
-            >
-              <span>🏢</span> {isUserAdmin ? 'Todas as Filiais (Acesso Master)' : `${filialUsuario} • Acesso Setorial`}
-            </span>
-          </div>
-          <p className="page-subtitle" style={{ marginTop: '4px' }}>Gerenciamento e controle de Notas Fiscais</p>
+          <h1 className="page-title">Notas Fiscais</h1>
+          <p className="page-subtitle">Gerenciamento e controle de Notas Fiscais</p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -1028,8 +1034,8 @@ export default function NotasPage() {
             onClick={() => setModalCadastrarFornecedorAberto(true)}
             style={{
               background: '#1e293b',
-              color: '#60a5fa',
-              border: '1px solid #3b82f6',
+              color: '#38bdf8',
+              border: '1px solid #0284c7',
               padding: '9px 16px',
               borderRadius: '6px',
               fontWeight: '700',
@@ -1038,12 +1044,12 @@ export default function NotasPage() {
               alignItems: 'center',
               gap: '6px',
               fontSize: '0.9rem',
-              boxShadow: '0 2px 6px rgba(59, 130, 246, 0.25)',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
               transition: 'all 0.2s',
             }}
-            title="Cadastrar Fornecedor com CNPJ e Nome em Maiúsculas"
+            title="Cadastrar Posto com CNPJ e Nome em Maiúsculas"
           >
-            <span>🏢</span> Cadastrar Fornecedor
+            <span>⛽</span> Cadastrar Posto
           </button>
 
           <button
@@ -1148,19 +1154,6 @@ export default function NotasPage() {
                     </label>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    <span
-                      style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        padding: '2px 7px',
-                        borderRadius: '4px',
-                        backgroundColor: 'rgba(59, 130, 246, 0.15)',
-                        color: '#93c5fd',
-                        border: '1px solid rgba(59, 130, 246, 0.3)',
-                      }}
-                    >
-                      🏢 {nota.filial || 'Filial 1'}
-                    </span>
                     <span
                       style={{
                         fontSize: '0.72rem',
@@ -1367,8 +1360,11 @@ export default function NotasPage() {
       <ModalCadastrarFornecedor
         isOpen={modalCadastrarFornecedorAberto}
         onClose={() => setModalCadastrarFornecedorAberto(false)}
-        onSave={(fornecedorSalvo) => {
-          toast.success(`Fornecedor "${fornecedorSalvo.nome}" cadastrado com sucesso!`);
+        titulo="Cadastrar Posto"
+        icone="⛽"
+        tipoEntidade="Posto"
+        onSave={(postoSalvo) => {
+          toast.success(`Posto "${postoSalvo.nome}" cadastrado com sucesso!`);
           setModalCadastrarFornecedorAberto(false);
         }}
       />

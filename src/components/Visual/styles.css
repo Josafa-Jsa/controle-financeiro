@@ -153,8 +153,7 @@ body {
 .modal-boleto-container,
 .modal-relatorio-box,
 .modal-relatorio-content,
-.modal-relatorio-simulacoes,
-.chamados-detail-modal-card {
+.modal-relatorio-simulacoes {
   margin: auto !important;
   max-height: calc(100vh - 48px) !important;
   max-width: min(600px, 95vw);

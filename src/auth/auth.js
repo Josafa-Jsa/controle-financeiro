@@ -179,7 +179,9 @@ export function updateUserPermissions(userIdOrEmail, newPermissions, optionalEma
     (u) =>
       String(u.id).toLowerCase() === searchId ||
       String(u.email || "").toLowerCase() === searchId ||
-      (searchEmail && String(u.email || "").toLowerCase() === searchEmail)
+      (searchEmail && String(u.email || "").toLowerCase() === searchEmail) ||
+      (searchId && String(u.username || "").toLowerCase() === searchId) ||
+      (searchId && String(u.name || "").toLowerCase() === searchId)
   );
 
   if (idx !== -1) {
@@ -203,18 +205,20 @@ export function updateUserPermissions(userIdOrEmail, newPermissions, optionalEma
     currentUser &&
     (String(currentUser.id) === searchId ||
       String(currentUser.email || "").toLowerCase() === searchId ||
-      (targetEmail && String(currentUser.email || "").toLowerCase() === targetEmail))
+      (targetEmail && String(currentUser.email || "").toLowerCase() === targetEmail) ||
+      (searchId && String(currentUser.username || "").toLowerCase() === searchId))
   ) {
     setUser({ ...currentUser, permissions: newPermissions });
   }
 
   // Notifica o evento globalmente para abas e componentes locais
-  if (targetEmail) {
+  if (targetEmail || searchId) {
+    const notifyEmail = targetEmail || (idx !== -1 ? users[idx]?.email : searchId);
     try {
       localStorage.setItem(
         "permissoes_alteradas_evento",
         JSON.stringify({
-          email: targetEmail,
+          email: notifyEmail,
           permissions: newPermissions,
           timestamp: Date.now(),
         })
@@ -223,7 +227,7 @@ export function updateUserPermissions(userIdOrEmail, newPermissions, optionalEma
 
     window.dispatchEvent(
       new CustomEvent("permissoes_alteradas_evento", {
-        detail: { email: targetEmail, permissions: newPermissions },
+        detail: { email: notifyEmail, permissions: newPermissions },
       })
     );
   }
@@ -344,7 +348,12 @@ export async function validateLogin(email, password) {
   const normalizedEmail = String(email || "").toLowerCase().trim();
   const inputPassword = String(password || "").trim();
 
-  const idx = users.findIndex((u) => String(u.email).toLowerCase() === normalizedEmail);
+  const idx = users.findIndex(
+    (u) =>
+      String(u.email || "").toLowerCase() === normalizedEmail ||
+      String(u.username || "").toLowerCase() === normalizedEmail ||
+      String(u.name || "").toLowerCase() === normalizedEmail
+  );
 
   if (idx === -1) {
     return { ok: false, error: "Usuário não encontrado." };
@@ -373,9 +382,13 @@ export async function validateLogin(email, password) {
   const loggedUser = {
     id: found.id,
     name: found.name,
+    username: found.username || normalizedEmail,
     email: found.email,
     password: found.password,
     role: found.role || ROLES.USER,
+    filial: found.filial || "Filial 1",
+    avatar: found.avatar || found.foto || null,
+    permissions: Array.isArray(found.permissions) ? found.permissions : ["chamados"],
     lastSeen: dataFormatada,
   };
 

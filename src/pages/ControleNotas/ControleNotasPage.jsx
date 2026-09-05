@@ -10,6 +10,7 @@ import {
 } from '../../services/controleNotasService';
 import { formatCurrencyBRL, formatDateBR } from '../../utils/telegram';
 import { getUser, isAdmin } from '../../auth/auth';
+import { normalizarNomeFilial } from '../../utils/filialUtils';
 import ModalInserirControleNota from '../../components/Modais/ModalInserirControleNota';
 import ModalCadastrarFornecedor from '../../components/Modais/ModalCadastrarFornecedor';
 import ModalAnexarDanfe from '../../components/Modais/ModalAnexarDanfe';
@@ -24,13 +25,32 @@ import './controleNotas.css';
 export default function ControleNotasPage() {
   const usuarioLogado = getUser();
   const isUserAdmin = isAdmin(usuarioLogado);
-  const filialUsuario =
+  const perms = Array.isArray(usuarioLogado?.permissions || usuarioLogado?.permissoes)
+    ? (usuarioLogado.permissions || usuarioLogado.permissoes)
+    : [];
+  const temPermissao = isUserAdmin || perms.includes('*') || perms.includes('controle-notas') || perms.includes('admin');
+
+  const filialUsuario = normalizarNomeFilial(
     usuarioLogado?.filial ||
     usuarioLogado?.user_filial ||
     localStorage.getItem('usuario_filial') ||
-    'Filial 1';
+    'Filial 1'
+  );
+
+  if (!temPermissao) {
+    return (
+      <div style={{ padding: '60px 20px', textAlign: 'center', color: '#f87171', maxWidth: '600px', margin: '40px auto', background: '#18181c', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+        <h2 style={{ margin: '0 0 10px 0', color: '#fff' }}>Acesso Restrito</h2>
+        <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.95rem' }}>
+          Você não possui permissão para acessar o <strong>Controle de Notas</strong>. Solicite liberação ao Administrador no painel de Usuários.
+        </p>
+      </div>
+    );
+  }
 
   const [notas, setNotas] = useState([]);
+  const [filtroFilialAdmin, setFiltroFilialAdmin] = useState('Todas');
   const [buscaChaveOuNumero, setBuscaChaveOuNumero] = useState('');
   const [notaDestacada, setNotaDestacada] = useState(null);
   const [modalInserirAberto, setModalInserirAberto] = useState(false);
@@ -237,12 +257,84 @@ export default function ControleNotasPage() {
     }
   };
 
+  const getSituacaoBadgeStyle = (situacao) => {
+    switch (situacao) {
+      case 'Liberada':
+        return { backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.4)' };
+      case 'Liberar':
+        return { backgroundColor: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)' };
+      case 'Fornecedor bloqueado':
+      case 'Divergente':
+        return { backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)' };
+      case 'Tributação':
+      case 'Tributação comercial':
+        return { backgroundColor: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.4)' };
+      case 'Vincular pedido':
+      case 'Sem pedido':
+      case 'Item sem pedido':
+      case 'Custo':
+      case 'Quantidade':
+        return { backgroundColor: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.4)' };
+      case 'Cadastro':
+      case 'Em lançamento':
+      case 'Guia':
+        return { backgroundColor: 'rgba(20, 184, 166, 0.2)', color: '#2dd4bf', border: '1px solid rgba(20, 184, 166, 0.4)' };
+      default:
+        return { backgroundColor: 'rgba(148, 163, 184, 0.15)', color: '#cbd5e1', border: '1px solid rgba(148, 163, 184, 0.3)' };
+    }
+  };
+
+  const handleLiberarNota = (nota) => {
+    if (!nota) return;
+    const agoraIso = new Date().toISOString();
+    const nomeResp =
+      usuarioLogado?.name ||
+      usuarioLogado?.nome ||
+      usuarioLogado?.username ||
+      'Usuário Atual';
+
+    const notaAtualizada = {
+      ...nota,
+      situacaoNota: 'Liberada',
+      responsavelLiberacao: nota.responsavelLiberacao || nomeResp,
+      dataHoraLiberacao: agoraIso,
+      status: 'Liberada',
+    };
+
+    try {
+      const atualizada = atualizarControleNota(notaAtualizada, usuarioLogado);
+      if (atualizada) {
+        carregarNotas();
+        if (notaDestacada && String(notaDestacada.id) === String(nota.id)) {
+          setNotaDestacada(atualizada);
+        }
+        const dataHoraFmt = formatarDataHoraEntrega(agoraIso);
+        toast.success(`Nota #${nota.numero || nota.id} LIBERADA com sucesso! Data e hora fixadas: ${dataHoraFmt}`);
+      }
+    } catch (err) {
+      console.error('Erro ao liberar nota:', err);
+      toast.error('Erro ao registrar liberação da nota.');
+    }
+  };
+
+  const notasPorFilial = useMemo(() => {
+    if (!isUserAdmin) {
+      const userFilialNorm = normalizarNomeFilial(filialUsuario || 'Filial 1').toLowerCase();
+      return notas.filter((n) => normalizarNomeFilial(n.filial || 'Filial 1').toLowerCase() === userFilialNorm);
+    }
+    if (filtroFilialAdmin && filtroFilialAdmin !== 'Todas') {
+      const filialFiltroNorm = normalizarNomeFilial(filtroFilialAdmin).toLowerCase();
+      return notas.filter((n) => normalizarNomeFilial(n.filial || 'Filial 1').toLowerCase() === filialFiltroNorm);
+    }
+    return notas;
+  }, [notas, isUserAdmin, filialUsuario, filtroFilialAdmin]);
+
   const metricas = useMemo(() => {
-    const totalNotas = notas.length;
-    const valorTotal = notas.reduce((acc, n) => acc + (Number(n.valor) || 0), 0);
-    const fornecedoresSet = new Set(notas.map((n) => n.fornecedor?.trim() || n.cnpj?.trim()).filter(Boolean));
+    const totalNotas = notasPorFilial.length;
+    const valorTotal = notasPorFilial.reduce((acc, n) => acc + (Number(n.valor) || 0), 0);
+    const fornecedoresSet = new Set(notasPorFilial.map((n) => n.fornecedor?.trim() || n.cnpj?.trim()).filter(Boolean));
     const hojeStr = new Date().toISOString().slice(0, 10);
-    const entreguesHoje = notas.filter((n) => String(n.dataHoraEntrega || '').slice(0, 10) === hojeStr).length;
+    const entreguesHoje = notasPorFilial.filter((n) => String(n.dataHoraEntrega || '').slice(0, 10) === hojeStr).length;
 
     return {
       totalNotas,
@@ -250,15 +342,15 @@ export default function ControleNotasPage() {
       totalFornecedores: fornecedoresSet.size,
       entreguesHoje,
     };
-  }, [notas]);
+  }, [notasPorFilial]);
 
   const notasFiltradas = useMemo(() => {
     const termo = buscaChaveOuNumero.trim();
-    if (!termo) return notas;
+    if (!termo) return notasPorFilial;
     const termoLower = termo.toLowerCase();
     const termoLimpo = termo.replace(/\D+/g, '');
 
-    return notas.filter((n) => {
+    return notasPorFilial.filter((n) => {
       const chaveLimpa = (n.chavedeacesso || '').replace(/\D+/g, '');
       const numLimpo = (n.numero || '').replace(/\D+/g, '');
       const cnpjLimpo = (n.cnpj || '').replace(/\D+/g, '');
@@ -273,7 +365,7 @@ export default function ControleNotasPage() {
         String(n.chavedeacesso || '').toLowerCase().includes(termoLower)
       );
     });
-  }, [notas, buscaChaveOuNumero]);
+  }, [notasPorFilial, buscaChaveOuNumero]);
 
   return (
     <div className="controle-notas-page">
@@ -298,13 +390,15 @@ export default function ControleNotasPage() {
                 gap: '5px',
               }}
             >
-              🏢 {isUserAdmin ? 'Todas as Filiais (Acesso Master)' : `${filialUsuario} • Acesso Setorial`}
+              🏢 {isUserAdmin ? (filtroFilialAdmin === 'Todas' ? 'Todas as Filiais (Acesso Master)' : `${filtroFilialAdmin} (Filtrada)`) : `${filialUsuario} • Acesso Setorial`}
             </span>
           </div>
           <p>
             {isUserAdmin
-              ? 'Visualização global de todas as Notas Fiscais inseridas por todas as filiais • Big Master Supermercados'
-              : `Notas Fiscais inseridas e compartilhadas pelos usuários da ${filialUsuario} • Big Master Supermercados`}
+              ? (filtroFilialAdmin === 'Todas'
+                  ? 'Visualização global de todas as Notas Fiscais inseridas por todas as filiais • Big Master Supermercados'
+                  : `Visualizando exclusivamente notas da ${filtroFilialAdmin} • Big Master Supermercados`)
+              : `Notas Fiscais inseridas e compartilhadas exclusivamente pelos usuários da ${filialUsuario} • Big Master Supermercados`}
           </p>
         </div>
 
@@ -372,44 +466,82 @@ export default function ControleNotasPage() {
         </div>
       </div>
 
-      {/* Barra de Pesquisa e Filtro (Tamanho padrão dos containers) */}
-      <div className="controle-search-container">
-        <form onSubmit={handleBuscarNotaRapida} className="controle-search-form">
-          <div className="controle-search-input-wrapper">
-            <span className="controle-search-icon">🔍</span>
-            <input
-              type="text"
-              className="controle-search-input"
-              placeholder="Pesquisar por Nº da Nota, Chave de Acesso (44 dígitos), Fornecedor, CNPJ ou Quem Recebeu..."
-              value={buscaChaveOuNumero}
-              onChange={(e) => setBuscaChaveOuNumero(e.target.value)}
-            />
-            {buscaChaveOuNumero && (
-              <button
-                type="button"
-                className="btn-limpar-busca-controle"
-                onClick={() => {
-                  setBuscaChaveOuNumero('');
-                  setNotaDestacada(null);
+      {/* Barra de Pesquisa e Filtro */}
+      <div className="controle-search-container" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {isUserAdmin && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fbbf24', whiteSpace: 'nowrap' }}>🏢 Filial:</span>
+              <select
+                value={filtroFilialAdmin}
+                onChange={(e) => setFiltroFilialAdmin(e.target.value)}
+                style={{
+                  height: '38px',
+                  padding: '0 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #d97706',
+                  backgroundColor: '#18181c',
+                  color: '#fbbf24',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  outline: 'none',
+                  cursor: 'pointer',
                 }}
-                title="Limpar pesquisa"
               >
-                ✕
-              </button>
-            )}
-          </div>
-          <button
-            type="submit"
-            className="btn-buscar-nota-controle"
-            title="Buscar e carregar nota específica no container de destaque"
-          >
-            🔍 Buscar / Destacar
-          </button>
-        </form>
+                <option value="Todas">🌐 Todas as Filiais</option>
+                <option value="Filial 1">Filial 1</option>
+                <option value="Filial 2">Filial 2</option>
+                <option value="Filial 3">Filial 3</option>
+                <option value="Filial 4">Filial 4</option>
+                <option value="Filial 5">Filial 5</option>
+                <option value="Filial 6">Filial 6</option>
+                <option value="Filial 7">Filial 7</option>
+                <option value="Filial Particular">Filial Particular</option>
+              </select>
+            </div>
+          )}
+
+          <form onSubmit={handleBuscarNotaRapida} className="controle-search-form" style={{ flex: 1 }}>
+            <div className="controle-search-input-wrapper">
+              <span className="controle-search-icon">🔍</span>
+              <input
+                type="text"
+                className="controle-search-input"
+                placeholder={
+                  isUserAdmin
+                    ? 'Pesquisar por Nº da Nota, Chave de Acesso (44 dígitos), Fornecedor, CNPJ ou Quem Recebeu...'
+                    : `Pesquisar notas da ${filialUsuario} por Nº, Chave (44 dígitos), Fornecedor, CNPJ ou Quem Recebeu...`
+                }
+                value={buscaChaveOuNumero}
+                onChange={(e) => setBuscaChaveOuNumero(e.target.value)}
+              />
+              {buscaChaveOuNumero && (
+                <button
+                  type="button"
+                  className="btn-limpar-busca-controle"
+                  onClick={() => {
+                    setBuscaChaveOuNumero('');
+                    setNotaDestacada(null);
+                  }}
+                  title="Limpar pesquisa"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <button
+              type="submit"
+              className="btn-buscar-nota-controle"
+              title="Buscar e carregar nota específica no container de destaque"
+            >
+              🔍 Buscar / Destacar
+            </button>
+          </form>
+        </div>
 
         {buscaChaveOuNumero && (
           <div className="controle-search-badge">
-            <span>Resultados: <strong>{notasFiltradas.length}</strong> de {notas.length} notas</span>
+            <span>Resultados: <strong>{notasFiltradas.length}</strong> de {notasPorFilial.length} notas</span>
           </div>
         )}
       </div>
@@ -499,6 +631,45 @@ export default function ControleNotasPage() {
                   : '⚠️ Sem DANFE Anexada'}
               </span>
             </div>
+
+            {notaDestacada.situacaoNota && (
+              <div className="controle-destaque-item">
+                <span className="item-label">Situação da Nota</span>
+                <span
+                  className="item-val"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.82rem',
+                    width: 'fit-content',
+                    ...getSituacaoBadgeStyle(notaDestacada.situacaoNota),
+                  }}
+                >
+                  📌 {notaDestacada.situacaoNota}
+                </span>
+              </div>
+            )}
+
+            {notaDestacada.dataHoraLiberacao && (
+              <div className="controle-destaque-item">
+                <span className="item-label">Data/Hora da Liberação</span>
+                <span className="item-val" style={{ color: '#34d399' }}>
+                  ✅ {formatarDataHoraEntrega(notaDestacada.dataHoraLiberacao)}
+                </span>
+              </div>
+            )}
+
+            {notaDestacada.responsavelLiberacao && (
+              <div className="controle-destaque-item">
+                <span className="item-label">Responsável Liberação</span>
+                <span className="item-val" style={{ color: '#38bdf8' }}>
+                  👤 {notaDestacada.responsavelLiberacao}
+                </span>
+              </div>
+            )}
           </div>
 
           {notaDestacada.chavedeacesso && (
@@ -536,6 +707,35 @@ export default function ControleNotasPage() {
 
           {/* Barra de Ações Rápidas da Nota Destacada */}
           <div className="controle-destaque-actions">
+            <button
+              type="button"
+              className={`btn-destaque-action ${notaDestacada.situacaoNota === 'Liberada' || notaDestacada.dataHoraLiberacao ? 'liberada' : ''}`}
+              onClick={() => handleLiberarNota(notaDestacada)}
+              style={
+                notaDestacada.situacaoNota === 'Liberada' || notaDestacada.dataHoraLiberacao
+                  ? {
+                      background: 'rgba(16, 185, 129, 0.22)',
+                      color: '#34d399',
+                      border: '1px solid #10b981',
+                      fontWeight: 800,
+                    }
+                  : {
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontWeight: 800,
+                    }
+              }
+              title={
+                notaDestacada.dataHoraLiberacao
+                  ? `Nota Liberada em ${formatarDataHoraEntrega(notaDestacada.dataHoraLiberacao)}. Clique para atualizar data/hora.`
+                  : 'Fixar data e hora da liberação da nota'
+              }
+            >
+              <span>{notaDestacada.situacaoNota === 'Liberada' || notaDestacada.dataHoraLiberacao ? '✅' : '🔓'}</span>
+              Nota Liberada
+            </button>
+
             <button
               type="button"
               className="btn-destaque-action ver"
@@ -690,7 +890,7 @@ export default function ControleNotasPage() {
                     {nota.numero ? `NF #${nota.numero}` : `NF #${nota.id}`}
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                   <span
                     className="badge"
                     style={{
@@ -708,6 +908,19 @@ export default function ControleNotasPage() {
                   <span className="badge status-recebida">
                     {nota.status || 'Recebida'}
                   </span>
+                  {nota.situacaoNota && (
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        ...getSituacaoBadgeStyle(nota.situacaoNota),
+                      }}
+                    >
+                      {nota.situacaoNota === 'Liberada' ? '🟢 LIBERADA' : nota.situacaoNota.toUpperCase()}
+                    </span>
+                  )}
                   {nota.anexoDanfe ? (
                     <span
                       style={{
@@ -780,6 +993,46 @@ export default function ControleNotasPage() {
                     </span>
                   </div>
 
+                  {nota.situacaoNota && (
+                    <div className="detail-item">
+                      <span className="detail-label">Situação:</span>
+                      <span
+                        className="detail-value"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          width: 'fit-content',
+                          ...getSituacaoBadgeStyle(nota.situacaoNota),
+                        }}
+                      >
+                        📌 {nota.situacaoNota}
+                      </span>
+                    </div>
+                  )}
+
+                  {nota.dataHoraLiberacao && (
+                    <div className="detail-item">
+                      <span className="detail-label">Data/Hora Liberação:</span>
+                      <span className="detail-value" style={{ color: '#34d399', fontWeight: 700 }}>
+                        ✅ {formatarDataHoraEntrega(nota.dataHoraLiberacao)}
+                      </span>
+                    </div>
+                  )}
+
+                  {nota.responsavelLiberacao && (
+                    <div className="detail-item">
+                      <span className="detail-label">Resp. Liberação:</span>
+                      <span className="detail-value" style={{ color: '#38bdf8', fontWeight: 600 }}>
+                        👤 {nota.responsavelLiberacao}
+                      </span>
+                    </div>
+                  )}
+
                   {nota.chavedeacesso && (
                     <div className="detail-item full-width">
                       <span className="detail-label">Chave de Acesso:</span>
@@ -810,7 +1063,7 @@ export default function ControleNotasPage() {
                 </div>
               </div>
 
-              {/* Rodapé do Card com os 3 Botões: Ver Nota, Editar Nota, Excluir Nota */}
+              {/* Rodapé do Card com os 4 Botões: Ver Nota, Nota Liberada, Editar Nota, Excluir Nota */}
               <div className="nota-card-footer">
                 <button
                   type="button"
@@ -819,6 +1072,20 @@ export default function ControleNotasPage() {
                   title="Visualizar a DANFE anexada da Nota"
                 >
                   <span>👁️</span> Ver Nota
+                </button>
+
+                <button
+                  type="button"
+                  className={`btn-card-action btn-liberar-nota ${nota.situacaoNota === 'Liberada' || nota.dataHoraLiberacao ? 'liberada' : ''}`}
+                  onClick={() => handleLiberarNota(nota)}
+                  title={
+                    nota.dataHoraLiberacao
+                      ? `Nota Liberada em ${formatarDataHoraEntrega(nota.dataHoraLiberacao)} por ${nota.responsavelLiberacao || 'Responsável'}. Clique para atualizar data/hora.`
+                      : 'Clique para fixar data e hora da liberação da nota'
+                  }
+                >
+                  <span>{nota.situacaoNota === 'Liberada' || nota.dataHoraLiberacao ? '✅' : '🔓'}</span>
+                  Nota Liberada
                 </button>
 
                 <button

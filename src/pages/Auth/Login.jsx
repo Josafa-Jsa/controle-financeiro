@@ -209,7 +209,7 @@ export default function Login() {
           ? user.permissions
           : standardPerms;
 
-      await login({
+      const userObjToSave = {
         id: user.id,
         email: user.email,
         username: user.username || targetLogin,
@@ -217,12 +217,15 @@ export default function Login() {
         name: nomeAmigavel,
         role: user.role === "admin" ? "ADMIN" : "USER",
         filial: user.filial || "Filial 1",
+        avatar: user.avatar || null,
         permissions: resolvedPermissions,
         whatsapp: user.whatsapp || "",
         lembrar,
-      });
+      };
 
-      localStorage.setItem("currentUser", JSON.stringify(user));
+      await login(userObjToSave);
+
+      localStorage.setItem("currentUser", JSON.stringify(userObjToSave));
       sessionStorage.setItem("play_login_intro", "true");
 
       toast.success("Acesso liberado!", {

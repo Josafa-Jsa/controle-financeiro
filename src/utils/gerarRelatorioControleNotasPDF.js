@@ -114,7 +114,8 @@ export function construirDocumentoRelatorioControleNotas({
 
   // 3. Tabela de Notas Fiscais
   const corpoTabela = notasOrdenadas.map((n, i) => {
-    const numNf = n.numero ? `NF #${n.numero}` : `NF #${n.id}`;
+    const situacaoStr = n.situacaoNota ? `\n[${n.situacaoNota}]` : '';
+    const numNf = (n.numero ? `NF #${n.numero}` : `NF #${n.id}`) + situacaoStr;
     const fornecedorLinha = n.fornecedor
       ? `${n.fornecedor}${n.cnpj ? `\nCNPJ: ${n.cnpj}` : ''}`
       : (n.cnpj || '-');

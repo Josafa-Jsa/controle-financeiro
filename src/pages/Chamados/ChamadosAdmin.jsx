@@ -7,6 +7,7 @@ import { api } from "../../api/client";
 import { sendTelegramEvent } from "../../utils/telegram";
 import { logEvent } from "../../utils/logger";
 import ModalSecao from "../../components/Modais/ModalSecao";
+import ModalChatAtendimento, { emitChatEvent } from "../../components/Modais/ModalChatAtendimento";
 import ChamadosClient from "./ChamadosClient";
 import "../../components/Visual/chamados.css";
 
@@ -41,6 +42,74 @@ export default function ChamadosAdmin() {
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
   const [procedimentoExecutado, setProcedimentoExecutado] = useState("");
   const [respostaTexto, setRespostaTexto] = useState("");
+  const [imagemModalAberta, setImagemModalAberta] = useState(null);
+  const [chatModalChamado, setChatModalChamado] = useState(null);
+
+  // Helper para normalizar e extrair o anexo independente do formato
+  const getAnexo = (item) => {
+    if (!item) return null;
+    let anx =
+      item.anexo ||
+      (Array.isArray(item.anexos) && item.anexos.length > 0 ? item.anexos[0] : null) ||
+      item.imagem ||
+      item.arquivo;
+    if (!anx) return null;
+
+    if (typeof anx === "string") {
+      const trimmed = anx.trim();
+      if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          anx = Array.isArray(parsed) ? parsed[0] : parsed;
+        } catch {}
+      } else if (
+        trimmed.startsWith("data:") ||
+        trimmed.startsWith("http") ||
+        trimmed.startsWith("/") ||
+        trimmed.startsWith("blob:")
+      ) {
+        return {
+          nome: "imagem_anexada.png",
+          tamanho: "Imagem",
+          tipo: "image/png",
+          data: trimmed,
+        };
+      }
+    }
+
+    if (anx && typeof anx === "object") {
+      const dataUrl = anx.data || anx.url || anx.src || anx.base64 || anx.link || "";
+      return {
+        nome: anx.nome || anx.name || "imagem_anexo.png",
+        tamanho: anx.tamanho || anx.size || "Anexo",
+        tipo:
+          anx.tipo ||
+          anx.type ||
+          (typeof dataUrl === "string" && dataUrl.startsWith("data:image") ? "image/png" : ""),
+        data: dataUrl,
+      };
+    }
+    return null;
+  };
+
+  // Helper para identificar anexos que são imagens
+  const isImagem = (anexo) => {
+    if (!anexo) return false;
+    const dataStr = typeof anexo === "string" ? anexo : anexo.data || anexo.url || anexo.src || "";
+    if (
+      typeof dataStr === "string" &&
+      (dataStr.startsWith("data:image") ||
+        dataStr.startsWith("blob:") ||
+        /\.(jpe?g|png|webp|gif|svg|bmp)($|\?)/i.test(dataStr))
+    ) {
+      return true;
+    }
+    const tipo = (anexo.tipo || anexo.type || "").toLowerCase();
+    if (tipo.startsWith("image")) return true;
+    const nome = (anexo.nome || anexo.name || "").toLowerCase();
+    if (/\.(jpe?g|png|webp|gif|svg|bmp)($|\?)/i.test(nome)) return true;
+    return false;
+  };
 
   // Modal Secao do Sistema para Cancelamento
   const [modalCancelamentoAberto, setModalCancelamentoAberto] = useState(false);
@@ -53,13 +122,17 @@ export default function ChamadosAdmin() {
 
   useEffect(() => {
     const handleEsc = (e) => {
-      if (e.key === "Escape" && modalDetalhesAberto) {
-        handleFecharDetalhes();
+      if (e.key === "Escape") {
+        if (imagemModalAberta) {
+          setImagemModalAberta(null);
+        } else if (modalDetalhesAberto) {
+          handleFecharDetalhes();
+        }
       }
     };
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
-  }, [modalDetalhesAberto]);
+  }, [modalDetalhesAberto, imagemModalAberta]);
 
   const carregarChamados = async () => {
     try {
@@ -394,7 +467,7 @@ export default function ChamadosAdmin() {
     }
   };
 
-  // 3. MUDAR PARA "EM ATENDIMENTO"
+  // 3. MUDAR PARA "EM ATENDIMENTO" E INICIAR CHAT AO VIVO
   const handleMudarParaAtendimento = async (chamado) => {
     if (!chamado) return;
 
@@ -404,16 +477,36 @@ export default function ChamadosAdmin() {
 
     const novaResposta = {
       autor: nomeAdmin,
-      mensagem: `Status alterado para Em Atendimento por ${nomeAdmin}.`,
+      mensagem: `Status alterado para Em Atendimento por ${nomeAdmin}. Chat ao vivo conectado.`,
       data: dataHora,
+      isAdmin: true,
+      timestamp: Date.now(),
     };
 
     const dadosUpdate = {
+      ...chamado,
       status: "Em Atendimento",
       respostas: [...historico, novaResposta],
     };
 
     atualizarChamadoAtivo(chamado.id, dadosUpdate);
+
+    // Emite evento para que abra o modal de conversa automaticamente na tela do usuário
+    emitChatEvent({
+      tipo: "INICIAR_ATENDIMENTO",
+      chamadoId: chamado.id,
+      clienteEmail: (chamado.clienteEmail || "").toLowerCase(),
+      clienteNome: chamado.clienteNome || "Cliente",
+      assunto: chamado.assunto,
+      autor: nomeAdmin,
+      mensagem: `Olá ${chamado.clienteNome || "Cliente"}! O Suporte JSA iniciou o atendimento da sua solicitação. Como podemos ajudar?`,
+      data: dataHora,
+      isAdminSender: true,
+      timestamp: Date.now(),
+    });
+
+    // Abre o modal do chat na tela do Admin
+    setChatModalChamado(dadosUpdate);
 
     // E-mail informativo
     const corpoEmail =
@@ -423,7 +516,7 @@ export default function ChamadosAdmin() {
       `Assunto: ${chamado.assunto}\n` +
       `Atendente: ${nomeAdmin}\n` +
       `Data: ${dataHora}\n\n` +
-      `Nossa equipe iniciou o atendimento técnico do seu chamado. Em breve você receberá novas informações!`;
+      `Nossa equipe iniciou o atendimento técnico do seu chamado no chat em tempo real do sistema.`;
 
     await enviarEmailCliente({
       chamado,
@@ -448,7 +541,7 @@ export default function ChamadosAdmin() {
       console.error(tgErr);
     }
 
-    toast.info(`Chamado #${chamado.id} colocado em atendimento.`);
+    toast.info(`Atendimento iniciado no Chamado #${chamado.id}!`);
   };
 
   // 4. ENVIAR RESPOSTA / ATUALIZAÇÃO NO HISTÓRICO
@@ -470,6 +563,8 @@ export default function ChamadosAdmin() {
       autor: nomeAdmin,
       mensagem: texto,
       data: dataHora,
+      isAdmin: true,
+      timestamp: Date.now(),
     };
 
     const novoStatus =
@@ -482,6 +577,18 @@ export default function ChamadosAdmin() {
 
     atualizarChamadoAtivo(chamadoSelecionado.id, dadosUpdate);
     setRespostaTexto("");
+
+    // Emite evento de chat em tempo real
+    emitChatEvent({
+      tipo: "NOVA_MENSAGEM",
+      chamadoId: chamadoSelecionado.id,
+      clienteEmail: (chamadoSelecionado.clienteEmail || "").toLowerCase(),
+      autor: `Suporte JSA (${nomeAdmin})`,
+      mensagem: texto,
+      data: dataHora,
+      isAdminSender: true,
+      timestamp: Date.now(),
+    });
 
     // Enviar E-mail
     const corpoEmail =
@@ -758,20 +865,78 @@ export default function ChamadosAdmin() {
               </div>
               <p className="chamados-admin-descricao">{c.descricao}</p>
 
-              {/* Anexo se houver */}
-              {c.anexo && (
-                <div style={{ marginBottom: "12px" }}>
-                  <a
-                    href={c.anexo.data}
-                    download={c.anexo.nome}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="chamados-attachment-tag"
-                  >
-                    📎 Anexo: {c.anexo.nome} ({c.anexo.tamanho}) — <em>Visualizar / Baixar</em>
-                  </a>
-                </div>
-              )}
+              {/* Anexo / Imagem no Card Admin */}
+              {(() => {
+                const anexoObj = getAnexo(c);
+                if (!anexoObj || !anexoObj.data) return null;
+                const ehImg = isImagem(anexoObj);
+
+                return (
+                  <div className="chamados-modal-anexo-wrapper" style={{ marginBottom: "14px" }}>
+                    {ehImg ? (
+                      <div className="chamados-admin-img-preview-card">
+                        <div
+                          className="chamados-admin-img-thumb-container"
+                          onClick={() => setImagemModalAberta(anexoObj.data)}
+                          title="Clique para ampliar a imagem"
+                        >
+                          <img
+                            src={anexoObj.data}
+                            alt={anexoObj.nome}
+                            className="chamados-admin-img-thumb"
+                          />
+                          <div className="chamados-admin-img-overlay-zoom">
+                            <span>🔍 Clique para ampliar</span>
+                          </div>
+                        </div>
+                        <div className="chamados-admin-img-details">
+                          <span className="chamados-admin-img-name" title={anexoObj.nome}>
+                            📷 {anexoObj.nome}
+                          </span>
+                          <span className="chamados-admin-img-size">
+                            {anexoObj.tamanho}
+                          </span>
+                          <div className="chamados-admin-img-btn-row">
+                            <button
+                              type="button"
+                              className="chamados-btn-preview-zoom"
+                              onClick={() => setImagemModalAberta(anexoObj.data)}
+                            >
+                              🔍 Ver Foto
+                            </button>
+                            <a
+                              href={anexoObj.data}
+                              download={anexoObj.nome}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="chamados-btn-preview-download"
+                            >
+                              ⬇️ Baixar
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="chamados-file-doc-row">
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span>📄</span>
+                          <strong style={{ color: "#fff" }}>{anexoObj.nome}</strong>
+                          <span style={{ color: "#a1a1aa", fontSize: "11px" }}>({anexoObj.tamanho})</span>
+                        </div>
+                        <a
+                          href={anexoObj.data}
+                          download={anexoObj.nome}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="chamados-attachment-tag"
+                        >
+                          ⬇️ Baixar / Abrir
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Destaque: Cancelado e Motivo */}
               {c.status === "Cancelado" && (
@@ -809,15 +974,51 @@ export default function ChamadosAdmin() {
                 </div>
               )}
 
-              {/* Rodapé com Botão "Ver Chamado" */}
+              {/* Rodapé com Botões de Ação */}
               <div className="chamados-admin-card-footer">
                 <button
                   type="button"
                   className="chamados-admin-btn-view"
                   onClick={() => handleAbrirDetalhes(c)}
                 >
-                  👁️ Ver Chamado Completo
+                  👁️ Ver Detalhes
                 </button>
+
+                {c.status === "Aberto" && (
+                  <button
+                    type="button"
+                    className="chamados-btn-in-progress"
+                    onClick={() => handleMudarParaAtendimento(c)}
+                    title="Iniciar atendimento e abrir chat com o usuário"
+                    style={{ padding: "8px 12px", fontSize: "13px" }}
+                  >
+                    🟡 Iniciar Atendimento
+                  </button>
+                )}
+
+                {c.status === "Em Atendimento" && (
+                  <button
+                    type="button"
+                    className="chamados-btn-edit-ticket"
+                    onClick={() => setChatModalChamado(c)}
+                    title="Abrir chat ao vivo deste chamado"
+                    style={{ padding: "8px 12px", fontSize: "13px" }}
+                  >
+                    💬 Abrir Chat
+                  </button>
+                )}
+
+                {(c.status === "Resolvido" || c.status === "Cancelado") && (
+                  <button
+                    type="button"
+                    className="chamados-btn-edit-ticket"
+                    onClick={() => setChatModalChamado(c)}
+                    title="Visualizar todo o histórico da conversa e anexos deste chamado"
+                    style={{ padding: "8px 12px", fontSize: "13px" }}
+                  >
+                    💬 Ver Histórico do Chat
+                  </button>
+                )}
 
                 {c.status !== "Cancelado" && c.status !== "Resolvido" && (
                   <button
@@ -852,248 +1053,337 @@ export default function ChamadosAdmin() {
                 <h3 className="chamados-detail-modal-title">
                   <span>🎧</span> Chamado #{chamadoSelecionado.id}
                 </h3>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <span className="chamados-admin-category-badge">
-                    {chamadoSelecionado.categoria || "Geral"}
-                  </span>
-                  {getStatusBadge(chamadoSelecionado.status)}
-                </div>
+                <span className="chamados-admin-category-badge">
+                  {chamadoSelecionado.categoria || "Geral"}
+                </span>
+                {getStatusBadge(chamadoSelecionado.status)}
               </div>
               <button
                 type="button"
                 className="chamados-detail-modal-close-btn"
                 onClick={handleFecharDetalhes}
-                title="Fechar"
+                title="Fechar (Esc)"
               >
                 ✕
               </button>
             </div>
 
-            {/* CONTAINER DESTACADO: DADOS DO USUÁRIO NO MODAL */}
-            <div className="chamados-detail-section">
-              <div className="chamados-detail-section-title">
-                <span>👤</span> Dados do Usuário Solicitante
-              </div>
-              <div className="chamados-detail-grid-info">
-                <div className="chamados-detail-info-cell">
-                  <span className="chamados-detail-info-label">Nome do Usuário:</span>
-                  <span className="chamados-detail-info-val">
-                    {chamadoSelecionado.clienteNome || "Não informado"}
-                  </span>
-                </div>
-                <div className="chamados-detail-info-cell">
-                  <span className="chamados-detail-info-label">E-mail:</span>
-                  <span className="chamados-detail-info-val">
-                    {chamadoSelecionado.clienteEmail || "-"}
-                  </span>
-                </div>
-                <div className="chamados-detail-info-cell">
-                  <span className="chamados-detail-info-label">WhatsApp / Telefone:</span>
-                  <span className="chamados-detail-info-val">
-                    {chamadoSelecionado.whatsapp ? (
-                      <a
-                        href={`https://wa.me/55${String(chamadoSelecionado.whatsapp).replace(/\D/g, "")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="chamados-admin-whatsapp-link"
-                      >
-                        📱 {chamadoSelecionado.whatsapp} (Conversar no WhatsApp)
-                      </a>
-                    ) : (
-                      "-"
-                    )}
-                  </span>
-                </div>
-                <div className="chamados-detail-info-cell">
-                  <span className="chamados-detail-info-label">Data e Hora da Abertura:</span>
-                  <span className="chamados-detail-info-val">
-                    {chamadoSelecionado.dataCriacao || "-"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Detalhes da Solicitação */}
-            <div className="chamados-detail-section">
-              <div className="chamados-detail-section-title">
-                <span>📝</span> Solicitação do Chamado
-              </div>
-              <div style={{ marginBottom: "8px" }}>
-                <strong style={{ color: "#fff", fontSize: "15px" }}>
-                  Assunto: {chamadoSelecionado.assunto}
-                </strong>
-              </div>
-              <div className="chamados-detail-description-box">
-                {chamadoSelecionado.descricao}
-              </div>
-
-              {chamadoSelecionado.anexo && (
-                <div style={{ marginTop: "10px" }}>
-                  <a
-                    href={chamadoSelecionado.anexo.data}
-                    download={chamadoSelecionado.anexo.nome}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="chamados-attachment-tag"
-                  >
-                    📎 Anexo: {chamadoSelecionado.anexo.nome} ({chamadoSelecionado.anexo.tamanho}) — <em>Baixar / Abrir</em>
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {/* SEÇÃO: SE FINALIZADO (RESOLVIDO) */}
-            {chamadoSelecionado.status === "Resolvido" && (
-              <div className="chamados-detail-section" style={{ borderColor: "#22c55e", background: "rgba(34, 197, 94, 0.05)" }}>
-                <div className="chamados-detail-section-title" style={{ color: "#22c55e" }}>
-                  <span>✅</span> Chamado Finalizado / Resolvido
-                </div>
-                <div style={{ fontSize: "13px", color: "#e4e4e7", lineHeight: "1.5" }}>
-                  <strong>Procedimento Executado:</strong>
-                  <div className="chamados-detail-description-box" style={{ marginTop: "6px" }}>
-                    {chamadoSelecionado.procedimentoExecutado || "Procedimento realizado conforme solicitação."}
+            {/* Corpo do Modal em Grid Adaptável de 2 Colunas */}
+            <div className="chamados-detail-modal-body-grid">
+              {/* COLUNA ESQUERDA: Dados do Solicitante + Solicitação + Imagem / Anexo */}
+              <div className="chamados-detail-col-left">
+                {/* 1. Dados do Solicitante */}
+                <div className="chamados-detail-section compact">
+                  <div className="chamados-detail-section-title">
+                    <span>👤</span> Dados do Solicitante
                   </div>
-                  <div style={{ marginTop: "8px", fontSize: "12px", color: "#a1a1aa" }}>
-                    {chamadoSelecionado.tecnicoResponsavel && (
-                      <span>Técnico Responsável: <strong>{chamadoSelecionado.tecnicoResponsavel}</strong> | </span>
-                    )}
-                    {chamadoSelecionado.dataFinalizacao && (
-                      <span>Data de Conclusão: <strong>{chamadoSelecionado.dataFinalizacao}</strong></span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* SEÇÃO: SE CANCELADO */}
-            {chamadoSelecionado.status === "Cancelado" && (
-              <div className="chamados-detail-section" style={{ borderColor: "#ef4444", background: "rgba(239, 68, 68, 0.05)" }}>
-                <div className="chamados-detail-section-title" style={{ color: "#ef4444" }}>
-                  <span>🚫</span> Chamado Cancelado
-                </div>
-                <div style={{ fontSize: "13px", color: "#e4e4e7", lineHeight: "1.5" }}>
-                  <strong>Motivo do Cancelamento:</strong>
-                  <div className="chamados-detail-description-box" style={{ marginTop: "6px", color: "#fca5a5" }}>
-                    {chamadoSelecionado.motivoCancelamento || "Cancelado pelo usuário ou administração."}
-                  </div>
-                  <div style={{ marginTop: "8px", fontSize: "12px", color: "#a1a1aa" }}>
-                    {chamadoSelecionado.canceladoPor && (
-                      <span>Cancelado por: <strong>{chamadoSelecionado.canceladoPor}</strong> | </span>
-                    )}
-                    {chamadoSelecionado.dataCancelamento && (
-                      <span>Data: <strong>{chamadoSelecionado.dataCancelamento}</strong></span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* SEÇÃO: AÇÕES DE RESOLUÇÃO E CANCELAMENTO (QUANDO NÃO FINALIZADO) */}
-            {chamadoSelecionado.status !== "Resolvido" && chamadoSelecionado.status !== "Cancelado" && (
-              <div className="chamados-detail-action-card">
-                <div className="chamados-detail-section-title" style={{ color: "#38bdf8" }}>
-                  <span>⚙️</span> Gestão do Chamado
-                </div>
-
-                {/* Bloco: Finalizar com Procedimento Obrigatório */}
-                <div className="chamados-detail-finalize-box">
-                  <label className="chamados-admin-label" style={{ color: "#4ade80", fontWeight: "700" }}>
-                    * Procedimento Executado para Resolução (Obrigatório para Finalizar):
-                  </label>
-                  <textarea
-                    className="chamados-detail-textarea"
-                    placeholder="Descreva detalhadamente o procedimento técnico executado para resolver o problema do usuário..."
-                    value={procedimentoExecutado}
-                    onChange={(e) => setProcedimentoExecutado(e.target.value)}
-                    rows="3"
-                  />
-
-                  <div className="chamados-detail-action-buttons">
-                    <button
-                      type="button"
-                      className="chamados-btn-finalize-submit"
-                      onClick={() => handleFinalizarChamado(chamadoSelecionado)}
-                      disabled={loading}
-                    >
-                      {loading ? "Processando..." : "✅ Finalizar Chamado (Notificar E-mail + Telegram)"}
-                    </button>
-
-                    {chamadoSelecionado.status === "Aberto" && (
-                      <button
-                        type="button"
-                        className="chamados-btn-in-progress"
-                        onClick={() => handleMudarParaAtendimento(chamadoSelecionado)}
-                        disabled={loading}
-                      >
-                        🟡 Iniciar Atendimento
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      className="chamados-btn-cancel-action"
-                      onClick={() => handleAbrirModalCancelamento(chamadoSelecionado)}
-                      disabled={loading}
-                    >
-                      🚫 Cancelar Chamado (Informar Motivo)
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Histórico de Mensagens & Resposta Adicional */}
-            <div className="chamados-detail-section">
-              <div className="chamados-detail-section-title">
-                <span>💬</span> Histórico de Interações ({chamadoSelecionado.respostas?.length || 0})
-              </div>
-
-              <div className="chamados-detail-timeline">
-                {chamadoSelecionado.respostas && chamadoSelecionado.respostas.length > 0 ? (
-                  chamadoSelecionado.respostas.map((r, idx) => (
-                    <div key={idx} className="chamados-detail-timeline-item">
-                      <div className="chamados-detail-timeline-header">
-                        <span className="chamados-detail-timeline-author">{r.autor}</span>
-                        <span>{r.data}</span>
-                      </div>
-                      <div className="chamados-detail-timeline-msg">{r.mensagem}</div>
+                  <div className="chamados-detail-grid-info">
+                    <div className="chamados-detail-info-cell">
+                      <span className="chamados-detail-info-label">Nome:</span>
+                      <span className="chamados-detail-info-val">
+                        {chamadoSelecionado.clienteNome || "Não informado"}
+                      </span>
                     </div>
-                  ))
-                ) : (
-                  <div style={{ color: "#71717a", fontSize: "12px", padding: "8px 0" }}>
-                    Nenhuma interação adicional registrada ainda.
+                    <div className="chamados-detail-info-cell">
+                      <span className="chamados-detail-info-label">E-mail:</span>
+                      <span className="chamados-detail-info-val">
+                        {chamadoSelecionado.clienteEmail || "-"}
+                      </span>
+                    </div>
+                    <div className="chamados-detail-info-cell">
+                      <span className="chamados-detail-info-label">WhatsApp:</span>
+                      <span className="chamados-detail-info-val">
+                        {chamadoSelecionado.whatsapp ? (
+                          <a
+                            href={`https://wa.me/55${String(chamadoSelecionado.whatsapp).replace(/\D/g, "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="chamados-admin-whatsapp-link"
+                          >
+                            📱 {chamadoSelecionado.whatsapp}
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </span>
+                    </div>
+                    <div className="chamados-detail-info-cell">
+                      <span className="chamados-detail-info-label">Data da Abertura:</span>
+                      <span className="chamados-detail-info-val">
+                        {chamadoSelecionado.dataCriacao || "-"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Solicitação do Chamado + Imagem / Anexo Inline */}
+                <div className="chamados-detail-section compact">
+                  <div className="chamados-detail-section-title">
+                    <span>📝</span> Solicitação do Usuário
+                  </div>
+                  <div style={{ marginBottom: "6px" }}>
+                    <strong style={{ color: "#38bdf8", fontSize: "14px" }}>
+                      Assunto: {chamadoSelecionado.assunto}
+                    </strong>
+                  </div>
+                  <div className="chamados-detail-description-box">
+                    {chamadoSelecionado.descricao}
+                  </div>
+
+                  {/* ANEXO / IMAGEM INSERIDA PELO USUÁRIO */}
+                  {(() => {
+                    const anexoModal = getAnexo(chamadoSelecionado);
+                    if (!anexoModal || !anexoModal.data) return null;
+                    const ehImg = isImagem(anexoModal);
+
+                    return (
+                      <div className="chamados-modal-anexo-wrapper">
+                        <div className="chamados-modal-anexo-header">
+                          <span>📎</span>
+                          <span>Anexo inserido pelo usuário:</span>
+                        </div>
+
+                        {ehImg ? (
+                          <div className="chamados-admin-img-preview-card">
+                            <div
+                              className="chamados-admin-img-thumb-container"
+                              onClick={() => setImagemModalAberta(anexoModal.data)}
+                              title="Clique para ampliar a imagem"
+                            >
+                              <img
+                                src={anexoModal.data}
+                                alt={anexoModal.nome}
+                                className="chamados-admin-img-thumb"
+                              />
+                              <div className="chamados-admin-img-overlay-zoom">
+                                <span>🔍 Clique para ampliar</span>
+                              </div>
+                            </div>
+                            <div className="chamados-admin-img-details">
+                              <span className="chamados-admin-img-name" title={anexoModal.nome}>
+                                {anexoModal.nome}
+                              </span>
+                              <span className="chamados-admin-img-size">
+                                {anexoModal.tamanho}
+                              </span>
+                              <div className="chamados-admin-img-btn-row">
+                                <button
+                                  type="button"
+                                  className="chamados-btn-preview-zoom"
+                                  onClick={() => setImagemModalAberta(anexoModal.data)}
+                                >
+                                  🔍 Ampliar Imagem
+                                </button>
+                                <a
+                                  href={anexoModal.data}
+                                  download={anexoModal.nome}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="chamados-btn-preview-download"
+                                >
+                                  ⬇️ Baixar
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="chamados-file-doc-row">
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span>📄</span>
+                              <strong style={{ color: "#fff" }}>{anexoModal.nome}</strong>
+                              <span style={{ color: "#a1a1aa", fontSize: "11px" }}>({anexoModal.tamanho})</span>
+                            </div>
+                            <a
+                              href={anexoModal.data}
+                              download={anexoModal.nome}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="chamados-attachment-tag"
+                            >
+                              ⬇️ Baixar / Abrir
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* COLUNA DIREITA: Ações do Técnico / Resolução + Histórico */}
+              <div className="chamados-detail-col-right">
+                {/* Se Finalizado (Resolvido) */}
+                {chamadoSelecionado.status === "Resolvido" && (
+                  <div className="chamados-detail-section compact" style={{ borderColor: "#22c55e", background: "rgba(34, 197, 94, 0.05)" }}>
+                    <div className="chamados-detail-section-title" style={{ color: "#22c55e" }}>
+                      <span>✅</span> Chamado Finalizado / Resolvido
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#e4e4e7", lineHeight: "1.4" }}>
+                      <strong>Procedimento Executado:</strong>
+                      <div className="chamados-detail-description-box" style={{ marginTop: "4px", color: "#86efac" }}>
+                        {chamadoSelecionado.procedimentoExecutado || "Procedimento realizado conforme solicitação."}
+                      </div>
+                      <div style={{ marginTop: "6px", fontSize: "11px", color: "#a1a1aa" }}>
+                        {chamadoSelecionado.tecnicoResponsavel && (
+                          <span>Técnico: <strong>{chamadoSelecionado.tecnicoResponsavel}</strong> | </span>
+                        )}
+                        {chamadoSelecionado.dataFinalizacao && (
+                          <span>Data: <strong>{chamadoSelecionado.dataFinalizacao}</strong></span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
-              </div>
 
-              {/* Caixa para enviar resposta intermediária */}
-              <div className="chamados-admin-reply-box" style={{ marginTop: "12px" }}>
-                <input
-                  type="text"
-                  placeholder="Enviar mensagem ou resposta ao cliente..."
-                  value={respostaTexto}
-                  onChange={(e) => setRespostaTexto(e.target.value)}
-                  className="chamados-admin-input-reply"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleEnviarRespostaModal();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleEnviarRespostaModal}
-                  disabled={loading}
-                  className="chamados-admin-btn-reply"
-                >
-                  {loading ? "Enviando..." : "Enviar Resposta"}
-                </button>
+                {/* Se Cancelado */}
+                {chamadoSelecionado.status === "Cancelado" && (
+                  <div className="chamados-detail-section compact" style={{ borderColor: "#ef4444", background: "rgba(239, 68, 68, 0.05)" }}>
+                    <div className="chamados-detail-section-title" style={{ color: "#ef4444" }}>
+                      <span>🚫</span> Chamado Cancelado
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#e4e4e7", lineHeight: "1.4" }}>
+                      <strong>Motivo do Cancelamento:</strong>
+                      <div className="chamados-detail-description-box" style={{ marginTop: "4px", color: "#fca5a5" }}>
+                        {chamadoSelecionado.motivoCancelamento || "Cancelado pelo usuário ou administração."}
+                      </div>
+                      <div style={{ marginTop: "6px", fontSize: "11px", color: "#a1a1aa" }}>
+                        {chamadoSelecionado.canceladoPor && (
+                          <span>Cancelado por: <strong>{chamadoSelecionado.canceladoPor}</strong> | </span>
+                        )}
+                        {chamadoSelecionado.dataCancelamento && (
+                          <span>Data: <strong>{chamadoSelecionado.dataCancelamento}</strong></span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Ações de Gestão (Quando Aberto ou Em Atendimento) */}
+                {chamadoSelecionado.status !== "Resolvido" && chamadoSelecionado.status !== "Cancelado" && (
+                  <div className="chamados-detail-action-card">
+                    <div className="chamados-detail-section-title" style={{ color: "#38bdf8" }}>
+                      <span>⚙️</span> Gestão do Atendimento
+                    </div>
+
+                    <div className="chamados-detail-finalize-box">
+                      <label className="chamados-admin-label" style={{ color: "#4ade80", fontWeight: "700", fontSize: "12px" }}>
+                        * Procedimento Executado (Obrigatório para Finalizar):
+                      </label>
+                      <textarea
+                        className="chamados-detail-textarea"
+                        placeholder="Descreva o procedimento técnico executado para resolver o problema..."
+                        value={procedimentoExecutado}
+                        onChange={(e) => setProcedimentoExecutado(e.target.value)}
+                        rows="2"
+                      />
+
+                      <div className="chamados-detail-action-buttons">
+                        <button
+                          type="button"
+                          className="chamados-btn-finalize-submit"
+                          onClick={() => handleFinalizarChamado(chamadoSelecionado)}
+                          disabled={loading}
+                        >
+                          {loading ? "Salvando..." : "✅ Finalizar Chamado"}
+                        </button>
+
+                        {chamadoSelecionado.status === "Aberto" && (
+                          <button
+                            type="button"
+                            className="chamados-btn-in-progress"
+                            onClick={() => handleMudarParaAtendimento(chamadoSelecionado)}
+                            disabled={loading}
+                          >
+                            🟡 Iniciar Atendimento
+                          </button>
+                        )}
+
+                        {chamadoSelecionado.status === "Em Atendimento" && (
+                          <button
+                            type="button"
+                            className="chamados-btn-edit-ticket"
+                            onClick={() => setChatModalChamado(chamadoSelecionado)}
+                            disabled={loading}
+                          >
+                            💬 Abrir Chat ao Vivo
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          className="chamados-btn-cancel-action"
+                          onClick={() => handleAbrirModalCancelamento(chamadoSelecionado)}
+                          disabled={loading}
+                        >
+                          🚫 Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Histórico de Interações */}
+                <div className="chamados-detail-section compact">
+                  <div className="chamados-detail-section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>💬 Histórico de Interações ({chamadoSelecionado.respostas?.length || 0})</span>
+                    <button
+                      type="button"
+                      className="chamados-btn-edit-ticket"
+                      onClick={() => setChatModalChamado(chamadoSelecionado)}
+                      title="Abrir histórico completo em modal de chat interativo"
+                      style={{ fontSize: "11px", padding: "2px 8px", textTransform: "none", fontWeight: "600" }}
+                    >
+                      💬 Abrir Chat Completo
+                    </button>
+                  </div>
+
+                  <div className="chamados-detail-timeline">
+                    {chamadoSelecionado.respostas && chamadoSelecionado.respostas.length > 0 ? (
+                      chamadoSelecionado.respostas.map((r, idx) => (
+                        <div key={idx} className="chamados-detail-timeline-item">
+                          <div className="chamados-detail-timeline-header">
+                            <span className="chamados-detail-timeline-author">{r.autor}</span>
+                            <span>{r.data}</span>
+                          </div>
+                          <div className="chamados-detail-timeline-msg">{r.mensagem}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ color: "#71717a", fontSize: "11px", padding: "4px 0" }}>
+                        Nenhuma interação registrada ainda.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="chamados-admin-reply-box" style={{ marginTop: "8px" }}>
+                    <input
+                      type="text"
+                      placeholder="Enviar resposta ao cliente..."
+                      value={respostaTexto}
+                      onChange={(e) => setRespostaTexto(e.target.value)}
+                      className="chamados-admin-input-reply"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleEnviarRespostaModal();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleEnviarRespostaModal}
+                      disabled={loading}
+                      className="chamados-admin-btn-reply"
+                    >
+                      {loading ? "..." : "Enviar"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Rodapé do Modal */}
-            <div className="chamados-modal-footer" style={{ marginTop: "10px" }}>
+            <div className="chamados-modal-footer" style={{ marginTop: "4px", paddingBottom: "0" }}>
               <button
                 type="button"
                 className="chamados-btn-cancelar"
@@ -1102,6 +1392,33 @@ export default function ChamadosAdmin() {
                 Fechar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ====================================================================
+          MODAL LIGHTBOX: VISUALIZAÇÃO DA IMAGEM EM TAMANHO REAL
+          ==================================================================== */}
+      {imagemModalAberta && (
+        <div
+          className="chamados-lightbox-overlay"
+          onClick={() => setImagemModalAberta(null)}
+          style={{ zIndex: 100050 }}
+        >
+          <div className="chamados-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="chamados-lightbox-close"
+              onClick={() => setImagemModalAberta(null)}
+              title="Fechar (Esc)"
+            >
+              ✕
+            </button>
+            <img
+              src={imagemModalAberta}
+              alt="Imagem Ampliada do Chamado"
+              className="chamados-lightbox-img"
+            />
           </div>
         </div>
       )}
@@ -1127,6 +1444,21 @@ export default function ChamadosAdmin() {
           }
           onClose={handleFecharModalCancelamento}
           onSalvar={handleConfirmarCancelamento}
+        />
+      )}
+
+      {/* ====================================================================
+          MODAL DE CHAT AO VIVO NO PAINEL ADMIN
+          ==================================================================== */}
+      {chatModalChamado && (
+        <ModalChatAtendimento
+          chamado={chatModalChamado}
+          isCurrentUserAdmin={true}
+          onClose={() => setChatModalChamado(null)}
+          onUpdateChamado={(atualizado) => {
+            setChatModalChamado(atualizado);
+            atualizarChamadoAtivo(atualizado.id, atualizado);
+          }}
         />
       )}
     </div>

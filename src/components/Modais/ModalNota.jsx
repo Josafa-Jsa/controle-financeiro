@@ -41,12 +41,14 @@ export default function ModalNota({
 
   const [form, setForm] = useState(base);
   const [consultando, setConsultando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
   const [lookupMsg, setLookupMsg] = useState({ text: '', tipo: '' });
   const [arrastandoXml, setArrastandoXml] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
+      setSalvando(false);
       let formInicial = base;
 
       if (notaParaEditar) {
@@ -378,10 +380,13 @@ export default function ModalNota({
   const submit = (e) => {
     e.preventDefault();
 
+    if (salvando || consultando) return;
     if (!form.clienteOuServico.trim()) return;
 
     const val = converterMoedaParaNumero(form.valor);
     if (!Number.isFinite(val) || val < 0) return;
+
+    setSalvando(true);
 
     // Salva ou atualiza permanentemente a memória de padrão para este CNPJ
     if (form.cnpj || form.chavedeacesso) {
@@ -404,7 +409,11 @@ export default function ModalNota({
 
     if (!payload.id) delete payload.id;
 
-    onSave(payload);
+    try {
+      onSave(payload);
+    } finally {
+      setTimeout(() => setSalvando(false), 1000);
+    }
   };
 
   if (!isOpen) return null;
@@ -838,17 +847,18 @@ export default function ModalNota({
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
             <button
               type="submit"
-              disabled={consultando}
+              disabled={consultando || salvando}
               style={{
                 height: '36px',
-                padding: '0 16px',
+                padding: '0 18px',
                 background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '6px',
                 fontWeight: 700,
                 fontSize: '0.85rem',
-                cursor: consultando ? 'not-allowed' : 'pointer',
+                cursor: consultando || salvando ? 'not-allowed' : 'pointer',
+                opacity: consultando || salvando ? 0.7 : 1,
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
@@ -856,7 +866,7 @@ export default function ModalNota({
                 transition: 'all 0.15s',
               }}
             >
-              💾 Salvar Nota
+              {salvando ? '💾 Salvando...' : '💾 Salvar Nota'}
             </button>
 
             <button

@@ -441,41 +441,70 @@
   background: rgba(96, 165, 250, 0.2);
 }
 
-/* Footer do Card com os 3 Botões */
+/* Footer do Card com os 4 Botões Adaptados em Grade 2x2 */
 .nota-card-footer {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  margin-top: 16px;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+  margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  align-items: center;
+  align-items: stretch;
 }
 
 .nota-card-footer .btn-card-action {
-  height: 34px;
-  padding: 0 8px;
-  border-radius: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  transition: all 0.2s ease;
+  gap: 6px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .btn-card-action.btn-ver-nota {
-  background: rgba(56, 189, 248, 0.14);
+  background: rgba(56, 189, 248, 0.12);
   color: #38bdf8;
   border: 1px solid rgba(56, 189, 248, 0.35);
 }
 
 .btn-card-action.btn-ver-nota:hover {
-  background: rgba(56, 189, 248, 0.25);
+  background: rgba(56, 189, 248, 0.24);
   border-color: #38bdf8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2);
+}
+
+.btn-card-action.btn-liberar-nota {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.btn-card-action.btn-liberar-nota:hover {
+  background: rgba(16, 185, 129, 0.24);
+  border-color: #34d399;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.btn-card-action.btn-liberar-nota.liberada {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(5, 150, 105, 0.3) 100%);
+  color: #4ade80;
+  border-color: rgba(16, 185, 129, 0.6);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+}
+
+.btn-card-action.btn-liberar-nota.liberada:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.32) 0%, rgba(5, 150, 105, 0.42) 100%);
+  border-color: #34d399;
   transform: translateY(-1px);
 }
 
@@ -488,19 +517,22 @@
 .btn-card-action.btn-editar-nota:hover {
   background: #3f3f46;
   color: #ffffff;
+  border-color: #71717a;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .btn-card-action.btn-excluir-nota {
-  background: rgba(239, 68, 68, 0.14);
-  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
   border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 .btn-card-action.btn-excluir-nota:hover {
-  background: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.24);
   border-color: #ef4444;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
 
 /* Estado Vazio */

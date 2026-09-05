@@ -8,6 +8,9 @@ export default function ModalCadastrarFornecedor({
   onClose = () => { },
   onSave = () => { },
   cnpj = '',
+  titulo = 'Cadastrar Fornecedor',
+  icone = '🏢',
+  tipoEntidade = 'Fornecedor',
 }) {
   const [cnpjInput, setCnpjInput] = useState('');
   const [nomeFornecedor, setNomeFornecedor] = useState('');
@@ -21,11 +24,11 @@ export default function ModalCadastrarFornecedor({
     if (isOpen) {
       setCnpjInput(cnpj ? formatarCnpj(cnpj) : '');
       setNomeFornecedor('');
-      setCategoria('');
+      setCategoria(tipoEntidade.toLowerCase() === 'posto' ? 'ABASTECIMENTO' : '');
       setTelefone('');
       setErroMsg('');
     }
-  }, [isOpen, cnpj]);
+  }, [isOpen, cnpj, tipoEntidade]);
 
   useEffect(() => {
     const onEsc = (e) => e.key === 'Escape' && isOpen && onClose();
@@ -116,7 +119,7 @@ export default function ModalCadastrarFornecedor({
         {/* Cabeçalho */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.18rem', color: '#60a5fa' }}>
-            <span>🏢</span> Cadastrar Fornecedor
+            <span>{icone}</span> {titulo}
           </h2>
           <button
             type="button"
@@ -152,12 +155,12 @@ export default function ModalCadastrarFornecedor({
           }}
         >
           <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>ℹ️</span> {cnpjFixo ? 'Fornecedor não cadastrado na chave' : 'Novo Cadastro de Fornecedor'}
+            <span>ℹ️</span> {cnpjFixo ? `${tipoEntidade} não cadastrado(a) na chave` : `Novo Cadastro de ${tipoEntidade}`}
           </div>
           <span style={{ color: '#cbd5e1' }}>
             {cnpjFixo
-              ? `O CNPJ ${formatarCnpj(cnpj)} ainda não possui cadastro. Digite o nome da empresa abaixo:`
-              : 'Cadastre o Fornecedor com CNPJ e Nome em MAIÚSCULAS para preenchimento automático nas notas.'}
+              ? `O CNPJ ${formatarCnpj(cnpj)} ainda não possui cadastro. Digite o nome abaixo:`
+              : `Cadastre o ${tipoEntidade} com CNPJ e Nome em MAIÚSCULAS para preenchimento automático nas notas.`}
           </span>
         </div>
 
@@ -183,7 +186,7 @@ export default function ModalCadastrarFornecedor({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8' }}>
-                CNPJ do Fornecedor: <span style={{ color: '#ef4444' }}>*</span>
+                CNPJ do {tipoEntidade}: <span style={{ color: '#ef4444' }}>*</span>
               </label>
               {cnpjFixo && (
                 <span style={{ fontSize: '0.72rem', color: '#64748b' }}>🔒 Validado na Chave</span>
@@ -231,17 +234,17 @@ export default function ModalCadastrarFornecedor({
             </div>
           </div>
 
-          {/* Campo Nome do Fornecedor (SEMPRE EM MAIÚSCULAS) */}
+          {/* Campo Nome do Fornecedor / Posto (SEMPRE EM MAIÚSCULAS) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9' }}>
-                Nome / Razão Social do Fornecedor: <span style={{ color: '#ef4444' }}>*</span>
+                Nome / Razão Social do {tipoEntidade}: <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <span style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 700 }}>EM MAIÚSCULAS</span>
             </div>
             <input
               type="text"
-              placeholder="DIGITE O NOME DO FORNECEDOR..."
+              placeholder={`DIGITE O NOME DO ${tipoEntidade.toUpperCase()}...`}
               value={nomeFornecedor}
               onChange={(e) => setNomeFornecedor(e.target.value.toUpperCase())}
               required
@@ -269,7 +272,7 @@ export default function ModalCadastrarFornecedor({
             </label>
             <input
               type="text"
-              placeholder="Ex: ABASTECIMENTO, ALIMENTOS, PEÇAS..."
+              placeholder={tipoEntidade.toLowerCase() === 'posto' ? 'Ex: ABASTECIMENTO, COMBUSTÍVEL, DIESEL...' : 'Ex: ABASTECIMENTO, ALIMENTOS, PEÇAS...'}
               value={categoria}
               onChange={(e) => setCategoria(e.target.value.toUpperCase())}
               style={{
@@ -307,7 +310,7 @@ export default function ModalCadastrarFornecedor({
                 transition: 'all 0.15s',
               }}
             >
-              🏢 Cadastrar Fornecedor
+              <span>{icone}</span> {titulo}
             </button>
 
             <button

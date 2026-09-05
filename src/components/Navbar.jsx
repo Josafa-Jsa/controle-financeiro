@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { logout, getUser, setUser } from "../auth/auth";
 import { api } from "../api/client";
 import { useSystemStatus, verificarManutencaoTela } from "../services/systemStatusService";
+import ModalEditarTema from "./Modais/ModalEditarTema";
 import brasaoImg from "../assets/brasao.png";
 import "./Visual/Navbar.css";
 
@@ -39,6 +40,7 @@ export default function Navbar({ onOpenAccessModal }) {
 
   // Estados de Modais e Overlays
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showThemeModal, setShowThemeModal] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [loadingText, setLoadingText] = useState("");
@@ -175,20 +177,27 @@ export default function Navbar({ onOpenAccessModal }) {
 
     const email = String(user.email || "").toLowerCase().trim();
 
-    // Busca permissões ativas priorizando o authUser e a lista cadastrada em 'users'
-    let permissions = Array.isArray(authUser.permissions)
-      ? authUser.permissions
-      : Array.isArray(user.permissions || user.permissoes)
-        ? (user.permissions || user.permissoes)
-        : [];
-
-    try {
-      const rawUsers = JSON.parse(localStorage.getItem("users") || "[]");
-      const matched = rawUsers.find((u) => String(u?.email || "").toLowerCase().trim() === email);
-      if (matched && Array.isArray(matched.permissions)) {
-        permissions = matched.permissions;
-      }
-    } catch { }
+    // Busca permissões ativas priorizando o authUser / sessão do usuário logado
+    let permissions = [];
+    if (Array.isArray(authUser.permissions) && authUser.permissions.length > 0) {
+      permissions = authUser.permissions;
+    } else if (Array.isArray(user.permissions) && user.permissions.length > 0) {
+      permissions = user.permissions;
+    } else if (Array.isArray(user.permissoes) && user.permissoes.length > 0) {
+      permissions = user.permissoes;
+    } else {
+      try {
+        const rawUsers = JSON.parse(localStorage.getItem("users") || "[]");
+        const matched = rawUsers.find((u) => 
+          (email && String(u?.email || "").toLowerCase().trim() === email) ||
+          (user.username && String(u?.username || "").toLowerCase().trim() === String(user.username).toLowerCase().trim()) ||
+          (user.id && String(u?.id) === String(user.id))
+        );
+        if (matched && Array.isArray(matched.permissions) && matched.permissions.length > 0) {
+          permissions = matched.permissions;
+        }
+      } catch { }
+    }
 
     const isAdminAcc =
       email === "jsa@jsa.com" ||
@@ -608,7 +617,7 @@ export default function Navbar({ onOpenAccessModal }) {
             </Link>
           )}
 
-          {(canAccess("controle-notas") || canAccess("notas")) && (
+          {canAccess("controle-notas") && (
             <Link
               to="/controle-notas"
               onClick={(e) => handleNavClick(e, "/controle-notas", "Controle de Notas")}
@@ -788,8 +797,8 @@ export default function Navbar({ onOpenAccessModal }) {
             <div className="modal-content" style={{ maxWidth: "440px" }}>
               <h3 className="modal-title">👤 Editar Perfil</h3>
 
-              {/* Avatar com overlay de Lápis interativo */}
-              <div className="modal-avatar-container">
+              {/* Avatar com botão Alterar Tema ao lado */}
+              <div className="modal-avatar-container-with-actions">
                 <div
                   className="modal-avatar-wrapper"
                   onClick={() => fileInputRef.current?.click()}
@@ -809,6 +818,16 @@ export default function Navbar({ onOpenAccessModal }) {
                     <span className="avatar-edit-hint">Editar</span>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  className="btn-modal-alterar-tema"
+                  onClick={() => setShowThemeModal(true)}
+                  title="Personalizar cores e tema do sistema"
+                >
+                  <span>🎨</span>
+                  <span>Alterar Tema</span>
+                </button>
 
                 <input
                   type="file"
@@ -968,7 +987,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   <span>📑</span> Notas Fiscais{renderMaintenanceBadge("/notas")}
                 </Link>
               )}
-              {(canAccess("controle-notas") || canAccess("notas")) && (
+              {canAccess("controle-notas") && (
                 <Link
                   to="/controle-notas"
                   onClick={(e) => handleNavClick(e, "/controle-notas", "Controle de Notas")}
@@ -1062,19 +1081,11 @@ export default function Navbar({ onOpenAccessModal }) {
         </div>
       )}
 
-      {/* AVISO DO SISTEMA COMENTADO ATÉ REATIVAÇÃO
-      {showBanner && (
-        <div className="banner-bar">
-          📢{" "}
-          <span>
-            <strong>
-              JSA Informa: Está sendo gerada uma fatura para validação do sistema,{" "}
-              <strong>APENAS TESTE!</strong>
-            </strong>
-          </span>
-        </div>
-      )}
-      */}
+      {/* MODAL DE EDIÇÃO DE TEMA */}
+      <ModalEditarTema
+        isOpen={showThemeModal}
+        onClose={() => setShowThemeModal(false)}
+      />
     </header>
   );
 }

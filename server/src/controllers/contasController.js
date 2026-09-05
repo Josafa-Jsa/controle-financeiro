@@ -38,18 +38,107 @@ function writeJsonFallback(lista) {
   }
 }
 
+let tableInitialized = false;
+
+async function ensureContasTable() {
+  if (tableInitialized) return;
+  try {
+    // 1. Cria a tabela contas caso não exista
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contas (
+        id BIGINT NOT NULL PRIMARY KEY,
+        codigo VARCHAR(64) NULL,
+        user_email VARCHAR(190) NULL,
+        user_id VARCHAR(64) NULL,
+        tipo VARCHAR(20) NOT NULL,
+        descricao VARCHAR(255) NOT NULL,
+        observacao TEXT NULL,
+        valor DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        vencimento DATE NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'Pendente',
+        data_pagamento DATE NULL,
+        referencia_tipo VARCHAR(60) NULL,
+        referencia_id VARCHAR(64) NULL,
+        editada TINYINT(1) NOT NULL DEFAULT 0,
+        exclusao_pendente TINYINT(1) NOT NULL DEFAULT 0,
+        delete_request_id VARCHAR(64) NULL,
+        motivo_exclusao TEXT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_contas_user_email (user_email),
+        INDEX idx_contas_user_id (user_id),
+        INDEX idx_contas_tipo (tipo),
+        INDEX idx_contas_status (status),
+        INDEX idx_contas_vencimento (vencimento)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 2. Cria a tabela contas_baixas caso não exista
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contas_baixas (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        conta_id BIGINT NOT NULL,
+        valor DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+        data DATE NOT NULL,
+        obs VARCHAR(255) NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_baixas_conta (conta_id),
+        INDEX idx_baixas_data (data)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // 3. Garante que colunas adicionadas em atualizações recentes existam na tabela contas
+    const [cols] = await pool.query("SHOW COLUMNS FROM contas");
+    const existingCols = cols.map((c) => c.Field);
+
+    if (!existingCols.includes('user_email')) {
+      await pool.query("ALTER TABLE contas ADD COLUMN user_email VARCHAR(190) NULL, ADD INDEX idx_contas_user_email (user_email)");
+    }
+    if (!existingCols.includes('user_id')) {
+      await pool.query("ALTER TABLE contas ADD COLUMN user_id VARCHAR(64) NULL, ADD INDEX idx_contas_user_id (user_id)");
+    }
+    if (!existingCols.includes('codigo')) {
+      await pool.query("ALTER TABLE contas ADD COLUMN codigo VARCHAR(64) NULL");
+    }
+    if (!existingCols.includes('referencia_tipo')) {
+      await pool.query("ALTER TABLE contas ADD COLUMN referencia_tipo VARCHAR(60) NULL");
+    }
+    if (!existingCols.includes('referencia_id')) {
+      await pool.query("ALTER TABLE contas ADD COLUMN referencia_id VARCHAR(64) NULL");
+    }
+    if (!existingCols.includes('editada')) {
+      await pool.query("ALTER TABLE contas ADD COLUMN editada TINYINT(1) NOT NULL DEFAULT 0");
+    }
+    if (!existingCols.includes('exclusao_pendente')) {
+      await pool.query("ALTER TABLE contas ADD COLUMN exclusao_pendente TINYINT(1) NOT NULL DEFAULT 0");
+    }
+    if (!existingCols.includes('delete_request_id')) {
+      await pool.query("ALTER TABLE contas ADD COLUMN delete_request_id VARCHAR(64) NULL");
+    }
+    if (!existingCols.includes('motivo_exclusao')) {
+      await pool.query("ALTER TABLE contas ADD COLUMN motivo_exclusao TEXT NULL");
+    }
+
+    tableInitialized = true;
+  } catch (err) {
+    // Silencia se o banco ainda estiver conectando ou inicializando
+  }
+}
+
+// Inicializa verificação de tabela
+ensureContasTable();
+
 // Filtra a lista de contas estritamente pelo usuário autenticado
 function filtrarContasPorUsuario(lista = [], req) {
-  const reqEmail = String(req.headers['x-user-email'] || req.query.userEmail || '').trim().toLowerCase();
-  const reqId = String(req.headers['x-user-id'] || req.query.userId || '').trim();
+  const reqEmail = String(req.headers['x-user-email'] || req.query.userEmail || req.query.user_email || '').trim().toLowerCase();
+  const reqId = String(req.headers['x-user-id'] || req.query.userId || req.query.user_id || '').trim();
+  const verTodas = String(req.query.verTodas || '').toLowerCase() === 'true';
 
-  if (!reqEmail && !reqId) return lista;
-
-  const isAdminReq = ADMIN_EMAILS.includes(reqEmail);
-  if (isAdminReq) {
-    // Administrador visualiza todas as contas do sistema financeiro
+  if (verTodas && (ADMIN_EMAILS.includes(reqEmail) || String(req.query.isAdmin) === 'true')) {
     return lista;
   }
+
+  if (!reqEmail && !reqId) return [];
 
   return lista.filter((c) => {
     const cEmail = String(c.userEmail || c.user_email || '').trim().toLowerCase();
@@ -62,24 +151,32 @@ function filtrarContasPorUsuario(lista = [], req) {
 }
 
 export async function listContas(req, res) {
-  const reqEmail = String(req.headers['x-user-email'] || req.query.userEmail || '').trim().toLowerCase();
-  const reqId = String(req.headers['x-user-id'] || req.query.userId || '').trim();
-  const isAdminReq = ADMIN_EMAILS.includes(reqEmail);
+  const reqEmail = String(req.headers['x-user-email'] || req.query.userEmail || req.query.user_email || '').trim().toLowerCase();
+  const reqId = String(req.headers['x-user-id'] || req.query.userId || req.query.user_id || '').trim();
+  const verTodas = String(req.query.verTodas || '').toLowerCase() === 'true';
 
   try {
+    await ensureContasTable();
     let query = 'SELECT * FROM contas';
     const params = [];
 
-    if (reqEmail || reqId) {
-      if (isAdminReq) {
-        query += ' ORDER BY vencimento ASC, id DESC';
+    if (!verTodas) {
+      if (reqEmail && reqId) {
+        query += ' WHERE (LOWER(user_email) = LOWER(?) OR (user_email IS NULL AND user_id = ?))';
+        params.push(reqEmail, reqId);
+      } else if (reqEmail) {
+        query += ' WHERE LOWER(user_email) = LOWER(?)';
+        params.push(reqEmail);
+      } else if (reqId) {
+        query += ' WHERE user_id = ?';
+        params.push(reqId);
       } else {
-        query += ' WHERE (user_email = ? OR (user_id IS NOT NULL AND user_id != "" AND user_id = ?)) ORDER BY vencimento ASC, id DESC';
-        params.push(reqEmail, reqId || '');
+        // Sem identificação de usuário: não retorna registros para evitar vazamento
+        return res.json([]);
       }
-    } else {
-      query += ' ORDER BY vencimento ASC, id DESC';
     }
+
+    query += ' ORDER BY vencimento ASC, id DESC';
 
     const [contas] = await pool.query(query, params);
     const [baixas] = await pool.query('SELECT * FROM contas_baixas ORDER BY data ASC');
@@ -99,7 +196,7 @@ export async function listContas(req, res) {
       id: c.id,
       codigo: c.codigo || String(c.id).slice(-6).padStart(6, '0'),
       codigoConta: c.codigo || String(c.id).slice(-6).padStart(6, '0'),
-      userEmail: c.user_email || (isAdminReq ? 'jsa@jsa.com' : null),
+      userEmail: c.user_email || null,
       userId: c.user_id || null,
       tipo: c.tipo,
       descricao: c.descricao,
@@ -147,8 +244,8 @@ export async function createConta(req, res) {
     return res.status(400).json({ error: 'Descrição da conta é obrigatória.' });
   }
 
-  const reqEmail = String(req.body.userEmail || req.headers['x-user-email'] || req.query.userEmail || 'jsa@jsa.com').trim().toLowerCase();
-  const reqId = String(req.body.userId || req.headers['x-user-id'] || req.query.userId || '1').trim();
+  const reqEmail = String(req.body.userEmail || req.body.user_email || req.headers['x-user-email'] || req.query.userEmail || req.query.user_email || '').trim().toLowerCase() || null;
+  const reqId = String(req.body.userId || req.body.user_id || req.headers['x-user-id'] || req.query.userId || req.query.user_id || '').trim() || null;
   const codFinal = String(codigo || codigoConta || String(id).slice(-6).padStart(6, '0'));
 
   const novaContaObj = {
@@ -171,6 +268,7 @@ export async function createConta(req, res) {
   };
 
   try {
+    await ensureContasTable();
     await pool.query(
       `INSERT INTO contas (id, tipo, descricao, observacao, valor, vencimento, status, referencia_tipo, referencia_id, user_email, user_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -230,6 +328,7 @@ export async function updateConta(req, res) {
   const reqEmail = String(req.body.userEmail || req.headers['x-user-email'] || '').trim().toLowerCase();
 
   try {
+    await ensureContasTable();
     const {
       tipo,
       descricao,
@@ -307,6 +406,7 @@ export async function deleteConta(req, res) {
   const { id } = req.params;
 
   try {
+    await ensureContasTable();
     await pool.query('DELETE FROM contas WHERE id = ?', [id]);
     await pool.query('DELETE FROM contas_baixas WHERE conta_id = ?', [id]);
   } catch (error) {

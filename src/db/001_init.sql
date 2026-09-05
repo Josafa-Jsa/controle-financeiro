@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS `users` (
 -- 3. Tabela de Contas a Pagar e a Receber (contas)
 CREATE TABLE IF NOT EXISTS `contas` (
   `id` BIGINT NOT NULL,
+  `codigo` VARCHAR(64) NULL,
+  `user_email` VARCHAR(190) NULL,
+  `user_id` VARCHAR(64) NULL,
   `tipo` VARCHAR(20) NOT NULL,
   `descricao` VARCHAR(255) NOT NULL,
   `observacao` TEXT NULL,
@@ -54,6 +57,8 @@ CREATE TABLE IF NOT EXISTS `contas` (
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  INDEX `idx_contas_user_email` (`user_email`),
+  INDEX `idx_contas_user_id` (`user_id`),
   INDEX `idx_contas_tipo` (`tipo`),
   INDEX `idx_contas_status` (`status`),
   INDEX `idx_contas_vencimento` (`vencimento`),

@@ -12,6 +12,7 @@ import React from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { getUser, isAdmin, isLoggedIn } from "../auth/auth";
 import TelaEmManutencaoView, { AdminMaintenanceNoticeBanner } from "./Visual/TelaEmManutencaoView";
+import TelaSemAcessoView from "./Visual/TelaSemAcessoView";
 import { useSystemStatus, verificarManutencaoTela } from "../services/systemStatusService";
 
 export default function ProtectedRoute({ children, requiredPermission }) {
@@ -55,25 +56,36 @@ export default function ProtectedRoute({ children, requiredPermission }) {
     return children ? children : <Outlet />;
   }
 
-  // Se não foi exigida permissão específica, acesso liberado
-  if (!requiredPermission) {
+  // Se não foi exigida permissão específica ou for Atendimentos & Chamados (padrão liberado), acesso liberado
+  if (!requiredPermission || requiredPermission === "chamados" || requiredPermission === "atendimento") {
     return children ? children : <Outlet />;
   }
 
   // Verifica se o usuário possui a permissão liberada pelo ADMIN
-  const perms = Array.isArray(user.permissions) ? user.permissions : [];
+  const perms = Array.isArray(user.permissions || user.permissoes)
+    ? (user.permissions || user.permissoes)
+    : [];
+
   let hasAccess = false;
 
-  if (requiredPermission === "ordem-servico" || requiredPermission === "os") {
+  if (perms.includes("*") || perms.includes("admin")) {
+    hasAccess = true;
+  } else if (requiredPermission === "ordem-servico" || requiredPermission === "os") {
     hasAccess = perms.includes("ordem-servico") || perms.includes("os");
+  } else if (requiredPermission === "uniformes" || requiredPermission === "controle-uniformes") {
+    hasAccess = perms.includes("uniformes") || perms.includes("controle-uniformes");
   } else {
     hasAccess = perms.includes(requiredPermission);
   }
 
   if (!hasAccess) {
-    // Redireciona para o dashboard ou para a primeira tela permitida
-    return <Navigate to="/dashboard" replace />;
+    return (
+      <TelaSemAcessoView
+        rota={location.pathname}
+        requiredPermission={requiredPermission}
+      />
+    );
   }
 
   return children ? children : <Outlet />;
-}
+}

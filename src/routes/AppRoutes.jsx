@@ -567,8 +567,10 @@ import { ToastContainer } from "react-toastify";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import MobileBottomNav from "../components/MobileBottomNav";
+import ChatbotIA from "../components/Chatbot/ChatbotIA";
 import JsaLoginIntroAnimation from "../components/Visual/JsaLoginIntroAnimation";
 import TelaEmManutencaoView, { AdminMaintenanceNoticeBanner } from "../components/Visual/TelaEmManutencaoView";
+import TelaSemAcessoView from "../components/Visual/TelaSemAcessoView";
 import { useSystemStatus, verificarManutencaoTela } from "../services/systemStatusService";
 import { useAdminPresenceAlerts } from "../hooks/useAdminPresenceAlerts";
 import { isMobilePort, initDeviceMode } from "../utils/deviceMode";
@@ -738,6 +740,10 @@ function ProtectedRoute({ children, requiredPermission }) {
   if (isUserAdmin) return children;
 
   if (requiredPermission) {
+    if (requiredPermission === "chamados" || requiredPermission === "atendimento") {
+      return children;
+    }
+
     const u = getUser();
     const perms = Array.isArray(u?.permissions || u?.permissoes)
       ? (u.permissions || u.permissoes)
@@ -747,16 +753,22 @@ function ProtectedRoute({ children, requiredPermission }) {
       return children;
     }
 
+    let hasPerm = false;
     if (requiredPermission === "ordem-servico" || requiredPermission === "os") {
-      const hasOS = perms.includes("ordem-servico") || perms.includes("os");
-      if (!hasOS) {
-        return <Navigate to="/" replace />;
-      }
+      hasPerm = perms.includes("ordem-servico") || perms.includes("os");
+    } else if (requiredPermission === "uniformes" || requiredPermission === "controle-uniformes") {
+      hasPerm = perms.includes("uniformes") || perms.includes("controle-uniformes");
     } else {
-      const hasPerm = perms.includes(requiredPermission);
-      if (!hasPerm) {
-        return <Navigate to="/" replace />;
-      }
+      hasPerm = perms.includes(requiredPermission);
+    }
+
+    if (!hasPerm) {
+      return (
+        <TelaSemAcessoView
+          rota={location.pathname}
+          requiredPermission={requiredPermission}
+        />
+      );
     }
   }
 
@@ -817,6 +829,7 @@ function Layout({ children }) {
       </main>
 
       {!isAuthPage && <Footer />}
+      {!isAuthPage && <ChatbotIA />}
       {showMobileNav && <MobileBottomNav />}
     </div>
   );

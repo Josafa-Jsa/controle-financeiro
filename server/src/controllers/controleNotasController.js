@@ -21,6 +21,9 @@ async function checarTabelaControleNotas() {
         quem_recebeu_email VARCHAR(150) NULL,
         observacoes TEXT NULL,
         status VARCHAR(50) DEFAULT 'Recebida',
+        situacao_nota VARCHAR(100) NULL,
+        responsavel_liberacao VARCHAR(150) NULL,
+        data_hora_liberacao DATETIME NULL,
         anexo_danfe LONGTEXT NULL,
         anexo_nome VARCHAR(255) NULL,
         anexo_tipo VARCHAR(100) NULL,
@@ -33,6 +36,15 @@ async function checarTabelaControleNotas() {
     // Migração segura para tabelas já existentes
     try {
       await pool.query(`ALTER TABLE controle_notas ADD COLUMN filial VARCHAR(100) DEFAULT 'Filial 1';`);
+    } catch (_) {}
+    try {
+      await pool.query(`ALTER TABLE controle_notas ADD COLUMN situacao_nota VARCHAR(100) NULL;`);
+    } catch (_) {}
+    try {
+      await pool.query(`ALTER TABLE controle_notas ADD COLUMN responsavel_liberacao VARCHAR(150) NULL;`);
+    } catch (_) {}
+    try {
+      await pool.query(`ALTER TABLE controle_notas ADD COLUMN data_hora_liberacao DATETIME NULL;`);
     } catch (_) {}
     try {
       await pool.query(`ALTER TABLE controle_notas ADD COLUMN anexo_danfe LONGTEXT NULL;`);
@@ -50,17 +62,39 @@ async function checarTabelaControleNotas() {
   }
 }
 
+const ADMIN_EMAILS = ['jsa@jsa.com', 'jsa.admin@gmail.com', 'josafa.santos.jss@gmail.com'];
+
+function normalizarFilial(f) {
+  if (!f) return 'Filial 1';
+  const s = String(f).trim();
+  if (!s || /^todas/i.test(s)) return 'Todas';
+  if (/particular/i.test(s)) return 'Filial Particular';
+  const matchNum = s.match(/\d+/);
+  if (matchNum) {
+    return `Filial ${parseInt(matchNum[0], 10)}`;
+  }
+  return s;
+}
+
 export async function listControleNotas(req, res) {
   try {
     await checarTabelaControleNotas();
-    const { filial, data } = req.query;
+    const { filial, data, isAdmin } = req.query;
+    const reqEmail = String(req.headers['x-user-email'] || req.query.user_email || req.query.userEmail || '').trim().toLowerCase();
+    const isMasterAdmin = String(isAdmin) === 'true' || (reqEmail && ADMIN_EMAILS.includes(reqEmail));
 
     let sql = 'SELECT * FROM controle_notas WHERE 1=1';
     const params = [];
 
-    if (filial && filial.trim() && filial.trim().toLowerCase() !== 'todas') {
-      sql += ' AND LOWER(filial) = LOWER(?)';
-      params.push(filial.trim());
+    if (!isMasterAdmin) {
+      // Usuário comum é estritamente restrito à sua própria filial (ex: Filial 4)
+      const filialFinal = normalizarFilial(filial || 'Filial 1');
+      sql += ' AND (LOWER(TRIM(filial)) = LOWER(?) OR filial = ?)';
+      params.push(filialFinal, filialFinal);
+    } else if (filial && filial.trim() && filial.trim().toLowerCase() !== 'todas' && filial.trim().toLowerCase() !== 'todas as filiais') {
+      const filialFinal = normalizarFilial(filial.trim());
+      sql += ' AND (LOWER(TRIM(filial)) = LOWER(?) OR filial = ?)';
+      params.push(filialFinal, filialFinal);
     }
 
     if (data && data.trim()) {
@@ -74,7 +108,7 @@ export async function listControleNotas(req, res) {
     
     const formatadas = rows.map((r) => ({
       id: r.id,
-      filial: r.filial || 'Filial 1',
+      filial: normalizarFilial(r.filial || 'Filial 1'),
       chavedeacesso: r.chavedeacesso,
       numero: r.numero,
       fornecedor: r.fornecedor,
@@ -86,6 +120,9 @@ export async function listControleNotas(req, res) {
       quemRecebeuEmail: r.quem_recebeu_email,
       observacoes: r.observacoes,
       status: r.status || 'Recebida',
+      situacaoNota: r.situacao_nota || null,
+      responsavelLiberacao: r.responsavel_liberacao || null,
+      dataHoraLiberacao: r.data_hora_liberacao ? (r.data_hora_liberacao instanceof Date ? r.data_hora_liberacao.toISOString() : r.data_hora_liberacao) : null,
       anexoDanfe: r.anexo_danfe
         ? {
             dataUrl: r.anexo_danfe,
@@ -110,14 +147,21 @@ export async function listControleNotas(req, res) {
 export async function getRelatorioControleNotas(req, res) {
   try {
     await checarTabelaControleNotas();
-    const { data, filial } = req.query;
+    const { data, filial, isAdmin } = req.query;
+    const reqEmail = String(req.headers['x-user-email'] || req.query.user_email || req.query.userEmail || '').trim().toLowerCase();
+    const isMasterAdmin = String(isAdmin) === 'true' || (reqEmail && ADMIN_EMAILS.includes(reqEmail));
 
     let sql = 'SELECT * FROM controle_notas WHERE 1=1';
     const params = [];
 
-    if (filial && filial.trim() && filial.trim().toLowerCase() !== 'todas') {
-      sql += ' AND LOWER(filial) = LOWER(?)';
-      params.push(filial.trim());
+    if (!isMasterAdmin) {
+      const filialFinal = normalizarFilial(filial || 'Filial 1');
+      sql += ' AND (LOWER(TRIM(filial)) = LOWER(?) OR filial = ?)';
+      params.push(filialFinal, filialFinal);
+    } else if (filial && filial.trim() && filial.trim().toLowerCase() !== 'todas' && filial.trim().toLowerCase() !== 'todas as filiais') {
+      const filialFinal = normalizarFilial(filial.trim());
+      sql += ' AND (LOWER(TRIM(filial)) = LOWER(?) OR filial = ?)';
+      params.push(filialFinal, filialFinal);
     }
 
     if (data && data.trim()) {
@@ -131,7 +175,7 @@ export async function getRelatorioControleNotas(req, res) {
 
     const formatadas = rows.map((r) => ({
       id: r.id,
-      filial: r.filial || 'Filial 1',
+      filial: normalizarFilial(r.filial || 'Filial 1'),
       chavedeacesso: r.chavedeacesso,
       numero: r.numero,
       fornecedor: r.fornecedor,
@@ -143,6 +187,9 @@ export async function getRelatorioControleNotas(req, res) {
       quemRecebeuEmail: r.quem_recebeu_email,
       observacoes: r.observacoes,
       status: r.status || 'Recebida',
+      situacaoNota: r.situacao_nota || null,
+      responsavelLiberacao: r.responsavel_liberacao || null,
+      dataHoraLiberacao: r.data_hora_liberacao ? (r.data_hora_liberacao instanceof Date ? r.data_hora_liberacao.toISOString() : r.data_hora_liberacao) : null,
       anexoDanfe: r.anexo_danfe
         ? {
             dataUrl: r.anexo_danfe,
@@ -177,22 +224,27 @@ export async function createControleNota(req, res) {
       quemRecebeuEmail,
       observacoes,
       status = 'Recebida',
+      situacaoNota,
+      responsavelLiberacao,
+      dataHoraLiberacao,
       anexoDanfe,
     } = req.body;
 
+    const filialFinal = normalizarFilial(filial || 'Filial 1');
     const dataEmissaoValida = dataEmissao ? new Date(dataEmissao).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
     const dataHoraEntregaValida = dataHoraEntrega ? new Date(dataHoraEntrega) : new Date();
+    const dataHoraLiberacaoValida = dataHoraLiberacao ? new Date(dataHoraLiberacao) : null;
 
     const anexoDataUrl = typeof anexoDanfe === 'string' ? anexoDanfe : anexoDanfe?.dataUrl || null;
     const anexoNome = anexoDanfe?.nome || null;
     const anexoTipo = anexoDanfe?.tipo || null;
 
     await pool.query(
-      `INSERT INTO controle_notas (id, filial, chavedeacesso, numero, fornecedor, cnpj, data_emissao, valor, data_hora_entrega, quem_recebeu, quem_recebeu_email, observacoes, status, anexo_danfe, anexo_nome, anexo_tipo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO controle_notas (id, filial, chavedeacesso, numero, fornecedor, cnpj, data_emissao, valor, data_hora_entrega, quem_recebeu, quem_recebeu_email, observacoes, status, situacao_nota, responsavel_liberacao, data_hora_liberacao, anexo_danfe, anexo_nome, anexo_tipo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
-        filial || 'Filial 1',
+        filialFinal,
         chavedeacesso || null,
         numero || null,
         fornecedor || null,
@@ -204,13 +256,16 @@ export async function createControleNota(req, res) {
         quemRecebeuEmail || null,
         observacoes || null,
         status,
+        situacaoNota || null,
+        responsavelLiberacao || null,
+        dataHoraLiberacaoValida,
         anexoDataUrl,
         anexoNome,
         anexoTipo,
       ]
     );
 
-    res.status(201).json({ id, filial: filial || 'Filial 1', numero, fornecedor, cnpj, valor, status });
+    res.status(201).json({ id, filial: filialFinal, numero, fornecedor, cnpj, valor, status, situacaoNota, responsavelLiberacao, dataHoraLiberacao });
   } catch (error) {
     console.error('Erro ao criar nota no controle:', error);
     res.status(500).json({ error: 'Erro ao salvar nota no controle.' });
@@ -234,9 +289,13 @@ export async function updateControleNota(req, res) {
       quemRecebeuEmail,
       observacoes,
       status,
+      situacaoNota,
+      responsavelLiberacao,
+      dataHoraLiberacao,
       anexoDanfe,
     } = req.body;
 
+    const filialFinal = filial !== undefined ? normalizarFilial(filial) : undefined;
     const anexoDataUrl = typeof anexoDanfe === 'string' ? anexoDanfe : anexoDanfe?.dataUrl !== undefined ? anexoDanfe.dataUrl : undefined;
     const anexoNome = anexoDanfe?.nome !== undefined ? anexoDanfe.nome : undefined;
     const anexoTipo = anexoDanfe?.tipo !== undefined ? anexoDanfe.tipo : undefined;
@@ -255,12 +314,15 @@ export async function updateControleNota(req, res) {
          quem_recebeu_email = COALESCE(?, quem_recebeu_email),
          observacoes = COALESCE(?, observacoes),
          status = COALESCE(?, status),
+         situacao_nota = COALESCE(?, situacao_nota),
+         responsavel_liberacao = COALESCE(?, responsavel_liberacao),
+         data_hora_liberacao = COALESCE(?, data_hora_liberacao),
          anexo_danfe = COALESCE(?, anexo_danfe),
          anexo_nome = COALESCE(?, anexo_nome),
          anexo_tipo = COALESCE(?, anexo_tipo)
        WHERE id = ?`,
       [
-        filial,
+        filialFinal,
         chavedeacesso,
         numero,
         fornecedor,
@@ -272,6 +334,9 @@ export async function updateControleNota(req, res) {
         quemRecebeuEmail,
         observacoes,
         status,
+        situacaoNota !== undefined ? situacaoNota : null,
+        responsavelLiberacao !== undefined ? responsavelLiberacao : null,
+        dataHoraLiberacao !== undefined ? (dataHoraLiberacao ? new Date(dataHoraLiberacao) : null) : null,
         anexoDataUrl,
         anexoNome,
         anexoTipo,

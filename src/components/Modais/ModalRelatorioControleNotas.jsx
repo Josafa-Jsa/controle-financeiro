@@ -7,6 +7,7 @@ import {
 } from '../../utils/gerarRelatorioControleNotasPDF';
 import { formatCurrencyBRL, formatDateBR } from '../../utils/telegram';
 import { getUser } from '../../auth/auth';
+import { normalizarNomeFilial } from '../../utils/filialUtils';
 import '../Visual/modal.css';
 import '../../pages/ControleNotas/controleNotas.css';
 
@@ -32,11 +33,12 @@ export default function ModalRelatorioControleNotas({
     usuarioLogado?.username ||
     localStorage.getItem('usuario_nome') ||
     'Operador do Sistema';
-  const filialUsuario =
+  const filialUsuario = normalizarNomeFilial(
     usuarioLogado?.filial ||
     usuarioLogado?.user_filial ||
     localStorage.getItem('usuario_filial') ||
-    'Filial 1';
+    'Filial 1'
+  );
 
   const dataFormatadaBR = dataReferencia ? dataReferencia.split('-').reverse().join('/') : '';
 
@@ -721,7 +723,24 @@ export default function ModalRelatorioControleNotas({
                                 {formatarDataHora(n.dataHoraEntrega)}
                               </td>
                               <td style={{ padding: '7px 10px', fontWeight: 800, color: '#38bdf8', whiteSpace: 'nowrap' }}>
-                                {n.numero ? `NF #${n.numero}` : `NF #${n.id}`}
+                                <div>{n.numero ? `NF #${n.numero}` : `NF #${n.id}`}</div>
+                                {n.situacaoNota && (
+                                  <div style={{ marginTop: '2px' }}>
+                                    <span
+                                      style={{
+                                        fontSize: '0.66rem',
+                                        fontWeight: 700,
+                                        padding: '1px 5px',
+                                        borderRadius: '3px',
+                                        background: n.situacaoNota === 'Liberada' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(56, 189, 248, 0.2)',
+                                        color: n.situacaoNota === 'Liberada' ? '#34d399' : '#38bdf8',
+                                        border: n.situacaoNota === 'Liberada' ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(56, 189, 248, 0.4)',
+                                      }}
+                                    >
+                                      {n.situacaoNota}
+                                    </span>
+                                  </div>
+                                )}
                               </td>
                               <td style={{ padding: '7px 10px' }}>
                                 <div style={{ fontWeight: 700, color: '#f1f5f9' }}>{n.fornecedor || 'Não informado'}</div>

@@ -66,17 +66,24 @@ export default function Dashboard() {
     user?.role === "ADMIN" ||
     user?.role === "admin";
 
-  let perms = Array.isArray(user?.permissions || user?.permissoes)
-    ? (user.permissions || user.permissoes)
-    : [];
-
-  try {
-    const rawUsers = JSON.parse(localStorage.getItem("users") || "[]");
-    const matched = rawUsers.find((u) => String(u?.email || "").toLowerCase().trim() === email);
-    if (matched && Array.isArray(matched.permissions)) {
-      perms = matched.permissions;
-    }
-  } catch { }
+  let perms = [];
+  if (Array.isArray(user?.permissions) && user.permissions.length > 0) {
+    perms = user.permissions;
+  } else if (Array.isArray(user?.permissoes) && user.permissoes.length > 0) {
+    perms = user.permissoes;
+  } else {
+    try {
+      const rawUsers = JSON.parse(localStorage.getItem("users") || "[]");
+      const matched = rawUsers.find((u) => 
+        (email && String(u?.email || "").toLowerCase().trim() === email) ||
+        (user?.username && String(u?.username || "").toLowerCase().trim() === String(user.username).toLowerCase().trim()) ||
+        (user?.id && String(u?.id) === String(user.id))
+      );
+      if (matched && Array.isArray(matched.permissions) && matched.permissions.length > 0) {
+        perms = matched.permissions;
+      }
+    } catch { }
+  }
 
   if (!isAdmin) {
     perms = perms.filter((p) => p !== "*");

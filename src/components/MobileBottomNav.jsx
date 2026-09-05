@@ -24,16 +24,24 @@ export default function MobileBottomNav() {
     user?.isAdmin === true;
 
   const [perms, setPerms] = useState(() => {
-    let p = Array.isArray(user?.permissions || user?.permissoes)
-      ? (user.permissions || user.permissoes)
-      : [];
-    try {
-      const rawUsers = JSON.parse(localStorage.getItem('users') || '[]');
-      const matched = rawUsers.find((u) => String(u?.email || '').toLowerCase().trim() === email);
-      if (matched && Array.isArray(matched.permissions)) {
-        p = matched.permissions;
-      }
-    } catch {}
+    let p = [];
+    if (Array.isArray(user?.permissions) && user.permissions.length > 0) {
+      p = user.permissions;
+    } else if (Array.isArray(user?.permissoes) && user.permissoes.length > 0) {
+      p = user.permissoes;
+    } else {
+      try {
+        const rawUsers = JSON.parse(localStorage.getItem('users') || '[]');
+        const matched = rawUsers.find((u) => 
+          (email && String(u?.email || '').toLowerCase().trim() === email) ||
+          (user?.username && String(u?.username || '').toLowerCase().trim() === String(user.username).toLowerCase().trim()) ||
+          (user?.id && String(u?.id) === String(user.id))
+        );
+        if (matched && Array.isArray(matched.permissions) && matched.permissions.length > 0) {
+          p = matched.permissions;
+        }
+      } catch {}
+    }
     return isAdmin ? p : p.filter((k) => k !== '*');
   });
 
@@ -156,7 +164,7 @@ export default function MobileBottomNav() {
                 </button>
               )}
 
-              {(canAccess('controle-notas') || canAccess('notas')) && (
+              {canAccess('controle-notas') && (
                 <button
                   type="button"
                   className={`mobile-drawer-item ${path === '/controle-notas' ? 'active' : ''}`}

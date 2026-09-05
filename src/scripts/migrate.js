@@ -90,6 +90,9 @@ CREATE TABLE IF NOT EXISTS \`users\` (
 -- 3. Tabela de Contas a Pagar e a Receber (contas)
 CREATE TABLE IF NOT EXISTS \`contas\` (
   \`id\` BIGINT NOT NULL,
+  \`codigo\` VARCHAR(64) NULL,
+  \`user_email\` VARCHAR(190) NULL,
+  \`user_id\` VARCHAR(64) NULL,
   \`tipo\` VARCHAR(20) NOT NULL,
   \`descricao\` VARCHAR(255) NOT NULL,
   \`observacao\` TEXT NULL,
@@ -106,6 +109,8 @@ CREATE TABLE IF NOT EXISTS \`contas\` (
   \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (\`id\`),
+  INDEX \`idx_contas_user_email\` (\`user_email\`),
+  INDEX \`idx_contas_user_id\` (\`user_id\`),
   INDEX \`idx_contas_tipo\` (\`tipo\`),
   INDEX \`idx_contas_status\` (\`status\`),
   INDEX \`idx_contas_vencimento\` (\`vencimento\`),
@@ -426,6 +431,9 @@ export async function runMigration(options = {}) {
 
           return [
             c.id ?? null,
+            c.codigo ? String(c.codigo).slice(0, 64) : (c.id ? String(c.id).slice(-6).padStart(6, '0') : null),
+            c.userEmail || c.user_email || 'jsa@jsa.com',
+            c.userId || c.user_id ? String(c.userId || c.user_id) : null,
             String(c.tipo || "Receber"),
             c.descricao ? String(c.descricao).slice(0, 255) : "",
             c.observacao || null,
@@ -444,9 +452,12 @@ export async function runMigration(options = {}) {
 
         for (const batch of chunk(rows, 500)) {
           await conn.query(
-            `INSERT INTO contas (id, tipo, descricao, observacao, valor, vencimento, status, data_pagamento, referencia_tipo, referencia_id, editada, exclusao_pendente, delete_request_id, motivo_exclusao)
-             VALUES ${batch.map(() => "(?,?,?,?,?,?,?,?,?,?,?,?,?,?)").join(",")}
+            `INSERT INTO contas (id, codigo, user_email, user_id, tipo, descricao, observacao, valor, vencimento, status, data_pagamento, referencia_tipo, referencia_id, editada, exclusao_pendente, delete_request_id, motivo_exclusao)
+             VALUES ${batch.map(() => "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").join(",")}
              ON DUPLICATE KEY UPDATE
+               codigo=VALUES(codigo),
+               user_email=VALUES(user_email),
+               user_id=VALUES(user_id),
                tipo=VALUES(tipo),
                descricao=VALUES(descricao),
                observacao=VALUES(observacao),

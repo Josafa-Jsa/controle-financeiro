@@ -1,155 +1,130 @@
 // src/components/Modais/ModalStatusManutencao.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { getUser } from '../../auth/auth';
 import {
   salvarStatusSistema,
   TELAS_SISTEMA_CONFIG,
-  GRUPOS_MANUTENCAO_VINCULADOS,
-  resolverTelasVinculadasManutencao,
-  obterGrupoVinculado,
+  isManutencaoGeral,
 } from '../../services/systemStatusService';
 import '../Visual/modal.css';
 
-export const OPCOES_TELAS = [
-  'Prevenção de Perdas',
-  'Controle de Uniformes',
-  'Controle de Notas',
-  'Notas Fiscais',
-  'Gestão de Contas',
-  'Gestão de Contratos',
-  'Contrato Internet / Provedor',
-  'Ordens de Serviço',
-  'Fluxo de Caixa',
-  'Controle de Estoque',
-  'Central de Chamados',
-  'Simulador de Créditos',
-  'Dashboard Principal',
-  'Painel Administrativo',
-  'Geral do Sistema (Todas as Telas)',
-];
-
 export default function ModalStatusManutencao({ isOpen, onClose, currentStatus, onStatusChanged }) {
   const [emManutencao, setEmManutencao] = useState(false);
-  const [telaPrincipal, setTelaPrincipal] = useState('Prevenção de Perdas');
-  const [telasSelecionadas, setTelasSelecionadas] = useState(['Prevenção de Perdas', 'Controle de Uniformes', 'Controle de Notas']);
-  const [telaPersonalizada, setTelaPersonalizada] = useState('');
+  const [telasSelecionadas, setTelasSelecionadas] = useState([]);
   const [mensagem, setMensagem] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const hasInitializedRef = useRef(false);
 
   const usuario = getUser();
   const nomeAdmin = usuario?.name || usuario?.nome || usuario?.email || 'Administrador';
 
+  // Todas as telas disponíveis no sistema
+  const todasAsTelas = useMemo(() => TELAS_SISTEMA_CONFIG.map((t) => t.nome), []);
+
+  // Inicializa o estado do modal SOMENTE no momento em que ele é aberto,
+  // impedindo que o polling de segundo plano feche ou limpe as seleções do usuário
   useEffect(() => {
-    if (!isOpen) return;
+    if (isOpen) {
+      if (!hasInitializedRef.current) {
+        hasInitializedRef.current = true;
+        const status = currentStatus || {};
+        const estaAtivo = Boolean(status.emManutencao);
+        setEmManutencao(estaAtivo);
 
-    if (currentStatus) {
-      setEmManutencao(Boolean(currentStatus.emManutencao));
-      const telaRaw = String(currentStatus.tela || '').trim();
+        const telaRaw = String(status.tela || '').trim();
 
-      if (telaRaw) {
-        // Se houver múltiplas telas separadas por vírgula
-        const listaTelas = telaRaw
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean);
-
-        if (listaTelas.length > 0) {
-          const primeira = listaTelas[0];
-          if (OPCOES_TELAS.includes(primeira)) {
-            setTelaPrincipal(primeira);
+        if (estaAtivo && telaRaw) {
+          if (isManutencaoGeral(status) || telaRaw.toLowerCase().includes('todas as telas') || telaRaw === '*') {
+            setTelasSelecionadas([...todasAsTelas]);
           } else {
-            setTelaPrincipal('Outra');
-            setTelaPersonalizada(primeira);
-          }
+            const listaCarregada = telaRaw
+              .split(',')
+              .map((t) => t.trim())
+              .filter(Boolean);
 
-          // Resolve vínculos para todas as telas presentes
-          const todasVinculadas = resolverTelasVinculadasManutencao(listaTelas);
-          setTelasSelecionadas(todasVinculadas);
+            // Normaliza os nomes para corresponderem exatamente aos cadastrados em TELAS_SISTEMA_CONFIG
+            const mapeadas = [];
+            listaCarregada.forEach((item) => {
+              const itemLower = item.toLowerCase();
+              const config = TELAS_SISTEMA_CONFIG.find(
+                (c) =>
+                  c.nome.toLowerCase() === itemLower ||
+                  c.key.toLowerCase() === itemLower ||
+                  (c.aliases || []).some((a) => a.toLowerCase() === itemLower)
+              );
+              if (config) {
+                if (!mapeadas.includes(config.nome)) mapeadas.push(config.nome);
+              } else if (item.length > 0) {
+                if (!mapeadas.includes(item)) mapeadas.push(item);
+              }
+            });
+
+            setTelasSelecionadas(mapeadas.length > 0 ? mapeadas : ['Notas Fiscais', 'Gestão de Contas']);
+          }
         } else {
-          setTelaPrincipal('Prevenção de Perdas');
-          setTelasSelecionadas(resolverTelasVinculadasManutencao('Prevenção de Perdas'));
+          setTelasSelecionadas([]);
         }
-      } else {
-        setTelaPrincipal('Prevenção de Perdas');
-        setTelasSelecionadas(resolverTelasVinculadasManutencao('Prevenção de Perdas'));
-        setTelaPersonalizada('');
+
+        setMensagem(status.mensagem || '');
       }
-      setMensagem(currentStatus.mensagem || '');
+    } else {
+      hasInitializedRef.current = false;
     }
   }, [isOpen]);
 
   useEffect(() => {
-    const onEsc = (e) => e.key === 'Escape' && isOpen && onClose();
+    const onEsc = (e) => e.key === 'Escape' && isOpen && !salvando && onClose();
     window.addEventListener('keydown', onEsc);
     return () => window.removeEventListener('keydown', onEsc);
-  }, [isOpen, onClose]);
+  }, [isOpen, salvando, onClose]);
 
   if (!isOpen) return null;
 
-  // Trata a mudança da tela no select principal
-  const handleSelecionarTela = (telaEscolhida) => {
-    setTelaPrincipal(telaEscolhida);
+  const todasEstaoSelecionadas = todasAsTelas.length > 0 && todasAsTelas.every((t) => telasSelecionadas.includes(t));
+  const nenhumaSelecionada = telasSelecionadas.length === 0;
 
-    if (telaEscolhida === 'Outra') {
-      setTelasSelecionadas(telaPersonalizada ? [telaPersonalizada] : []);
-      return;
-    }
-
-    if (telaEscolhida === 'Geral do Sistema (Todas as Telas)') {
-      setTelasSelecionadas(['Geral do Sistema (Todas as Telas)']);
-      return;
-    }
-
-    // Se a tela escolhida pertencer a um grupo vinculado (ex: Prevenção -> Prevenção + Uniformes + Controle de Notas)
-    const vinculadas = resolverTelasVinculadasManutencao(telaEscolhida);
-    setTelasSelecionadas(vinculadas);
-  };
-
-  // Trata seleção direta de um Grupo Vinculado
-  const handleSelecionarGrupo = (grupo) => {
-    setTelaPrincipal(grupo.telas[0]);
-    setTelasSelecionadas([...grupo.telas]);
-  };
-
-  // Trata alternância de checkbox individual
+  // Alterna uma tela individual
   const handleToggleTela = (nomeTela) => {
-    // Se a tela pertence a um grupo, seleciona ou desmarca o grupo
-    const grupo = obterGrupoVinculado(nomeTela);
-    const telasDoGrupo = grupo ? grupo.telas : [nomeTela];
-
-    const jaContem = telasDoGrupo.some((t) => telasSelecionadas.includes(t));
-
-    if (jaContem) {
-      const filtradas = telasSelecionadas.filter((t) => !telasDoGrupo.includes(t));
-      setTelasSelecionadas(filtradas);
-      if (filtradas.length > 0) {
-        setTelaPrincipal(filtradas[0]);
-      }
+    if (telasSelecionadas.includes(nomeTela)) {
+      setTelasSelecionadas(telasSelecionadas.filter((t) => t !== nomeTela));
     } else {
-      const novas = [...telasSelecionadas, ...telasDoGrupo];
-      setTelasSelecionadas(Array.from(new Set(novas)));
-      setTelaPrincipal(nomeTela);
+      setTelasSelecionadas([...telasSelecionadas, nomeTela]);
     }
+  };
+
+  // Alterna selecionar/desmarcar todas as telas
+  const handleToggleTodas = () => {
+    if (todasEstaoSelecionadas) {
+      setTelasSelecionadas([]);
+    } else {
+      setTelasSelecionadas([...todasAsTelas]);
+    }
+  };
+
+  // Limpa todas
+  const handleLimparSelecao = () => {
+    setTelasSelecionadas([]);
   };
 
   const handleSalvar = async (e) => {
     if (e) e.preventDefault();
-    setSalvando(true);
 
-    let telasFinais = [];
-    if (emManutencao) {
-      if (telaPrincipal === 'Outra') {
-        const personalizada = telaPersonalizada.trim();
-        telasFinais = personalizada ? [personalizada] : ['Outra Tela'];
-      } else if (telaPrincipal === 'Geral do Sistema (Todas as Telas)') {
-        telasFinais = ['Geral do Sistema (Todas as Telas)'];
-      } else {
-        telasFinais = telasSelecionadas.length > 0 ? telasSelecionadas : [telaPrincipal];
-      }
+    if (emManutencao && telasSelecionadas.length === 0) {
+      toast.warn('Por favor, selecione ao menos uma tela para colocar em manutenção ou marque "Operacional & Online".');
+      return;
     }
 
-    const telaStringFinal = emManutencao ? telasFinais.join(', ') : '';
+    setSalvando(true);
+
+    let telaStringFinal = '';
+    if (emManutencao) {
+      if (todasEstaoSelecionadas) {
+        telaStringFinal = 'Geral do Sistema (Todas as Telas)';
+      } else {
+        telaStringFinal = telasSelecionadas.join(', ');
+      }
+    }
 
     const payload = {
       emManutencao,
@@ -164,17 +139,17 @@ export default function ModalStatusManutencao({ isOpen, onClose, currentStatus, 
 
       if (emManutencao) {
         toast.warn(
-          `⚠️ Modo de manutenção ATIVADO para "${telaStringFinal}". Telas BLOQUEADAS para usuários comuns com aviso em tempo real.`
+          `⚠️ Modo de manutenção ATIVADO para: ${telaStringFinal}. Apenas as telas selecionadas foram bloqueadas para operadores.`
         );
       } else {
         toast.success(
-          '🟢 Sistema restaurado para 100% Operacional & Online. O acesso de todos os usuários foi liberado!'
+          '🟢 Sistema 100% Operacional & Online. Todas as telas foram liberadas!'
         );
       }
 
       onClose();
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao salvar status do sistema:', err);
       toast.error('Erro ao salvar status do sistema.');
     } finally {
       setSalvando(false);
@@ -193,323 +168,441 @@ export default function ModalStatusManutencao({ isOpen, onClose, currentStatus, 
     try {
       const atualizado = await salvarStatusSistema(payload, nomeAdmin);
       if (onStatusChanged) onStatusChanged(atualizado);
-      toast.success('🟢 Sistema restaurado para 100% Operacional & Online! O acesso de todos os usuários foi liberado.');
+      setEmManutencao(false);
+      setTelasSelecionadas([]);
+      toast.success('🟢 Sistema restaurado para 100% Operacional & Online! O acesso de todas as telas foi liberado.');
       onClose();
     } catch (err) {
-      toast.error('Erro ao restaurar status.');
+      console.error('Erro ao restaurar status:', err);
+      toast.error('Erro ao restaurar status online.');
     } finally {
       setSalvando(false);
     }
   };
 
-  const grupoAtivo = obterGrupoVinculado(telaPrincipal);
-
   return (
-    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" style={{ zIndex: 999999 }}>
       <div
-        className="modal-box modal-md"
+        className="modal-box"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '640px', width: '94%', maxHeight: '92vh', overflowY: 'auto' }}
+        style={{
+          maxWidth: '860px',
+          width: '95%',
+          maxHeight: '96vh',
+          overflowY: 'auto',
+          backgroundColor: '#11151e',
+          border: '1px solid #1e293b',
+          borderRadius: '12px',
+          padding: '14px 18px',
+          boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.9)',
+          boxSizing: 'border-box',
+        }}
       >
-        {/* Cabeçalho */}
+        {/* Cabeçalho Compacto */}
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '14px',
-            borderBottom: '1px solid #283340',
-            paddingBottom: '10px',
+            marginBottom: '10px',
+            borderBottom: '1px solid #1e293b',
+            paddingBottom: '8px',
           }}
         >
-          <div>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: '18px',
-                color: '#f8fafc',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <span>⚙️</span> Controle de Status & Manutenção do Sistema
-            </h2>
-            <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#94a3b8' }}>
-              Alterne o status das telas e grupos correlacionados para ajustes simultâneos em tempo real.
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '1.2rem' }}>⚙️</span>
+            <div>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: '1.05rem',
+                  color: '#f8fafc',
+                  fontWeight: 800,
+                  lineHeight: 1.2,
+                }}
+              >
+                Controle de Status & Manutenção do Sistema
+              </h2>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                Marque individualmente as telas para manutenção ou selecione todas com 1 clique.
+              </span>
+            </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
             style={{
-              background: 'transparent',
+              background: '#1e293b',
               border: 'none',
               color: '#94a3b8',
-              fontSize: '1.2rem',
+              fontSize: '1.1rem',
               cursor: 'pointer',
-              padding: '4px',
+              padding: '2px 8px',
+              borderRadius: '6px',
+              lineHeight: 1,
             }}
+            title="Fechar (ESC)"
           >
             ✕
           </button>
         </div>
 
-        <form onSubmit={handleSalvar} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Seletor de Estado Principal */}
+        <form onSubmit={handleSalvar} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {/* Seletor de Modo: Operacional vs Manutenção (Compacto lado a lado) */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div
               onClick={() => setEmManutencao(false)}
               style={{
-                background: !emManutencao ? 'rgba(16, 185, 129, 0.15)' : '#181d24',
-                border: !emManutencao ? '2px solid #10b981' : '1px solid #2d3748',
+                background: !emManutencao ? 'rgba(16, 185, 129, 0.15)' : '#0b0f17',
+                border: !emManutencao ? '1.5px solid #10b981' : '1px solid #1e293b',
                 borderRadius: '8px',
-                padding: '12px',
+                padding: '8px 12px',
                 cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                transition: 'all 0.15s ease',
               }}
             >
-              <div style={{ fontSize: '22px', marginBottom: '4px' }}>🟢</div>
-              <strong style={{ color: !emManutencao ? '#34d399' : '#cbd5e1', fontSize: '13px', display: 'block' }}>
-                Operacional & Online
-              </strong>
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>Todas as telas liberadas</span>
+              <div style={{ fontSize: '20px' }}>🟢</div>
+              <div style={{ textAlign: 'left' }}>
+                <strong style={{ color: !emManutencao ? '#34d399' : '#cbd5e1', fontSize: '0.88rem', display: 'block' }}>
+                  Operacional & Online
+                </strong>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Todas as telas 100% liberadas</span>
+              </div>
             </div>
 
             <div
-              onClick={() => setEmManutencao(true)}
+              onClick={() => {
+                setEmManutencao(true);
+                if (telasSelecionadas.length === 0) {
+                  setTelasSelecionadas(['Notas Fiscais', 'Gestão de Contas']);
+                }
+              }}
               style={{
-                background: emManutencao ? 'rgba(245, 158, 11, 0.18)' : '#181d24',
-                border: emManutencao ? '2px solid #f59e0b' : '1px solid #2d3748',
+                background: emManutencao ? 'rgba(245, 158, 11, 0.15)' : '#0b0f17',
+                border: emManutencao ? '1.5px solid #f59e0b' : '1px solid #1e293b',
                 borderRadius: '8px',
-                padding: '12px',
+                padding: '8px 12px',
                 cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                transition: 'all 0.15s ease',
               }}
             >
-              <div style={{ fontSize: '22px', marginBottom: '4px' }}>🟡</div>
-              <strong style={{ color: emManutencao ? '#fbbf24' : '#cbd5e1', fontSize: '13px', display: 'block' }}>
-                Manutenção / Ajustes
-              </strong>
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>Bloqueia telas selecionadas</span>
+              <div style={{ fontSize: '20px' }}>🟡</div>
+              <div style={{ textAlign: 'left' }}>
+                <strong style={{ color: emManutencao ? '#fbbf24' : '#cbd5e1', fontSize: '0.88rem', display: 'block' }}>
+                  Manutenção / Ajustes
+                </strong>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Bloqueia telas selecionadas</span>
+              </div>
             </div>
           </div>
 
-          {/* Configurações de Manutenção */}
+          {/* Painel de Seleção de Telas */}
           {emManutencao && (
             <div
               style={{
-                background: 'rgba(245, 158, 11, 0.08)',
+                background: '#090d16',
                 border: '1px solid rgba(245, 158, 11, 0.3)',
                 borderRadius: '8px',
-                padding: '14px',
+                padding: '10px 12px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '12px',
+                gap: '8px',
               }}
             >
-              {/* 1. Atalhos de Grupos Vinculados Simultâneos */}
-              <div>
-                <label style={{ fontSize: '11.5px', fontWeight: 700, color: '#fef08a', textTransform: 'uppercase' }}>
-                  🔗 Grupos com Ajustes Simultâneos (Clique para ativar o grupo):
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '6px', marginTop: '6px' }}>
-                  {GRUPOS_MANUTENCAO_VINCULADOS.map((g) => {
-                    const isGrupoSelecionado = g.telas.every((t) => telasSelecionadas.includes(t));
-                    return (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => handleSelecionarGrupo(g)}
-                        style={{
-                          background: isGrupoSelecionado ? 'rgba(56, 189, 248, 0.22)' : '#111827',
-                          border: isGrupoSelecionado ? '1.5px solid #38bdf8' : '1px solid #1e293b',
-                          color: isGrupoSelecionado ? '#38bdf8' : '#e2e8f0',
-                          borderRadius: '6px',
-                          padding: '8px 10px',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          textAlign: 'left',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        <div>
-                          <span>🔗 {g.nome}</span>
-                          <div style={{ fontSize: '10.5px', color: '#94a3b8', fontWeight: 500 }}>
-                            {g.telas.join(' • ')}
-                          </div>
-                        </div>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            background: isGrupoSelecionado ? '#0284c7' : '#1e293b',
-                            color: '#fff',
-                          }}
-                        >
-                          {isGrupoSelecionado ? '✓ Ativo' : 'Selecionar Grupo'}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 2. Seletor de Tela Principal */}
-              <div className="form-row">
-                <label style={{ fontSize: '12px', fontWeight: 600, color: '#fef08a' }}>
-                  Selecione a Tela Principal ou Módulo:
-                </label>
-                <select
-                  value={telaPrincipal}
-                  onChange={(e) => handleSelecionarTela(e.target.value)}
-                  style={{ height: '36px', fontSize: '13px', borderRadius: '6px', background: '#0f172a', color: '#fff' }}
-                >
-                  <optgroup label="📋 Telas com Vínculo Simultâneo">
-                    <option value="Prevenção de Perdas">🛡️ Prevenção de Perdas (Vinculada com Uniformes e Controle de Notas)</option>
-                    <option value="Controle de Uniformes">👔 Controle de Uniformes (Vinculada com Prevenção e Controle de Notas)</option>
-                    <option value="Controle de Notas">📋 Controle de Notas (Vinculada com Prevenção e Uniformes)</option>
-                    <option value="Notas Fiscais">📑 Notas Fiscais (Vinculada com Gestão de Contas)</option>
-                    <option value="Gestão de Contas">💳 Gestão de Contas (Vinculada com Notas Fiscais)</option>
-                    <option value="Gestão de Contratos">📝 Gestão de Contratos (Vinculada com Internet e OS)</option>
-                    <option value="Contrato Internet / Provedor">🌐 Contrato Internet / Provedor (Vinculada com Contratos e OS)</option>
-                    <option value="Ordens de Serviço">🛠️ Ordens de Serviço (Vinculada com Contratos e Internet)</option>
-                  </optgroup>
-                  <optgroup label="📄 Telas Individuais">
-                    <option value="Fluxo de Caixa">📈 Fluxo de Caixa (Individual)</option>
-                    <option value="Controle de Estoque">📦 Controle de Estoque (Individual)</option>
-                    <option value="Central de Chamados">🎧 Central de Chamados (Individual)</option>
-                    <option value="Simulador de Créditos">🧮 Simulador de Créditos (Individual)</option>
-                    <option value="Dashboard Principal">📊 Dashboard Principal (Individual)</option>
-                    <option value="Painel Administrativo">⚙️ Painel Administrativo (Individual)</option>
-                    <option value="Geral do Sistema (Todas as Telas)">🚨 Geral do Sistema (Todas as Telas)</option>
-                  </optgroup>
-                  <option value="Outra">✏️ Outra tela / Digitação livre...</option>
-                </select>
-              </div>
-
-              {telaPrincipal === 'Outra' && (
-                <div className="form-row">
-                  <label style={{ fontSize: '12px', color: '#fef08a' }}>Nome da Tela Personalizada:</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Módulo de Relatórios Gerenciais"
-                    value={telaPersonalizada}
-                    onChange={(e) => {
-                      setTelaPersonalizada(e.target.value);
-                      setTelasSelecionadas([e.target.value]);
-                    }}
-                    style={{ height: '36px', fontSize: '13px' }}
-                    required
-                  />
-                </div>
-              )}
-
-              {/* 3. Painel de Telas que ficarão em Manutenção */}
-              {telaPrincipal !== 'Outra' && telaPrincipal !== 'Geral do Sistema (Todas as Telas)' && (
-                <div
+              {/* Barra de Controle Geral: Selecionar Todas + Contador */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: '#0f172a',
+                  border: '1px solid #1e293b',
+                  borderRadius: '6px',
+                  padding: '6px 10px',
+                }}
+              >
+                <label
                   style={{
-                    background: '#090d16',
-                    border: '1px solid #1e293b',
-                    borderRadius: '6px',
-                    padding: '10px 12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                    userSelect: 'none',
                   }}
                 >
-                  <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700, marginBottom: '6px', textTransform: 'uppercase' }}>
-                    Telas que ficarão bloqueadas para os usuários:
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {telasSelecionadas.map((t) => (
-                      <span
-                        key={t}
-                        style={{
-                          background: 'rgba(234, 179, 8, 0.18)',
-                          color: '#fbbf24',
-                          border: '1px solid rgba(234, 179, 8, 0.4)',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontSize: '11.5px',
-                          fontWeight: 700,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        ⚠️ {t}
-                      </span>
-                    ))}
-                  </div>
+                  <input
+                    type="checkbox"
+                    checked={todasEstaoSelecionadas}
+                    onChange={handleToggleTodas}
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      accentColor: '#f59e0b',
+                      cursor: 'pointer',
+                    }}
+                  />
+                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fef08a' }}>
+                    ☑️ Selecionar Todas as Telas do Sistema
+                  </span>
+                </label>
 
-                  {grupoAtivo && (
-                    <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '6px', fontStyle: 'italic' }}>
-                      ℹ️ <strong>Grupo Vinculado:</strong> Ao colocar <strong>{telaPrincipal}</strong> em manutenção,
-                      as telas correlacionadas ({grupoAtivo.telas.filter((x) => x !== telaPrincipal).join(', ')}) são
-                      automaticamente sincronizadas em manutenção conjunta.
-                    </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span
+                    style={{
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      backgroundColor: telasSelecionadas.length > 0 ? 'rgba(245, 158, 11, 0.2)' : '#1f2937',
+                      color: telasSelecionadas.length > 0 ? '#fbbf24' : '#94a3b8',
+                      border: telasSelecionadas.length > 0 ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid #374151',
+                    }}
+                  >
+                    {telasSelecionadas.length}/{todasAsTelas.length} marcadas
+                  </span>
+
+                  {telasSelecionadas.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleLimparSelecao}
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid #475569',
+                        color: '#94a3b8',
+                        borderRadius: '4px',
+                        padding: '2px 6px',
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                      title="Desmarcar todas"
+                    >
+                      Limpar
+                    </button>
                   )}
+                </div>
+              </div>
+
+              {/* Grid Compacto das 14 Telas em 3 a 4 Colunas */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))',
+                  gap: '6px',
+                }}
+              >
+                {TELAS_SISTEMA_CONFIG.map((tela) => {
+                  const isSelecionada = telasSelecionadas.includes(tela.nome);
+
+                  return (
+                    <div
+                      key={tela.key}
+                      onClick={() => handleToggleTela(tela.nome)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 8px',
+                        borderRadius: '6px',
+                        backgroundColor: isSelecionada ? 'rgba(245, 158, 11, 0.16)' : '#111827',
+                        border: isSelecionada ? '1px solid #f59e0b' : '1px solid #1f2937',
+                        cursor: 'pointer',
+                        transition: 'all 0.1s ease',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelecionada}
+                        onChange={() => {}}
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          accentColor: '#f59e0b',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      />
+
+                      <span style={{ fontSize: '13px', flexShrink: 0 }}>{tela.icon}</span>
+
+                      <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            fontSize: '0.78rem',
+                            fontWeight: isSelecionada ? 800 : 600,
+                            color: isSelecionada ? '#fbbf24' : '#e2e8f0',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                          title={tela.nome}
+                        >
+                          {tela.nome}
+                        </div>
+                      </div>
+
+                      {isSelecionada && (
+                        <span
+                          style={{
+                            fontSize: '0.62rem',
+                            fontWeight: 800,
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            backgroundColor: 'rgba(245, 158, 11, 0.3)',
+                            color: '#fbbf24',
+                            flexShrink: 0,
+                          }}
+                        >
+                          Ajuste
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Linha de Resumo Rápido das Telas Bloqueadas */}
+              {telasSelecionadas.length > 0 ? (
+                <div
+                  style={{
+                    backgroundColor: '#0c121e',
+                    border: '1px solid #1e293b',
+                    borderRadius: '6px',
+                    padding: '6px 8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    overflowX: 'auto',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, flexShrink: 0 }}>
+                    🔒 Bloqueadas ({telasSelecionadas.length}):
+                  </span>
+                  <div style={{ display: 'inline-flex', gap: '4px', flexWrap: 'wrap' }}>
+                    {telasSelecionadas.map((nome) => {
+                      const cfg = TELAS_SISTEMA_CONFIG.find((t) => t.nome === nome);
+                      return (
+                        <span
+                          key={nome}
+                          style={{
+                            backgroundColor: 'rgba(245, 158, 11, 0.18)',
+                            color: '#fbbf24',
+                            border: '1px solid rgba(245, 158, 11, 0.35)',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                          }}
+                        >
+                          <span>{cfg?.icon || '⚠️'}</span> {nome}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                    borderRadius: '6px',
+                    padding: '5px 8px',
+                    color: '#f87171',
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  ⚠️ Nenhuma tela selecionada. Marque as caixinhas acima ou alterne para "Operacional & Online".
                 </div>
               )}
 
-              {/* 4. Descrição do Ajuste */}
-              <div className="form-row">
-                <label style={{ fontSize: '12px', color: '#fef08a' }}>
-                  Descrição do Ajuste / Mensagem aos Usuários (Opcional):
-                </label>
+              {/* Mensagem Opcional de Aviso */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                  💬 Mensagem (Opcional):
+                </span>
                 <input
                   type="text"
-                  placeholder="Ex: Aplicando melhorias na rotina de notas e relatórios."
+                  placeholder="Ex: Realizando ajustes técnicos..."
                   value={mensagem}
                   onChange={(e) => setMensagem(e.target.value)}
-                  style={{ height: '36px', fontSize: '13px' }}
+                  style={{
+                    flex: 1,
+                    height: '30px',
+                    padding: '0 8px',
+                    borderRadius: '5px',
+                    border: '1px solid #334155',
+                    backgroundColor: '#111827',
+                    color: '#ffffff',
+                    fontSize: '0.78rem',
+                    outline: 'none',
+                  }}
                 />
               </div>
             </div>
           )}
 
-          {/* Rodapé de Ações */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+          {/* Rodapé de Ações Compacto */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderTop: '1px solid #1e293b',
+              paddingTop: '8px',
+              flexWrap: 'wrap',
+              gap: '8px',
+            }}
+          >
             {emManutencao ? (
               <button
                 type="button"
                 onClick={handleRestaurarOnline}
                 disabled={salvando}
                 style={{
-                  background: 'rgba(16, 185, 129, 0.15)',
+                  background: 'rgba(16, 185, 129, 0.12)',
                   border: '1px solid #10b981',
                   color: '#34d399',
                   borderRadius: '6px',
-                  padding: '8px 14px',
-                  fontSize: '12.5px',
-                  fontWeight: 600,
+                  padding: '6px 12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
                 }}
               >
-                🟢 Concluir Manutenção e Liberar Sistema
+                <span>🟢</span> Liberar Sistema Inteiro
               </button>
             ) : (
-              <div></div>
+              <div />
             )}
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
               <button
                 type="button"
                 onClick={onClose}
                 disabled={salvando}
                 style={{
-                  background: '#242b35',
+                  background: '#1e293b',
                   border: '1px solid #334155',
                   color: '#cbd5e1',
                   borderRadius: '6px',
-                  padding: '8px 14px',
-                  fontSize: '12.5px',
+                  padding: '6px 14px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
@@ -518,17 +611,23 @@ export default function ModalStatusManutencao({ isOpen, onClose, currentStatus, 
 
               <button
                 type="submit"
-                className="salve"
                 disabled={salvando}
                 style={{
-                  padding: '8px 18px',
-                  fontSize: '12.5px',
+                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  border: 'none',
+                  color: '#ffffff',
                   borderRadius: '6px',
-                  cursor: 'pointer',
+                  padding: '6px 16px',
+                  fontSize: '0.78rem',
                   fontWeight: 700,
+                  cursor: salvando ? 'wait' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.35)',
                 }}
               >
-                {salvando ? 'Salvando...' : '💾 Salvar Status'}
+                {salvando ? '💾 Salvando...' : '💾 Salvar Status'}
               </button>
             </div>
           </div>

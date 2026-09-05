@@ -952,6 +952,11 @@ export default function AdminUsersPage() {
 
     try {
       const payload = {
+        id: targetId,
+        name: selectedUser.name,
+        surname: selectedUser.surname || null,
+        username: selectedUser.username || null,
+        email: targetEmail,
         role: isMasterAdmin ? "admin" : "user",
         filial: editFilial || "Filial 1",
         permissions: finalPermissions,
@@ -963,7 +968,7 @@ export default function AdminUsersPage() {
         payload.avatar = editAvatar;
       }
 
-      await api.put(`/users/${targetId || targetEmail}`, {
+      await api.put(`/users/${targetId || targetEmail || selectedUser.username || selectedUser.name}`, {
         ...payload,
         email: targetEmail,
       });
@@ -971,7 +976,7 @@ export default function AdminUsersPage() {
       console.warn("Aviso ao salvar usuário via API:", apiErr);
     }
 
-    // 1. Atualizar Permissões e Filial
+    // 1. Atualizar Permissões e Filial no auth
     updateUserRole(targetId, isMasterAdmin ? ROLES.ADMIN : ROLES.USER, targetEmail);
     updateUserPermissions(targetId, finalPermissions, targetEmail);
 
@@ -980,12 +985,16 @@ export default function AdminUsersPage() {
       if (rawUsers) {
         const list = JSON.parse(rawUsers);
         const updated = list.map((u) => {
-          if (
-            String(u.id) === String(targetId) ||
-            String(u.email || "").toLowerCase() === String(targetEmail).toLowerCase()
-          ) {
+          const matchId = targetId && String(u.id) === String(targetId);
+          const matchEmail = targetEmail && String(u.email || "").toLowerCase() === String(targetEmail).toLowerCase();
+          const matchUser = selectedUser.username && String(u.username || "").toLowerCase() === String(selectedUser.username).toLowerCase();
+          const matchName = selectedUser.name && String(u.name || "").toLowerCase() === String(selectedUser.name).toLowerCase();
+
+          if (matchId || matchEmail || matchUser || matchName) {
             return {
               ...u,
+              permissions: finalPermissions,
+              role: isMasterAdmin ? "admin" : "user",
               filial: editFilial || "Filial 1",
               avatar: editAvatar !== undefined ? editAvatar : u.avatar,
               foto: editAvatar !== undefined ? editAvatar : u.foto,
@@ -994,11 +1003,21 @@ export default function AdminUsersPage() {
           return u;
         });
         localStorage.setItem("users", JSON.stringify(updated));
+        localStorage.setItem("auth_users", JSON.stringify(updated));
       }
 
       const curr = getUser();
-      if (curr && String(curr.email || "").toLowerCase() === String(targetEmail).toLowerCase()) {
-        const updatedCurr = { ...curr, filial: editFilial || "Filial 1" };
+      if (
+        curr &&
+        ((targetEmail && String(curr.email || "").toLowerCase() === String(targetEmail).toLowerCase()) ||
+          (targetId && String(curr.id) === String(targetId)))
+      ) {
+        const updatedCurr = {
+          ...curr,
+          permissions: finalPermissions,
+          role: isMasterAdmin ? "admin" : "user",
+          filial: editFilial || "Filial 1",
+        };
         if (editAvatar !== undefined) {
           updatedCurr.avatar = editAvatar;
           updatedCurr.foto = editAvatar;
@@ -1008,6 +1027,28 @@ export default function AdminUsersPage() {
         localStorage.setItem("currentUser", JSON.stringify(updatedCurr));
       }
     } catch { }
+
+    // Atualiza imediatamente a lista em tela
+    setUsers((prev) =>
+      prev.map((u) => {
+        const matchId = targetId && String(u.id) === String(targetId);
+        const matchEmail = targetEmail && String(u.email || "").toLowerCase() === String(targetEmail).toLowerCase();
+        const matchUser = selectedUser.username && String(u.username || "").toLowerCase() === String(selectedUser.username).toLowerCase();
+        const matchName = selectedUser.name && String(u.name || "").toLowerCase() === String(selectedUser.name).toLowerCase();
+
+        if (matchId || matchEmail || matchUser || matchName) {
+          return {
+            ...u,
+            permissions: finalPermissions,
+            role: isMasterAdmin ? "admin" : "user",
+            filial: editFilial || "Filial 1",
+            avatar: editAvatar !== undefined ? editAvatar : u.avatar,
+            foto: editAvatar !== undefined ? editAvatar : u.foto,
+          };
+        }
+        return u;
+      })
+    );
 
     changesMade.push(`Perfil: ${isMasterAdmin ? "ADMIN" : "USER"}`);
     changesMade.push(`Filial: ${editFilial || "Filial 1"}`);
@@ -1189,6 +1230,15 @@ export default function AdminUsersPage() {
   const handleGerarFaturaManual = async (targetUser) => {
     if (!targetUser) return;
     try {
+      const filialUser = targetUser.filial || "Filial 1";
+      const isAdmin = targetUser.role === "admin" || targetUser.role === "ADMIN";
+      const isFilialParticular = filialUser === "Filial Particular";
+
+      if (!isAdmin && !isFilialParticular) {
+        toast.info(`Apenas usuários da Filial Particular ou Administradores possuem cobrança de manutenção do sistema.`);
+        return;
+      }
+
       const hoje = new Date();
       const mesAnoAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
       const vencimentoCiclo = calcularVencimentoMesAtual(hoje);
@@ -1196,7 +1246,6 @@ export default function AdminUsersPage() {
       const userEmail = String(targetUser.email || "").toLowerCase().trim();
       const userId = String(targetUser.id || "").trim();
       const userName = targetUser.name || targetUser.nome || targetUser.username || "Usuário";
-      const filialUser = targetUser.filial || "Filial 1";
 
       toast.info(`Verificando fatura de ${mesAnoAtual} para ${userName}...`);
 

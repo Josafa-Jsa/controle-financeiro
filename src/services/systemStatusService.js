@@ -13,14 +13,23 @@ const DEFAULT_STATUS = {
   updatedBy: 'Sistema',
 };
 
-// Configuração completa de todas as telas do sistema para detecção de manutenção
+// Configuração completa e individual de todas as telas do sistema
 export const TELAS_SISTEMA_CONFIG = [
   {
-    nome: 'Prevenção de Perdas',
-    aliases: ['prevencao', 'prevenção', 'prevencao de perdas', 'prevenção de perdas'],
-    paths: ['/prevencao'],
-    key: 'prevencao',
-    icon: '🛡️',
+    nome: 'Dashboard Principal',
+    aliases: ['dashboard', 'dashboard principal', 'inicio', 'painel'],
+    paths: ['/dashboard'],
+    key: 'dashboard',
+    icon: '📊',
+    descricao: 'Indicadores, gráficos e resumo financeiro',
+  },
+  {
+    nome: 'Atendimento & Chamados',
+    aliases: ['chamados', 'atendimento', 'central de chamados', 'atendimento & chamados', 'suporte'],
+    paths: ['/chamados'],
+    key: 'chamados',
+    icon: '🎧',
+    descricao: 'Suporte e abertura de chamados técnicos',
   },
   {
     nome: 'Gestão de Contas',
@@ -28,6 +37,7 @@ export const TELAS_SISTEMA_CONFIG = [
     paths: ['/contas'],
     key: 'contas',
     icon: '💳',
+    descricao: 'Contas a pagar e receber, lançamentos',
   },
   {
     nome: 'Fluxo de Caixa',
@@ -35,34 +45,7 @@ export const TELAS_SISTEMA_CONFIG = [
     paths: ['/fluxo'],
     key: 'fluxo',
     icon: '📈',
-  },
-  {
-    nome: 'Notas Fiscais',
-    aliases: ['notas', 'notas fiscais', 'nfe', 'nf-e'],
-    paths: ['/notas'],
-    key: 'notas',
-    icon: '📑',
-  },
-  {
-    nome: 'Ordens de Serviço',
-    aliases: ['ordem-servico', 'ordens', 'os', 'ordem de servico', 'ordem de serviço', 'ordens de serviço', 'ordens de servico'],
-    paths: ['/ordem-servico', '/ordens'],
-    key: 'ordem-servico',
-    icon: '🛠️',
-  },
-  {
-    nome: 'Controle de Estoque',
-    aliases: ['estoque', 'controle de estoque'],
-    paths: ['/estoque'],
-    key: 'estoque',
-    icon: '📦',
-  },
-  {
-    nome: 'Central de Chamados',
-    aliases: ['chamados', 'atendimento', 'central de chamados', 'atendimento & chamados', 'suporte'],
-    paths: ['/chamados'],
-    key: 'chamados',
-    icon: '🎧',
+    descricao: 'Entradas, saídas e projeções financeiras',
   },
   {
     nome: 'Simulador de Créditos',
@@ -70,27 +53,15 @@ export const TELAS_SISTEMA_CONFIG = [
     paths: ['/simulador'],
     key: 'simulador',
     icon: '🧮',
+    descricao: 'Simulação de taxas, parcelas e juros',
   },
   {
-    nome: 'Gestão de Contratos',
-    aliases: ['contratos', 'gestao de contratos', 'gestão de contratos'],
-    paths: ['/contratos'],
-    key: 'contratos',
-    icon: '📝',
-  },
-  {
-    nome: 'Contrato Internet / Provedor',
-    aliases: ['contrato-internet', 'internet', 'provedor', 'contrato internet'],
-    paths: ['/contrato-internet'],
-    key: 'contrato-internet',
-    icon: '🌐',
-  },
-  {
-    nome: 'Controle de Uniformes',
-    aliases: ['uniformes', 'painel uniformes', 'controle de uniformes'],
-    paths: ['/uniformes'],
-    key: 'uniformes',
-    icon: '👔',
+    nome: 'Notas Fiscais',
+    aliases: ['notas', 'notas fiscais', 'nfe', 'nf-e', 'notas fiscais (nf-e)'],
+    paths: ['/notas'],
+    key: 'notas',
+    icon: '📑',
+    descricao: 'Emissão, consulta e upload de NF-e',
   },
   {
     nome: 'Controle de Notas',
@@ -98,13 +69,55 @@ export const TELAS_SISTEMA_CONFIG = [
     paths: ['/controle-notas'],
     key: 'controle-notas',
     icon: '📋',
+    descricao: 'Registro, conferência e entrega de notas recebidas',
   },
   {
-    nome: 'Dashboard Principal',
-    aliases: ['dashboard', 'dashboard principal', 'inicio', 'painel'],
-    paths: ['/dashboard'],
-    key: 'dashboard',
-    icon: '📊',
+    nome: 'Ordens de Serviço',
+    aliases: ['ordem-servico', 'ordens', 'os', 'ordem de servico', 'ordem de serviço', 'ordens de serviço', 'ordens de servico'],
+    paths: ['/ordem-servico', '/ordens'],
+    key: 'ordem-servico',
+    icon: '🛠️',
+    descricao: 'Abertura, acompanhamento e fechamento de O.S',
+  },
+  {
+    nome: 'Gestão de Contratos',
+    aliases: ['contratos', 'gestao de contratos', 'gestão de contratos'],
+    paths: ['/contratos'],
+    key: 'contratos',
+    icon: '📝',
+    descricao: 'Contratos gerais e clientes',
+  },
+  {
+    nome: 'Contrato Internet / Provedor',
+    aliases: ['contrato-internet', 'internet', 'provedor', 'contrato internet'],
+    paths: ['/contrato-internet'],
+    key: 'contrato-internet',
+    icon: '🌐',
+    descricao: 'Planos e contratos de internet',
+  },
+  {
+    nome: 'Controle de Estoque',
+    aliases: ['estoque', 'controle de estoque'],
+    paths: ['/estoque'],
+    key: 'estoque',
+    icon: '📦',
+    descricao: 'Produtos, itens e movimentações',
+  },
+  {
+    nome: 'Prevenção de Perdas',
+    aliases: ['prevencao', 'prevenção', 'prevencao de perdas', 'prevenção de perdas'],
+    paths: ['/prevencao'],
+    key: 'prevencao',
+    icon: '🛡️',
+    descricao: 'Registro e gestão de ocorrências e segurança',
+  },
+  {
+    nome: 'Controle de Uniformes',
+    aliases: ['uniformes', 'painel uniformes', 'controle de uniformes'],
+    paths: ['/uniformes'],
+    key: 'uniformes',
+    icon: '👔',
+    descricao: 'Estoque de uniformes novos e usados por departamento',
   },
   {
     nome: 'Painel Administrativo',
@@ -112,83 +125,9 @@ export const TELAS_SISTEMA_CONFIG = [
     paths: ['/admin/users', '/admin/log'],
     key: 'admin',
     icon: '⚙️',
+    descricao: 'Gestão de usuários, permissões e configurações',
   },
 ];
-
-/* =========================================================
-   GRUPOS DE MANUTENÇÃO SIMULTÂNEA / VINCULADA
-   ========================================================= */
-export const GRUPOS_MANUTENCAO_VINCULADOS = [
-  {
-    id: 'grupo_notas_contas',
-    nome: 'Notas Fiscais & Gestão de Contas',
-    telas: ['Notas Fiscais', 'Gestão de Contas'],
-    keys: ['notas', 'contas'],
-    descricao: 'Ajuste simultâneo: Notas Fiscais e Gestão de Contas.',
-  },
-  {
-    id: 'grupo_contratos_internet_os',
-    nome: 'Contratos, Internet & Ordens de Serviço',
-    telas: ['Gestão de Contratos', 'Contrato Internet / Provedor', 'Ordens de Serviço'],
-    keys: ['contratos', 'contrato-internet', 'ordem-servico'],
-    descricao: 'Ajuste simultâneo: Gestão de Contratos, Contrato Internet e Ordens de Serviço.',
-  },
-  {
-    id: 'grupo_prevencao_uniformes_notas',
-    nome: 'Prevenção, Uniformes & Controle de Notas',
-    telas: ['Prevenção de Perdas', 'Controle de Uniformes', 'Controle de Notas'],
-    keys: ['prevencao', 'uniformes', 'controle-notas'],
-    descricao: 'Ajuste simultâneo: Prevenção de Perdas, Controle de Uniformes e Controle de Notas.',
-  },
-];
-
-/**
- * Retorna as telas vinculadas caso a tela informada pertença a um grupo simultâneo
- */
-export function resolverTelasVinculadasManutencao(telaSelecionada) {
-  if (!telaSelecionada) return [];
-  if (Array.isArray(telaSelecionada)) {
-    const result = [];
-    telaSelecionada.forEach((t) => {
-      const vinculadas = resolverTelasVinculadasManutencao(t);
-      vinculadas.forEach((v) => {
-        if (!result.includes(v)) result.push(v);
-      });
-    });
-    return result;
-  }
-
-  const telaTrim = String(telaSelecionada).trim();
-
-  for (const grupo of GRUPOS_MANUTENCAO_VINCULADOS) {
-    const pertence = grupo.telas.some(
-      (t) =>
-        t.toLowerCase() === telaTrim.toLowerCase() ||
-        telaTrim.toLowerCase().includes(t.toLowerCase()) ||
-        t.toLowerCase().includes(telaTrim.toLowerCase())
-    );
-
-    if (pertence) {
-      return [...grupo.telas];
-    }
-  }
-
-  return [telaTrim];
-}
-
-/**
- * Retorna o grupo vinculado correspondente, se existir
- */
-export function obterGrupoVinculado(tela) {
-  if (!tela) return null;
-  const telaTrim = String(tela).trim().toLowerCase();
-
-  return (
-    GRUPOS_MANUTENCAO_VINCULADOS.find((g) =>
-      g.telas.some((t) => t.toLowerCase() === telaTrim || telaTrim.includes(t.toLowerCase()))
-    ) || null
-  );
-}
 
 /**
  * Checa se o status ativo corresponde à manutenção geral de todas as telas
@@ -213,8 +152,6 @@ export function verificarManutencaoTela(pathname, status) {
   if (!status || !status.emManutencao) return null;
   const telaConfigurada = String(status.tela || '').trim();
   if (!telaConfigurada) return null;
-
-  const telaLower = telaConfigurada.toLowerCase();
 
   // 1. Manutenção Geral do Sistema (bloqueia todas as telas)
   if (isManutencaoGeral(status)) {
@@ -243,50 +180,56 @@ export function verificarManutencaoTela(pathname, status) {
   // Se o pathname for a raiz '/', trata como Dashboard
   const pathParaChecar = pathClean === '' || pathClean === '/' ? '/dashboard' : pathClean;
 
-  // Encontra a configuração pelo pathname
-  const configPorPath = TELAS_SISTEMA_CONFIG.find((t) =>
+  // Lista de nomes/chaves selecionadas pelo admin no modal de status
+  const listaSelecionadas = telaConfigurada
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+
+  // Localiza a configuração da tela correspondente ao pathname exato
+  const configDaTela = TELAS_SISTEMA_CONFIG.find((t) =>
     t.paths.some((p) => pathParaChecar === p || pathParaChecar.startsWith(p + '/'))
   );
 
-  if (configPorPath) {
-    const nomeLower = configPorPath.nome.toLowerCase();
-    const match =
-      telaLower.includes(nomeLower) ||
-      nomeLower.includes(telaLower) ||
-      configPorPath.aliases.some((alias) => telaLower.includes(alias));
+  if (configDaTela) {
+    const nomeNorm = configDaTela.nome.toLowerCase();
+    const keyNorm = configDaTela.key.toLowerCase();
+    const aliasesNorm = (configDaTela.aliases || []).map((a) => a.toLowerCase());
 
-    if (match) {
+    const estaEmManutencao = listaSelecionadas.some((sel) => {
+      // 1. Match exato por nome, key ou aliases
+      if (sel === nomeNorm || sel === keyNorm || aliasesNorm.includes(sel)) return true;
+
+      // 2. Tratamento estrito para evitar colisão entre 'Notas Fiscais' e 'Controle de Notas'
+      if (keyNorm === 'controle-notas') {
+        if (sel === 'controle de notas' || sel === 'controle-notas' || sel === 'controle notas' || sel.includes('controle')) return true;
+        return false;
+      }
+      if (keyNorm === 'notas') {
+        if (sel.includes('controle')) return false; // NUNCA ativa quando o selecionado for controle de notas
+        if (sel === 'notas fiscais' || sel === 'notas' || sel === 'nfe' || sel === 'nf-e' || sel.startsWith('notas fiscais')) return true;
+        return false;
+      }
+
+      // 3. Match por inclusão para os demais módulos
+      if (sel.includes(nomeNorm) || nomeNorm.includes(sel) || sel.includes(keyNorm) || keyNorm.includes(sel)) {
+        return true;
+      }
+      return false;
+    });
+
+    if (estaEmManutencao) {
       return {
-        nomeTela: configPorPath.nome,
+        nomeTela: configDaTela.nome,
         emManutencao: true,
         mensagem: status.mensagem || '',
-        icon: configPorPath.icon,
+        icon: configDaTela.icon,
       };
     }
   }
 
-  // 3. Fallback: Checa por aliases diretamente no pathname
-  for (const item of TELAS_SISTEMA_CONFIG) {
-    const matchAlias = item.aliases.some((a) => pathParaChecar.includes(a));
-    if (matchAlias) {
-      const nomeLower = item.nome.toLowerCase();
-      if (
-        telaLower.includes(nomeLower) ||
-        nomeLower.includes(telaLower) ||
-        item.aliases.some((a) => telaLower.includes(a))
-      ) {
-        return {
-          nomeTela: item.nome,
-          emManutencao: true,
-          mensagem: status.mensagem || '',
-          icon: item.icon,
-        };
-      }
-    }
-  }
-
-  // 4. Se a tela configurada for personalizada ('Outra') e coincidir com a URL
-  if (telaLower.length > 2 && pathParaChecar.includes(telaLower.replace(/\s+/g, '-'))) {
+  // 3. Fallback se tela personalizada digitada coincidir com a URL
+  if (telaConfigurada.length > 2 && pathParaChecar.includes(telaConfigurada.toLowerCase().replace(/\s+/g, '-'))) {
     return {
       nomeTela: telaConfigurada,
       emManutencao: true,
