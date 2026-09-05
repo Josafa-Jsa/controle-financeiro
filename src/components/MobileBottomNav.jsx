@@ -51,7 +51,11 @@ export default function MobileBottomNav() {
     return () => window.removeEventListener('permissoes_alteradas_evento', handlePerms);
   }, [email, isAdmin]);
 
-  const isPrevencaoUser = perms.includes('prevencao') || perms.includes('uniformes');
+  const isPrevencaoUser =
+    perms.includes('prevencao') ||
+    perms.includes('uniformes') ||
+    perms.includes('controle-uniformes') ||
+    perms.includes('controle-notas');
 
   const canAccess = (key) => {
     if (isAdmin) return true;
@@ -149,6 +153,16 @@ export default function MobileBottomNav() {
                   onClick={() => handleNav('/notas', 'Notas Fiscais')}
                 >
                   <span>📑</span> Notas Fiscais
+                </button>
+              )}
+
+              {(canAccess('controle-notas') || canAccess('notas')) && (
+                <button
+                  type="button"
+                  className={`mobile-drawer-item ${path === '/controle-notas' ? 'active' : ''}`}
+                  onClick={() => handleNav('/controle-notas', 'Controle de Notas')}
+                >
+                  <span>📋</span> Controle de Notas
                 </button>
               )}
 

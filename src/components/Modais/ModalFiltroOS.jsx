@@ -100,7 +100,7 @@ export default function ModalFiltroOS({
   };
 
   const handleVerPDF = (os) => {
-    gerarPDF(os, termosCondicoes);
+    gerarPDF(os, os?.termoCondicoes || termosCondicoes);
     toast.info(`Gerando PDF da ${os.numeroOS || os.numero_os}...`);
   };
 

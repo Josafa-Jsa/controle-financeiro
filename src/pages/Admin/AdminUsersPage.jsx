@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { toast } from "react-toastify";
 import {
   listUsers,
@@ -11,6 +11,8 @@ import {
 } from "../../auth/auth";
 import { api } from "../../api/client";
 import { sendTelegramEvent } from "../../utils/telegram";
+import { salvarConta, listarContas, sincronizarContasDoServidor } from "../../services/contasService";
+import { calcularVencimentoMesAtual } from "../../services/bankPaymentService";
 import "../../components/Visual/Admin.css";
 
 export const FILIAIS = [
@@ -31,6 +33,7 @@ export const SYSTEM_SCREENS = [
   { key: "fluxo", label: "Fluxo de Caixa", icon: "📈", path: "/fluxo", desc: "Entradas, saídas e projeções financeiras", isFixed: false },
   { key: "simulador", label: "Simulador de Créditos", icon: "🧮", path: "/simulador", desc: "Simulação de taxas, parcelas e juros", isFixed: false },
   { key: "notas", label: "Notas Fiscais (NF-e)", icon: "📑", path: "/notas", desc: "Emissão, consulta e upload de NF-e", isFixed: false },
+  { key: "controle-notas", label: "Controle de Notas", icon: "📋", path: "/controle-notas", desc: "Registro, conferência e entrega de notas recebidas", isFixed: false },
   { key: "ordem-servico", label: "Ordem de Serviço (O.S)", icon: "🛠️", path: "/ordem-servico", desc: "Abertura, acompanhamento e fechamento de O.S", isFixed: false },
   { key: "contratos", label: "Gestão de Contratos", icon: "📝", path: "/contratos", desc: "Contratos gerais e clientes", isFixed: false },
   { key: "contrato-internet", label: "Contrato Internet / Provedor", icon: "🌐", path: "/contrato-internet", desc: "Planos e contratos de internet", isFixed: false },
@@ -153,6 +156,27 @@ function UserAvatarView({ user, isOnline }) {
         className={`user-avatar-status-dot ${isOnline ? "online" : "offline"}`}
         title={isOnline ? "Online agora" : "Offline"}
       />
+    </div>
+  );
+}
+
+function MiniAvatarItem({ user }) {
+  const [imgErr, setImgErr] = useState(false);
+  const src = user.avatar || user.foto;
+  if (src && !imgErr) {
+    return (
+      <img
+        src={src}
+        alt={user.name}
+        className="filial-card-avatar-mini"
+        title={user.name}
+        onError={() => setImgErr(true)}
+      />
+    );
+  }
+  return (
+    <div className="filial-card-avatar-mini" title={user.name}>
+      {obterIniciais(user.name)}
     </div>
   );
 }
@@ -438,21 +462,76 @@ export default function AdminUsersPage() {
     return (
       u.name?.toLowerCase().includes(term) ||
       u.email?.toLowerCase().includes(term) ||
+      u.username?.toLowerCase().includes(term) ||
+      u.filial?.toLowerCase().includes(term) ||
       u.role?.toLowerCase().includes(term)
     );
   });
 
+  // Estados e agrupamento para os 8 Containers de Filiais
+  const [filialModalOpen, setFilialModalOpen] = useState(null);
+  const [filialModalSearch, setFilialModalSearch] = useState("");
+  const [filtroFilialAtiva, setFiltroFilialAtiva] = useState("TODAS");
+
+  // Agrupamento de TODOS os usuários por Filial para os 8 Containers
+  const allUsersByFilial = useMemo(() => {
+    const map = {};
+    FILIAIS.forEach((f) => {
+      map[f] = [];
+    });
+    users.forEach((u) => {
+      const uFilial = u.filial && FILIAIS.includes(u.filial) ? u.filial : "Filial 1";
+      if (!map[uFilial]) map[uFilial] = [];
+      map[uFilial].push(u);
+    });
+    return map;
+  }, [users]);
+
+  // Usuários exibidos dentro do Modal da Filial Aberta (com suporte a busca local)
+  const usersDaFilialAtual = useMemo(() => {
+    if (!filialModalOpen) return [];
+    const baseList = allUsersByFilial[filialModalOpen] || [];
+    if (!filialModalSearch.trim()) return baseList;
+    const term = filialModalSearch.toLowerCase().trim();
+    return baseList.filter((u) => (
+      u.name?.toLowerCase().includes(term) ||
+      u.email?.toLowerCase().includes(term) ||
+      u.username?.toLowerCase().includes(term) ||
+      u.whatsapp?.includes(term) ||
+      u.role?.toLowerCase().includes(term)
+    ));
+  }, [allUsersByFilial, filialModalOpen, filialModalSearch]);
+
+  const handleOpenFilialModal = (filial) => {
+    setFilialModalOpen(filial);
+    setFilialModalSearch("");
+  };
+
+  const handleOpenCreateForFilial = (filial) => {
+    setNewUserData((prev) => ({
+      ...prev,
+      filial: filial && FILIAIS.includes(filial) ? filial : "Filial 1",
+    }));
+    setShowCreateModal(true);
+  };
+
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === "Escape") {
-        if (selectedUser) setSelectedUser(null);
-        if (showCreateModal) setShowCreateModal(false);
-        if (showDisconnectAllModal) setShowDisconnectAllModal(false);
+        if (selectedUser) {
+          setSelectedUser(null);
+        } else if (showCreateModal) {
+          setShowCreateModal(false);
+        } else if (showDisconnectAllModal) {
+          setShowDisconnectAllModal(false);
+        } else if (filialModalOpen) {
+          setFilialModalOpen(null);
+        }
       }
     };
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
-  }, [selectedUser, showCreateModal, showDisconnectAllModal]);
+  }, [selectedUser, showCreateModal, showDisconnectAllModal, filialModalOpen]);
 
   const handleOpenEdit = (user) => {
     setLoadingUser(user);
@@ -1107,6 +1186,95 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleGerarFaturaManual = async (targetUser) => {
+    if (!targetUser) return;
+    try {
+      const hoje = new Date();
+      const mesAnoAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+      const vencimentoCiclo = calcularVencimentoMesAtual(hoje);
+
+      const userEmail = String(targetUser.email || "").toLowerCase().trim();
+      const userId = String(targetUser.id || "").trim();
+      const userName = targetUser.name || targetUser.nome || targetUser.username || "Usuário";
+      const filialUser = targetUser.filial || "Filial 1";
+
+      toast.info(`Verificando fatura de ${mesAnoAtual} para ${userName}...`);
+
+      // 1. Sincroniza e busca faturas existentes
+      const contasExistentes = (await sincronizarContasDoServidor()) || listarContas() || [];
+
+      // 2. Checa se já existe fatura SYS deste mês para o usuário
+      const jaExiste = contasExistentes.some((c) => {
+        if (c.descricao !== "SYS_Liberação e Manutenção" || c.tipo !== "Pagar") return false;
+        const cVenc = String(c.vencimento || "").slice(0, 7);
+        if (cVenc !== mesAnoAtual) return false;
+
+        const cEmail = String(c.userEmail || "").toLowerCase().trim();
+        const cId = String(c.userId || "").trim();
+
+        if (userEmail && cEmail && cEmail === userEmail) return true;
+        if (userId && cId && cId === userId) return true;
+        if (!cEmail && !cId && c.cliente === userName) return true;
+        return false;
+      });
+
+      if (jaExiste) {
+        toast.info(
+          `A fatura SYS de ${mesAnoAtual} já está gerada para ${userName} e disponível na tela Contas.`
+        );
+        return;
+      }
+
+      // 3. Cria a nova fatura com status Pendente
+      const novaFatura = {
+        id: Date.now(),
+        descricao: "SYS_Liberação e Manutenção",
+        tipo: "Pagar",
+        valor: 10.00,
+        vencimento: vencimentoCiclo,
+        status: "Pendente",
+        observacao: `Fatura de Liberação e Manutenção Mensal (${mesAnoAtual})`,
+        cliente: userName,
+        userEmail: userEmail,
+        userId: userId,
+        filial: filialUser,
+        editada: false,
+      };
+
+      const salva = await salvarConta(novaFatura, { silencioso: true });
+
+      // Garante persistência no backend via API
+      try {
+        await api.post("/contas", salva || novaFatura);
+      } catch (apiErr) {
+        console.warn("Aviso ao persistir fatura gerada manualmente na API:", apiErr);
+      }
+
+      toast.success(
+        `💳 Fatura de ${mesAnoAtual} (R$ 10,00) gerada com sucesso para ${userName}! Já está disponível na tela Contas do usuário.`
+      );
+
+      // 4. Notifica no Telegram
+      sendTelegramEvent({
+        title: "Fatura SYS Gerada Manualmente",
+        emoji: "💳",
+        screen: "Admin / Gerenciador de Usuários",
+        lines: [
+          `Colaborador: ${userName}`,
+          `E-mail: ${userEmail || "Não informado"}`,
+          `Filial: ${filialUser}`,
+          `Valor: R$ 10,00`,
+          `Vencimento: ${vencimentoCiclo}`,
+          `Ciclo: ${mesAnoAtual}`,
+        ],
+      }).catch(() => {});
+
+    } catch (err) {
+      console.error("Erro ao gerar fatura manual:", err);
+      toast.error("Erro ao gerar fatura para o usuário.");
+    }
+  };
+
   const totalCadastrados = users.length;
   const totalOnline = users.filter((u) => Boolean(u.isOnline || u.is_currently_online || u.online)).length;
   const totalOffline = Math.max(0, totalCadastrados - totalOnline);
@@ -1202,203 +1370,596 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      {/* Grid de Cards dos Usuários */}
-      <div className="users-grid">
-        {filteredUsers.map((u) => {
-          const isMasterAdmin = isMasterAdminAccount(u);
-          const isOnline = Boolean(u.isOnline || u.is_currently_online || u.online);
+      {/* Barra de Navegação e Acesso Rápido às 8 Filiais */}
+      <div
+        className="filiais-nav-bar"
+        style={{
+          display: "flex",
+          gap: "8px",
+          flexWrap: "wrap",
+          marginBottom: "22px",
+          alignItems: "center",
+          background: "rgba(15, 23, 42, 0.75)",
+          padding: "12px 18px",
+          borderRadius: "12px",
+          border: "1px solid rgba(56, 189, 248, 0.2)",
+          boxShadow: "0 4px 16px rgba(0, 0, 0, 0.25)",
+        }}
+      >
+        <span style={{ fontSize: "12.5px", color: "#94a3b8", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+          <span>🏢</span> Containers por Filial:
+        </span>
 
-          // Cálculo do tempo de atividade (Online)
-          let tempoAtivoTexto = "-";
-          if (isOnline) {
-            const loginTs = u.lastLoginAt
-              ? new Date(u.lastLoginAt).getTime()
-              : (u.lastSeenAt ? new Date(u.lastSeenAt).getTime() : nowTs);
-            const segsAtivo = Math.max(0, Math.floor((nowTs - loginTs) / 1000));
-            tempoAtivoTexto = `Ativo há ${formatarTempo(segsAtivo)}`;
-          }
+        <button
+          type="button"
+          onClick={() => setFiltroFilialAtiva("TODAS")}
+          style={{
+            background: filtroFilialAtiva === "TODAS" ? "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)" : "rgba(30, 41, 59, 0.7)",
+            color: filtroFilialAtiva === "TODAS" ? "#ffffff" : "#cbd5e1",
+            border: `1px solid ${filtroFilialAtiva === "TODAS" ? "#38bdf8" : "rgba(255, 255, 255, 0.1)"}`,
+            padding: "5px 12px",
+            borderRadius: "20px",
+            fontSize: "12px",
+            fontWeight: 700,
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          🌐 Todas as 8 Filiais ({searchTerm.trim() ? filteredUsers.length : users.length})
+        </button>
 
-          // Cálculo do tempo de inatividade (Offline)
-          let tempoInativoTexto = "-";
-          if (!isOnline) {
-            const ultimoVistoTs = u.lastSeenAt
-              ? new Date(u.lastSeenAt).getTime()
-              : (u.lastLogoutAt
-                ? new Date(u.lastLogoutAt).getTime()
-                : (u.lastLoginAt
-                  ? new Date(u.lastLoginAt).getTime()
-                  : (u.createdAt ? new Date(u.createdAt).getTime() : null)));
+        {FILIAIS.map((f) => {
+          const count = allUsersByFilial[f]?.length || 0;
+          const isSelected = filtroFilialAtiva === f;
+          return (
+            <button
+              key={f}
+              type="button"
+              onClick={() => handleOpenFilialModal(f)}
+              style={{
+                background: isSelected ? "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)" : "rgba(30, 41, 59, 0.7)",
+                color: isSelected ? "#ffffff" : "#cbd5e1",
+                border: `1px solid ${isSelected ? "#38bdf8" : "rgba(255, 255, 255, 0.1)"}`,
+                padding: "5px 12px",
+                borderRadius: "20px",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+              title={`Clique para abrir o modal de usuários da ${f}`}
+            >
+              <span>{f}</span>
+              <span style={{ fontSize: "11px", opacity: 0.9, background: "rgba(0,0,0,0.35)", padding: "1px 6px", borderRadius: "10px", fontWeight: 700 }}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-            if (ultimoVistoTs) {
-              const segsInativo = Math.max(0, Math.floor((nowTs - ultimoVistoTs) / 1000));
-              tempoInativoTexto = `Offline há ${formatarTempo(segsInativo)}`;
-            } else {
-              tempoInativoTexto = "Sem registros de acesso";
-            }
-          }
+      {/* Os 8 Containers Individuais das Filiais em Grid */}
+      <div className="filiais-grid-dashboard">
+        {(filtroFilialAtiva === "TODAS" ? FILIAIS : [filtroFilialAtiva]).map((filial) => {
+          const filialUsers = allUsersByFilial[filial] || [];
+          const onlineCount = filialUsers.filter((u) => Boolean(u.isOnline || u.is_currently_online || u.online)).length;
+
+          // Se houver busca no campo principal, checa correspondências nesta filial
+          const matchingSearchCount = searchTerm.trim()
+            ? filteredUsers.filter((u) => {
+                const uFilial = u.filial && FILIAIS.includes(u.filial) ? u.filial : "Filial 1";
+                return uFilial === filial;
+              }).length
+            : null;
 
           return (
-            <div key={u.id || u.email} className="user-card" style={{ borderColor: isOnline ? "#38a169" : "#2a2a2a" }}>
-              {/* Header do Card */}
-              <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  {isOnline ? (
-                    <span className="status-badge status-online">
-                      <span className="status-dot"></span> Online
-                    </span>
-                  ) : (
-                    <span className="status-badge status-offline">
-                      <span className="status-dot"></span> Offline
-                    </span>
-                  )}
+            <div
+              key={filial}
+              className="filial-container-card"
+              onClick={() => handleOpenFilialModal(filial)}
+              title={`Clique para abrir o modal com os usuários cadastrados de ${filial}`}
+            >
+              <div>
+                <div className="filial-card-header">
+                  <div className="filial-card-icon-wrap">
+                    🏢
+                  </div>
+                  <span className={`filial-card-online-badge ${onlineCount > 0 ? "online" : "offline"}`}>
+                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: onlineCount > 0 ? "#4ade80" : "#64748b" }} />
+                    {onlineCount > 0 ? `${onlineCount} Online` : "0 Online"}
+                  </span>
                 </div>
 
-                <div>
-                  {isMasterAdmin ? (
-                    <span className="badge-admin">👑 JSA ADMIN</span>
-                  ) : (
-                    <span className="badge-user">👤 USUÁRIO</span>
-                  )}
+                <div style={{ marginTop: "14px" }}>
+                  <h3 className="filial-card-title">{filial}</h3>
+                  <p className="filial-card-desc">Clique para abrir o modal e gerenciar acessos</p>
                 </div>
               </div>
 
-              {/* Informações do Usuário */}
-              <div className="card-body">
-                {/* Topo do Card: Avatar do Usuário com Indicador */}
-                <div className="user-card-top">
-                  <UserAvatarView user={u} isOnline={isOnline} />
+              {/* Estatísticas do Container */}
+              <div className="filial-card-stats-row">
+                <div className="filial-card-stat-col">
+                  <span className="filial-card-stat-label">Cadastrados</span>
+                  <span className="filial-card-stat-value">
+                    {filialUsers.length} {filialUsers.length === 1 ? "usuário" : "usuários"}
+                  </span>
+                </div>
+                <div className="filial-card-stat-col" style={{ borderLeft: "1px solid rgba(255,255,255,0.08)", paddingLeft: "10px" }}>
+                  <span className="filial-card-stat-label">Presença</span>
+                  <span className="filial-card-stat-value" style={{ color: onlineCount > 0 ? "#4ade80" : "#94a3b8", fontSize: "13px" }}>
+                    {onlineCount > 0 ? `🟢 ${onlineCount} ativo(s)` : "⚪ Offline"}
+                  </span>
+                </div>
+              </div>
 
-                  <div className="user-card-title-group">
-                    <h3 className="user-name" title={`${u.name} ${u.surname || ""}`}>
-                      {u.name} {u.surname ? u.surname : ""}
-                    </h3>
-                    <span className="user-subtitle">ID #{u.id}</span>
-                  </div>
+              {/* Pré-visualização de Avatares dos Colaboradores */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div className="filial-card-avatars-preview">
+                  {filialUsers.slice(0, 4).map((u) => (
+                    <MiniAvatarItem key={u.id || u.email} user={u} />
+                  ))}
+                  {filialUsers.length > 4 && (
+                    <div className="filial-card-avatar-more">
+                      +{filialUsers.length - 4}
+                    </div>
+                  )}
+                  {filialUsers.length === 0 && (
+                    <span style={{ fontSize: "11px", color: "#64748b", fontStyle: "italic" }}>
+                      Nenhum colaborador
+                    </span>
+                  )}
                 </div>
 
-                <p className="user-detail">
-                  <strong>Usuário (Login):</strong> <span style={{ color: "#38bdf8", fontFamily: "monospace", fontWeight: 700 }}>{u.username || `${u.name?.toLowerCase().replace(/\s+/g, '') || 'usuario'}.${u.surname?.toLowerCase().replace(/\s+/g, '') || ''}`}</span>
-                </p>
-                <p className="user-detail">
-                  <strong>E-mail:</strong> {u.email}
-                </p>
-                <p className="user-detail" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <strong>🏢 Filial:</strong>{" "}
+                {matchingSearchCount !== null && (
                   <span
                     style={{
-                      color: "#38bdf8",
+                      fontSize: "11px",
+                      background: matchingSearchCount > 0 ? "rgba(56, 189, 248, 0.2)" : "rgba(100, 116, 139, 0.2)",
+                      color: matchingSearchCount > 0 ? "#38bdf8" : "#94a3b8",
+                      padding: "2px 6px",
+                      borderRadius: "6px",
                       fontWeight: 700,
-                      background: "rgba(56, 189, 248, 0.12)",
-                      border: "1px solid rgba(56, 189, 248, 0.3)",
-                      borderRadius: "4px",
-                      padding: "1px 8px",
-                      fontSize: "12px",
                     }}
                   >
-                    {u.filial || "Filial 1"}
+                    🔍 {matchingSearchCount} resultado{matchingSearchCount === 1 ? "" : "s"}
                   </span>
-                </p>
-                {u.whatsapp && (
-                  <p className="user-detail">
-                    <strong>WhatsApp:</strong> {u.whatsapp}
-                  </p>
-                )}
-
-                {/* Bloco de Atividade / Inatividade Detalhado */}
-                <div className="user-activity-box">
-                  <div className="user-activity-row">
-                    <span className="activity-label">
-                      <span>⏱️</span> Tempo de Atividade:
-                    </span>
-                    <span
-                      className="activity-value"
-                      style={{ color: isOnline ? "#4ade80" : "#64748b" }}
-                    >
-                      {isOnline ? `🟢 ${tempoAtivoTexto}` : "Desconectado"}
-                    </span>
-                  </div>
-
-                  <div className="user-activity-row">
-                    <span className="activity-label">
-                      <span>💤</span> Tempo de Inatividade:
-                    </span>
-                    <span
-                      className="activity-value"
-                      style={{ color: !isOnline ? "#f87171" : "#4ade80" }}
-                    >
-                      {!isOnline ? `⚪ ${tempoInativoTexto}` : "0s (Operando)"}
-                    </span>
-                  </div>
-
-                  <div className="user-activity-row" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "6px" }}>
-                    <span className="activity-label" style={{ fontSize: "12px" }}>
-                      <span>📅</span> Último Acesso:
-                    </span>
-                    <span style={{ fontSize: "12px", color: "#cbd5e1" }}>
-                      {formatarDataHora(u.lastLoginAt || u.lastSeenAt || u.createdAt)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Telas Liberadas para o Usuário */}
-                <div style={{ marginTop: "10px", borderTop: "1px solid #283340", paddingTop: "8px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", display: "block", marginBottom: "4px" }}>
-                    🖥️ Telas Liberadas:
-                  </span>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                    {isMasterAdmin ? (
-                      <span style={{ fontSize: "10.5px", background: "rgba(239, 68, 68, 0.2)", color: "#fca5a5", border: "1px solid rgba(239, 68, 68, 0.4)", borderRadius: "4px", padding: "1px 6px", fontWeight: 700 }}>
-                        👑 Todas as Telas (*)
-                      </span>
-                    ) : (
-                      SYSTEM_SCREENS.filter((s) => {
-                        const userPerms = Array.isArray(u.permissions) ? u.permissions : [];
-                        return userPerms.includes("*") || userPerms.includes(s.key) || s.isFixed;
-                      }).map((s) => (
-                        <span
-                          key={s.key}
-                          style={{
-                            fontSize: "10.5px",
-                            background: s.key === "prevencao" ? "rgba(0, 210, 255, 0.15)" : "#1e2632",
-                            color: s.key === "prevencao" ? "#38bdf8" : "#cbd5e1",
-                            border: s.key === "prevencao" ? "1px solid rgba(0, 210, 255, 0.35)" : "1px solid #334155",
-                            borderRadius: "4px",
-                            padding: "1px 6px",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "3px",
-                          }}
-                        >
-                          {s.icon} {s.label.split(" ")[0]}
-                        </span>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Botões de Ação na Tela Principal */}
-              <div className="card-footer" style={{ display: "flex", gap: "10px" }}>
-                <button
-                  className="edit-btn"
-                  onClick={() => handleOpenEdit(u)}
-                >
-                  📝 Editar Acesso
-                </button>
-                {!isMasterAdmin && (
-                  <button
-                    className="disconnect-btn"
-                    onClick={() => handleDisconnectUser(u)}
-                    title={isOnline ? "Desconectar sessão imediatamente" : "Usuário já desconectado"}
-                  >
-                    🚫 Desconectar
-                  </button>
                 )}
               </div>
+
+              {/* Botão de Ação do Card */}
+              <button
+                type="button"
+                className="filial-card-action-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenFilialModal(filial);
+                }}
+              >
+                <span>👥 Ver Usuários da Filial</span>
+                <span>➔</span>
+              </button>
             </div>
           );
         })}
       </div>
+
+      {/* MODAL DE USUÁRIOS DA FILIAL CLICADA */}
+      {filialModalOpen && (
+        <div
+          className="filial-modal-overlay"
+          onClick={() => setFilialModalOpen(null)}
+        >
+          <div
+            className="filial-modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header do Modal */}
+            <div className="filial-modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    width: "44px",
+                    height: "44px",
+                    borderRadius: "12px",
+                    background: "linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(37, 99, 235, 0.25))",
+                    border: "1px solid rgba(56, 189, 248, 0.4)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "22px",
+                    flexShrink: 0,
+                  }}
+                >
+                  🏢
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <h2 style={{ margin: 0, fontSize: "19px", color: "#f8fafc", fontWeight: 800 }}>
+                      {filialModalOpen}
+                    </h2>
+                    <span
+                      style={{
+                        fontSize: "11.5px",
+                        padding: "2px 8px",
+                        borderRadius: "12px",
+                        background: usersDaFilialAtual.length > 0 ? "rgba(56, 189, 248, 0.15)" : "rgba(148, 163, 184, 0.1)",
+                        color: usersDaFilialAtual.length > 0 ? "#38bdf8" : "#94a3b8",
+                        border: `1px solid ${usersDaFilialAtual.length > 0 ? "rgba(56, 189, 248, 0.3)" : "rgba(148, 163, 184, 0.2)"}`,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {usersDaFilialAtual.length} {usersDaFilialAtual.length === 1 ? "usuário" : "usuários"}
+                    </span>
+                    {usersDaFilialAtual.filter((u) => Boolean(u.isOnline || u.is_currently_online || u.online)).length > 0 && (
+                      <span
+                        style={{
+                          fontSize: "11.5px",
+                          padding: "2px 8px",
+                          borderRadius: "12px",
+                          background: "rgba(34, 197, 94, 0.15)",
+                          color: "#4ade80",
+                          border: "1px solid rgba(34, 197, 94, 0.3)",
+                          fontWeight: 700,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4ade80" }} />
+                        {usersDaFilialAtual.filter((u) => Boolean(u.isOnline || u.is_currently_online || u.online)).length} online
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#94a3b8" }}>
+                    Usuários cadastrados e designados para a {filialModalOpen}
+                  </p>
+                </div>
+              </div>
+
+              {/* Barra de Ações do Header do Modal */}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                <input
+                  type="text"
+                  placeholder={`Buscar em ${filialModalOpen}...`}
+                  value={filialModalSearch}
+                  onChange={(e) => setFilialModalSearch(e.target.value)}
+                  style={{
+                    background: "rgba(15, 23, 42, 0.8)",
+                    border: "1px solid #334155",
+                    borderRadius: "8px",
+                    color: "#fff",
+                    padding: "7px 12px",
+                    fontSize: "12.5px",
+                    outline: "none",
+                    minWidth: "180px",
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenCreateForFilial(filialModalOpen)}
+                  style={{
+                    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                    border: "none",
+                    color: "#fff",
+                    borderRadius: "8px",
+                    padding: "7px 12px",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    whiteSpace: "nowrap",
+                  }}
+                  title="Cadastrar novo usuário diretamente nesta filial"
+                >
+                  ➕ Novo Usuário
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setFilialModalOpen(null)}
+                  className="close-btn"
+                  style={{
+                    fontSize: "22px",
+                    lineHeight: 1,
+                    padding: "4px 8px",
+                    color: "#94a3b8",
+                    cursor: "pointer",
+                  }}
+                  title="Fechar (ESC)"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Corpo do Modal: Grid com os Cards Originais dos Usuários */}
+            <div className="filial-modal-body">
+              {usersDaFilialAtual.length === 0 ? (
+                <div
+                  style={{
+                    textAlign: "center",
+                    padding: "48px 20px",
+                    background: "rgba(15, 23, 42, 0.4)",
+                    borderRadius: "12px",
+                    border: "1px dashed rgba(255, 255, 255, 0.12)",
+                    color: "#94a3b8",
+                    fontSize: "14px",
+                  }}
+                >
+                  <span style={{ fontSize: "36px", display: "block", marginBottom: "10px" }}>👥</span>
+                  Nenhum usuário encontrado para a <strong>{filialModalOpen}</strong>
+                  {filialModalSearch ? ` com o termo "${filialModalSearch}"` : ""}.
+                  <div style={{ marginTop: "16px" }}>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenCreateForFilial(filialModalOpen)}
+                      className="create-user-btn"
+                      style={{ margin: "0 auto", display: "inline-flex" }}
+                    >
+                      ➕ Cadastrar Usuário para {filialModalOpen}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="users-grid">
+                  {usersDaFilialAtual.map((u) => {
+                    const isMasterAdmin = isMasterAdminAccount(u);
+                    const isOnline = Boolean(u.isOnline || u.is_currently_online || u.online);
+
+                    // Cálculo do tempo de atividade (Online)
+                    let tempoAtivoTexto = "-";
+                    if (isOnline) {
+                      const loginTs = u.lastLoginAt
+                        ? new Date(u.lastLoginAt).getTime()
+                        : (u.lastSeenAt ? new Date(u.lastSeenAt).getTime() : nowTs);
+                      const segsAtivo = Math.max(0, Math.floor((nowTs - loginTs) / 1000));
+                      tempoAtivoTexto = `Ativo há ${formatarTempo(segsAtivo)}`;
+                    }
+
+                    // Cálculo do tempo de inatividade (Offline)
+                    let tempoInativoTexto = "-";
+                    if (!isOnline) {
+                      const ultimoVistoTs = u.lastSeenAt
+                        ? new Date(u.lastSeenAt).getTime()
+                        : (u.lastLogoutAt
+                          ? new Date(u.lastLogoutAt).getTime()
+                          : (u.lastLoginAt
+                            ? new Date(u.lastLoginAt).getTime()
+                            : (u.createdAt ? new Date(u.createdAt).getTime() : null)));
+
+                      if (ultimoVistoTs) {
+                        const segsInativo = Math.max(0, Math.floor((nowTs - ultimoVistoTs) / 1000));
+                        tempoInativoTexto = `Offline há ${formatarTempo(segsInativo)}`;
+                      } else {
+                        tempoInativoTexto = "Sem registros de acesso";
+                      }
+                    }
+
+                    return (
+                      <div key={u.id || u.email} className="user-card" style={{ borderColor: isOnline ? "#38a169" : "#2a2a2a" }}>
+                        {/* Header do Card */}
+                        <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div>
+                            {isOnline ? (
+                              <span className="status-badge status-online">
+                                <span className="status-dot"></span> Online
+                              </span>
+                            ) : (
+                              <span className="status-badge status-offline">
+                                <span className="status-dot"></span> Offline
+                              </span>
+                            )}
+                          </div>
+
+                          <div>
+                            {isMasterAdmin ? (
+                              <span className="badge-admin">👑 JSA ADMIN</span>
+                            ) : (
+                              <span className="badge-user">👤 USUÁRIO</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Informações do Usuário */}
+                        <div className="card-body">
+                          {/* Topo do Card: Avatar do Usuário com Indicador */}
+                          <div className="user-card-top">
+                            <UserAvatarView user={u} isOnline={isOnline} />
+
+                            <div className="user-card-title-group">
+                              <h3 className="user-name" title={`${u.name} ${u.surname || ""}`}>
+                                {u.name} {u.surname ? u.surname : ""}
+                              </h3>
+                              <span className="user-subtitle">ID #{u.id}</span>
+                            </div>
+                          </div>
+
+                          <p className="user-detail">
+                            <strong>Usuário (Login):</strong> <span style={{ color: "#38bdf8", fontFamily: "monospace", fontWeight: 700 }}>{u.username || `${u.name?.toLowerCase().replace(/\s+/g, '') || 'usuario'}.${u.surname?.toLowerCase().replace(/\s+/g, '') || ''}`}</span>
+                          </p>
+                          <p className="user-detail">
+                            <strong>E-mail:</strong> {u.email}
+                          </p>
+                          <p className="user-detail" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <strong>🏢 Filial:</strong>{" "}
+                            <span
+                              style={{
+                                color: "#38bdf8",
+                                fontWeight: 700,
+                                background: "rgba(56, 189, 248, 0.12)",
+                                border: "1px solid rgba(56, 189, 248, 0.3)",
+                                borderRadius: "4px",
+                                padding: "1px 8px",
+                                fontSize: "12px",
+                              }}
+                            >
+                              {u.filial || "Filial 1"}
+                            </span>
+                          </p>
+                          {u.whatsapp && (
+                            <p className="user-detail">
+                              <strong>WhatsApp:</strong> {u.whatsapp}
+                            </p>
+                          )}
+
+                          {/* Bloco de Atividade / Inatividade Detalhado */}
+                          <div className="user-activity-box">
+                            <div className="user-activity-row">
+                              <span className="activity-label">
+                                <span>⏱️</span> Tempo de Atividade:
+                              </span>
+                              <span
+                                className="activity-value"
+                                style={{ color: isOnline ? "#4ade80" : "#64748b" }}
+                              >
+                                {isOnline ? `🟢 ${tempoAtivoTexto}` : "Desconectado"}
+                              </span>
+                            </div>
+
+                            <div className="user-activity-row">
+                              <span className="activity-label">
+                                <span>💤</span> Tempo de Inatividade:
+                              </span>
+                              <span
+                                className="activity-value"
+                                style={{ color: !isOnline ? "#f87171" : "#4ade80" }}
+                              >
+                                {!isOnline ? `⚪ ${tempoInativoTexto}` : "0s (Operando)"}
+                              </span>
+                            </div>
+
+                            <div className="user-activity-row" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "6px" }}>
+                              <span className="activity-label" style={{ fontSize: "12px" }}>
+                                <span>📅</span> Último Acesso:
+                              </span>
+                              <span style={{ fontSize: "12px", color: "#cbd5e1" }}>
+                                {formatarDataHora(u.lastLoginAt || u.lastSeenAt || u.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Telas Liberadas para o Usuário */}
+                          <div style={{ marginTop: "10px", borderTop: "1px solid #283340", paddingTop: "8px" }}>
+                            <span style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", display: "block", marginBottom: "4px" }}>
+                              🖥️ Telas Liberadas:
+                            </span>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                              {isMasterAdmin ? (
+                                <span style={{ fontSize: "10.5px", background: "rgba(239, 68, 68, 0.2)", color: "#fca5a5", border: "1px solid rgba(239, 68, 68, 0.4)", borderRadius: "4px", padding: "1px 6px", fontWeight: 700 }}>
+                                  👑 Todas as Telas (*)
+                                </span>
+                              ) : (
+                                SYSTEM_SCREENS.filter((s) => {
+                                  const userPerms = Array.isArray(u.permissions) ? u.permissions : [];
+                                  return userPerms.includes("*") || userPerms.includes(s.key) || s.isFixed;
+                                }).map((s) => (
+                                  <span
+                                    key={s.key}
+                                    style={{
+                                      fontSize: "10.5px",
+                                      background: s.key === "prevencao" ? "rgba(0, 210, 255, 0.15)" : "#1e2632",
+                                      color: s.key === "prevencao" ? "#38bdf8" : "#cbd5e1",
+                                      border: s.key === "prevencao" ? "1px solid rgba(0, 210, 255, 0.35)" : "1px solid #334155",
+                                      borderRadius: "4px",
+                                      padding: "1px 6px",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "3px",
+                                    }}
+                                  >
+                                    {s.icon} {s.label.split(" ")[0]}
+                                  </span>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Botões de Ação: Editar, Gerar Fatura e Desconectar */}
+                        <div className="card-footer">
+                          <button
+                            type="button"
+                            className="edit-btn"
+                            onClick={() => handleOpenEdit(u)}
+                            title={`Editar ${u.name || u.username}`}
+                          >
+                            📝 Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="fatura-btn"
+                            onClick={() => handleGerarFaturaManual(u)}
+                            title={`Gerar fatura SYS do mês atual para ${u.name || u.username}`}
+                          >
+                            💳 Gerar Fatura
+                          </button>
+                          {!isMasterAdmin && (
+                            <button
+                              type="button"
+                              className="disconnect-btn"
+                              onClick={() => handleDisconnectUser(u)}
+                              title={isOnline ? "Desconectar sessão imediatamente" : "Usuário já desconectado"}
+                            >
+                              🚫 Desconectar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Rodapé do Modal */}
+            <div className="filial-modal-footer">
+              <span style={{ fontSize: "12.5px", color: "#94a3b8" }}>
+                Mostrando <strong>{usersDaFilialAtual.length}</strong> de <strong>{allUsersByFilial[filialModalOpen]?.length || 0}</strong> colaboradores de {filialModalOpen}
+              </span>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  type="button"
+                  onClick={() => handleOpenCreateForFilial(filialModalOpen)}
+                  style={{
+                    background: "rgba(56, 189, 248, 0.15)",
+                    border: "1px solid rgba(56, 189, 248, 0.35)",
+                    color: "#38bdf8",
+                    padding: "6px 14px",
+                    borderRadius: "8px",
+                    fontSize: "12.5px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  ➕ Novo Usuário nesta Filial
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilialModalOpen(null)}
+                  style={{
+                    background: "#334155",
+                    border: "none",
+                    color: "#fff",
+                    padding: "6px 16px",
+                    borderRadius: "8px",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Cadastro de Novo Usuário pelo Admin */}
       {showCreateModal && (

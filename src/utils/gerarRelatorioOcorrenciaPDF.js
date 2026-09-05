@@ -134,6 +134,12 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
       { content: 'Valor Total Envolvido:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
       { content: formatBRL(oc.valorTotalEnvolvido), styles: { fontStyle: 'bold', textColor: [22, 101, 52] } },
     ],
+    [
+      { content: 'Filial Referente:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+      { content: oc.filial || 'Filial 1', styles: { fontStyle: 'bold', textColor: [2, 132, 199] } },
+      { content: 'Registrado por:', styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+      { content: oc.registradoPor || oc.responsaveisRegistro?.emitidoPor?.nome || 'Operador', styles: { fontStyle: 'bold' } },
+    ],
   ];
 
   if (oc.nome || oc.titulo) {
@@ -410,17 +416,21 @@ export function gerarRelatorioOcorrenciaPDF(oc) {
     // Linha divisória de rodapé
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.3);
-    doc.line(margin, pageHeight - 8, pageWidth - margin, pageHeight - 8);
+    doc.line(margin, pageHeight - 9, pageWidth - margin, pageHeight - 9);
 
     doc.setFontSize(6.8);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(148, 163, 184);
     doc.text(
-      // `JSA Soluções Tecnológicas • Gestão de Prevenção de Perdas | Ocorrência: ${oc.numero || '-'} | Página ${i} de ${totalPages}`,
+      'Copyright © 2026 JSA Soluções Tecnológicas. All rights reserved.',
+      margin,
+      pageHeight - 4.5
+    );
+    doc.text(
       `BIG MASTER • Gestão de Prevenção de Perdas | Ocorrência: ${oc.numero || '-'} | Página ${i} de ${totalPages}`,
-      pageWidth / 2,
+      pageWidth - margin,
       pageHeight - 4.5,
-      { align: 'center' }
+      { align: 'right' }
     );
   }
 

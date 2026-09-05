@@ -7,9 +7,9 @@ import 'react-toastify/dist/ReactToastify.css';
 
 import ModalConta from '../../components/Modais/ModalConta';
 import ModalFiltroCobranca from '../../components/Modais/ModalFiltroCobranca';
-import ModalMotivo from '../../components/Modais/ModalMotivo';
 import ModalBoleto from '../../components/Modais/ModalBoleto';
 import ModalConfirmarPagamento from '../../components/Modais/ModalConfirmarPagamento';
+import ModalExcluirConta from '../../components/Modais/ModalExcluirConta';
 import qrCodeImg from '../../assets/QrCode.png';
 
 import {
@@ -65,8 +65,9 @@ const ContasPage = () => {
   const [modalRelatorioOpen, setModalRelatorioOpen] = useState(false);
   const [modalPagamentoOpen, setModalPagamentoOpen] = useState(false);
   const [contaParaPagamento, setContaParaPagamento] = useState(null);
-  const [modalMotivoConfig, setModalMotivoConfig] = useState({ isOpen: false, conta: null });
   const [contaParaEditar, setContaParaEditar] = useState(null);
+  const [modalExcluirOpen, setModalExcluirOpen] = useState(false);
+  const [contaParaExcluir, setContaParaExcluir] = useState(null);
 
   const [faturaSysSelecionada, setFaturaSysSelecionada] = useState(null);
   const [verificandoPagamento, setVerificandoPagamento] = useState(false);
@@ -74,7 +75,6 @@ const ContasPage = () => {
   const [filtroTipo, setFiltroTipo] = useState("Todos");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
 
-  const pendentesRef = useRef({});
   const lastUpdateIdRef = useRef(0);
 
   const isUserAdmin = isAdmin();
@@ -90,46 +90,69 @@ const ContasPage = () => {
       const data = await sincronizarContasDoServidor();
       let lista = Array.isArray(data) ? data : [];
 
-      /* === GERAÇÃO E AVISO DE FATURA SYS COMENTADOS ATÉ REATIVAÇÃO ===
-      const hoje = new Date();
-      const mesAnoAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+      // Geração e cobrança de fatura SYS_Liberação e Manutenção automática
+      // aplicada EXCLUSIVAMENTE aos usuários cadastrados na "Filial Particular".
+      // Usuários das filiais de 1 a 7 (atuais e futuros) não geram essa cobrança automaticamente.
+      const curUser = getCurrentUser() || {};
+      const userFilial = String(
+        curUser.filial ||
+        localStorage.getItem("usuario_filial") ||
+        ""
+      ).trim();
+      const isFilialParticular = userFilial === "Filial Particular";
 
-      // 1. Busca todas as faturas SYS cadastradas
-      const faturasSys = lista.filter(
-        (c) => c.descricao === NOME_CONTA_SYS && c.tipo === "Pagar"
-      );
+      if (isFilialParticular) {
+        const hoje = new Date();
+        const mesAnoAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+        const userEmailLogado = String(curUser.email || localStorage.getItem("usuario_email") || "").toLowerCase().trim();
+        const userIdLogado = String(curUser.id || localStorage.getItem("usuario_id") || "").trim();
 
-      // Fatura do mês atual (YYYY-MM)
-      const faturaMesAtual = faturasSys.find(
-        (c) => c.vencimento && c.vencimento.slice(0, 7) === mesAnoAtual
-      );
+        // 1. Busca todas as faturas SYS cadastradas para este usuário
+        const faturasSys = lista.filter((c) => {
+          if (c.descricao !== NOME_CONTA_SYS || c.tipo !== "Pagar") return false;
+          const cEmail = String(c.userEmail || "").toLowerCase().trim();
+          const cId = String(c.userId || "").trim();
+          if (userEmailLogado && cEmail && cEmail === userEmailLogado) return true;
+          if (userIdLogado && cId && cId === userIdLogado) return true;
+          if (!cEmail && !cId) return true;
+          return false;
+        });
 
-      // 2. Se a fatura do mês atual já existir:
-      if (faturaMesAtual) {
-        if (
-          faturaMesAtual.status === "Pendente" &&
-          !faturaMesAtual.editada &&
-          Number(faturaMesAtual.valor) !== VALOR_PADRAO_SYS
-        ) {
-          faturaMesAtual.valor = VALOR_PADRAO_SYS;
-          await atualizarConta(faturaMesAtual.id, faturaMesAtual);
+        // Fatura do mês atual (YYYY-MM)
+        const faturaMesAtual = faturasSys.find(
+          (c) => c.vencimento && c.vencimento.slice(0, 7) === mesAnoAtual
+        );
+
+        // 2. Se a fatura do mês atual já existir:
+        if (faturaMesAtual) {
+          if (
+            faturaMesAtual.status === "Pendente" &&
+            !faturaMesAtual.editada &&
+            Number(faturaMesAtual.valor) !== VALOR_PADRAO_SYS
+          ) {
+            faturaMesAtual.valor = VALOR_PADRAO_SYS;
+            await atualizarConta(faturaMesAtual.id, faturaMesAtual);
+          }
+        } else {
+          const novaContaSys = {
+            id: Date.now(),
+            descricao: NOME_CONTA_SYS,
+            tipo: "Pagar",
+            valor: VALOR_PADRAO_SYS,
+            vencimento: getVencimentoPadraoSys(hoje),
+            status: "Pendente",
+            observacao: "Fatura de Liberação e Manutenção Mensal do Sistema",
+            cliente: usuarioLogado,
+            userEmail: userEmailLogado,
+            userId: userIdLogado,
+            filial: "Filial Particular",
+            editada: false,
+          };
+
+          await salvarConta(novaContaSys, { silencioso: true });
+          lista = [...lista, novaContaSys];
         }
-      } else {
-        const novaContaSys = {
-          id: Date.now(),
-          descricao: NOME_CONTA_SYS,
-          tipo: "Pagar",
-          valor: VALOR_PADRAO_SYS,
-          vencimento: getVencimentoPadraoSys(hoje),
-          status: "Pendente",
-          observacao: "Fatura de Liberação e Manutenção Mensal do Sistema",
-          editada: false,
-        };
-
-        await salvarConta(novaContaSys);
-        lista = [...lista, novaContaSys];
       }
-      === FIM DA GERAÇÃO DE FATURA SYS === */
 
       setContas(lista);
     } catch (error) {
@@ -142,14 +165,6 @@ const ContasPage = () => {
 
   useEffect(() => {
     fetchContas();
-
-    return () => {
-      Object.keys(pendentesRef.current).forEach((reqId) => {
-        if (pendentesRef.current[reqId]?.timer) {
-          clearTimeout(pendentesRef.current[reqId].timer);
-        }
-      });
-    };
   }, []);
 
   useEffect(() => {
@@ -161,12 +176,12 @@ const ContasPage = () => {
         if (modalPagamentoOpen) setModalPagamentoOpen(false);
         if (modalOpen) setModalOpen(false);
         if (modalFiltroOpen) setModalFiltroOpen(false);
-        if (modalMotivoConfig?.isOpen) setModalMotivoConfig({ isOpen: false, conta: null });
+        if (modalExcluirOpen) setModalExcluirOpen(false);
       }
     };
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
-  }, [modalPixOpen, verificandoPagamento, modalRelatorioOpen, modalBoletoOpen, modalPagamentoOpen, modalOpen, modalFiltroOpen, modalMotivoConfig]);
+  }, [modalPixOpen, verificandoPagamento, modalRelatorioOpen, modalBoletoOpen, modalPagamentoOpen, modalOpen, modalFiltroOpen, modalExcluirOpen]);
 
   const tgBase = () => {
     const token = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
@@ -196,255 +211,81 @@ const ContasPage = () => {
     }
   };
 
-  const tgAnswerCallback = async (callbackQueryId, text) => {
-    const base = tgBase();
-    if (!base || !callbackQueryId) return;
-    const url = `${base}/answerCallbackQuery`;
-    const body = new URLSearchParams({ callback_query_id: String(callbackQueryId), text, show_alert: 'false' }).toString();
-    try { await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }); }
-    catch (e) { console.error('[TG] answerCallbackQuery falhou:', e); }
+  const podeExcluirConta = (conta) => {
+    if (!conta) return false;
+    if (isUserAdmin) return true;
+
+    const curUser = getCurrentUser();
+    if (!curUser) return false;
+
+    const emailLogado = String(curUser.email || "").trim().toLowerCase();
+    const idLogado = String(curUser.id || "").trim();
+    const nomeLogado = String(curUser.nome || curUser.name || "").trim().toLowerCase();
+
+    // Se o usuário inseriu a conta (compatível com email, id ou nome gravado)
+    const isOwner = Boolean(
+      (conta.userEmail && emailLogado && String(conta.userEmail).trim().toLowerCase() === emailLogado) ||
+      (conta.userId && idLogado && String(conta.userId).trim() === idLogado) ||
+      (conta.criadoPor && nomeLogado && String(conta.criadoPor).trim().toLowerCase() === nomeLogado) ||
+      (conta.usuarioCriacao && nomeLogado && String(conta.usuarioCriacao).trim().toLowerCase() === nomeLogado)
+    );
+
+    return isOwner;
   };
 
-  const tgDisableButtonsAndAnnotate = async (chatId, messageId, originalText, suffix) => {
-    const base = tgBase();
-    if (!base || !chatId || !messageId) return;
-    try {
-      await fetch(`${base}/editMessageReplyMarkup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          chat_id: String(chatId),
-          message_id: String(messageId),
-          reply_markup: JSON.stringify({ inline_keyboard: [] })
-        }).toString()
-      });
-      await fetch(`${base}/editMessageText`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          chat_id: String(chatId),
-          message_id: String(messageId),
-          text: `${originalText}\n\n${suffix}`,
-          parse_mode: 'HTML',
-          disable_web_page_preview: 'true'
-        }).toString()
-      });
-    } catch (e) { console.error('[TG] edição do texto falhou:', e); }
-  };
-
-  const checarAprovacaoTelegram = async (requestId, sinceTs) => {
-    const base = tgBase();
-    if (!base) return { status: 'indefinido' };
-
-    try {
-      const url = `${base}/getUpdates?offset=${lastUpdateIdRef.current + 1}`;
-      const resp = await fetch(url);
-      const json = await resp.json();
-      if (!json.ok || !Array.isArray(json.result)) return { status: 'indefinido' };
-
-      const reApproveDeleteCb = new RegExp(`^delete_conta:approve:${requestId}$`, 'i');
-      const reDenyDeleteCb = new RegExp(`^delete_conta:deny:${requestId}$`, 'i');
-
-      let decided = 'pendente';
-      let cbMeta = null;
-
-      for (const upd of json.result) {
-        if (typeof upd.update_id === 'number' && upd.update_id > lastUpdateIdRef.current) {
-          lastUpdateIdRef.current = upd.update_id;
-        }
-
-        const cbData = upd?.callback_query?.data;
-        if (cbData) {
-          if (reApproveDeleteCb.test(cbData)) { decided = 'aprovado'; }
-          else if (reDenyDeleteCb.test(cbData)) { decided = 'negado'; }
-
-          if (decided !== 'pendente') {
-            cbMeta = {
-              id: upd.callback_query.id,
-              chatId: upd.callback_query.message?.chat?.id,
-              messageId: upd.callback_query.message?.message_id,
-              messageText: upd.callback_query.message?.text || ''
-            };
-            break;
-          }
-        }
-      }
-      return { status: decided, cbMeta };
-    } catch (e) {
-      console.error('[TG] Falha no getUpdates:', e);
-      return { status: 'indefinido' };
-    }
-  };
-
-  const encerrarPolling = (requestId) => {
-    const pend = pendentesRef.current[requestId];
-    if (pend?.timer) clearTimeout(pend.timer);
-    delete pendentesRef.current[requestId];
-  };
-
-  const iniciarPollingDecisao = (requestId, conta, sinceTs) => {
-    encerrarPolling(requestId);
-
-    const loop = async () => {
-      const pend = pendentesRef.current[requestId];
-      if (!pend) return;
-
-      if (pend.attempts >= POLL_MAX_ATTEMPTS) {
-        toast.info('Aguardando decisão do financeiro. Você pode checar mais tarde.');
-        encerrarPolling(requestId);
-        return;
-      }
-
-      try {
-        const r = await checarAprovacaoTelegram(requestId, sinceTs);
-        if (r.status === 'aprovado' || r.status === 'negado') {
-          const aprovado = r.status === 'aprovado';
-
-          if (r.cbMeta?.id) {
-            await tgAnswerCallback(r.cbMeta.id, aprovado ? 'Exclusão Aprovada ✅' : 'Exclusão Negada ❌');
-          }
-          if (r.cbMeta?.chatId && r.cbMeta?.messageId) {
-            const suffix = aprovado ? '✅ <b>Exclusão Aprovada</b>' : '❌ <b>Exclusão Negada</b>';
-            await tgDisableButtonsAndAnnotate(r.cbMeta.chatId, r.cbMeta.messageId, r.cbMeta.messageText || '', suffix);
-          }
-
-          if (aprovado) {
-            const isOrigemNotaFiscal =
-              conta.origem === 'Nota Fiscal' ||
-              conta.notaFiscalId ||
-              conta.descricao?.toLowerCase().includes('nota fiscal') ||
-              conta.observacao?.toLowerCase().includes('nota fiscal');
-
-            const idNota = conta.notaFiscalId || conta.id;
-
-            if (isOrigemNotaFiscal && typeof excluirNota === 'function') {
-              try { await excluirNota(idNota); } catch (err) { console.error(err); }
-            }
-
-            try { await excluirConta(conta.id); } catch (err) { console.error(err); }
-            fetchContas();
-
-            await sendTelegramEvent({
-              title: "Exclusão de Conta Concluída",
-              emoji: "🗑️",
-              screen: "Gestão de Contas",
-              lines: [
-                `Conta #${conta.id} (${conta.descricao || "Sem descrição"}) foi excluída com sucesso por aprovação do financeiro.`,
-              ],
-            });
-            logEvent("CONTA_EXCLUIDA_APROVADA", { idConta: conta.id, idNota });
-            toast.success("Conta excluída com sucesso!");
-          } else {
-            const data = await listarContas();
-            const c = (Array.isArray(data) ? data : []).find(x => x.id === conta.id);
-            if (c) {
-              const restaurada = { ...c };
-              delete restaurada.exclusaoPendente;
-              delete restaurada.deleteRequestId;
-              delete restaurada.motivoExclusao;
-              await atualizarConta(conta.id, restaurada);
-            }
-            fetchContas();
-
-            await sendTelegramEvent({
-              title: "Exclusão de Conta Negada",
-              emoji: "🚫",
-              screen: "Gestão de Contas",
-              lines: [
-                `A solicitação de exclusão para a Conta #${conta.id} (${conta.descricao || "Sem descrição"}) foi negada pelo financeiro.`,
-              ],
-            });
-            logEvent("EXCLUSAO_CONTA_NEGADA", { id: conta.id });
-            toast.warn("Solicitação de exclusão negada.");
-          }
-
-          encerrarPolling(requestId);
-          return;
-        }
-      } catch (e) {
-        console.error('[Polling] erro:', e);
-      }
-
-      if (pendentesRef.current[requestId]) {
-        pendentesRef.current[requestId].attempts += 1;
-        pendentesRef.current[requestId].timer = setTimeout(loop, POLL_INTERVAL_MS);
-      }
-    };
-
-    pendentesRef.current[requestId] = {
-      contaId: conta.id,
-      sinceTs,
-      attempts: pendentesRef.current[requestId]?.attempts || 0,
-      timer: setTimeout(loop, POLL_INTERVAL_MS),
-    };
-  };
-
-  const handleExcluirConta = (conta) => {
-    if (!isAdmin()) {
-      toast.error("Apenas administradores podem solicitar a exclusão de contas.");
+  const handleExcluirConta = async (conta) => {
+    if (!podeExcluirConta(conta)) {
+      toast.error("Você só pode excluir contas inseridas por você.");
       return;
     }
-    setModalMotivoConfig({ isOpen: true, conta });
-  };
 
-  const confirmarExclusaoConta = async (motivo) => {
-    if (!isAdmin()) {
-      toast.error("Apenas administradores podem solicitar a exclusão de contas.");
-      return;
-    }
-    const conta = modalMotivoConfig.conta;
-    setModalMotivoConfig({ isOpen: false, conta: null });
-    if (!conta) return;
-
-    const isOrigemNotaFiscal =
-      conta.origem === 'Nota Fiscal' ||
-      conta.notaFiscalId ||
-      conta.descricao?.toLowerCase().includes('nota fiscal') ||
-      conta.observacao?.toLowerCase().includes('nota fiscal');
-
-    const requestId = `REQ-CONTA-${Date.now()}`;
-    const idNota = conta.notaFiscalId || conta.id;
-
-    const contaPendente = {
-      ...conta,
-      exclusaoPendente: true,
-      deleteRequestId: requestId,
-      motivoExclusao: motivo
-    };
+    const contaId = conta.id;
+    // 1. Atualização otimista imediata na interface
+    setContas((prev) => prev.filter((c) => String(c.id) !== String(contaId)));
 
     try {
-      await atualizarConta(conta.id, contaPendente);
-      fetchContas();
+      const isOrigemNotaFiscal =
+        conta.origem === 'Nota Fiscal' ||
+        conta.notaFiscalId ||
+        conta.descricao?.toLowerCase().includes('nota fiscal') ||
+        conta.observacao?.toLowerCase().includes('nota fiscal');
 
-      const texto =
-        '🧹 <b>Solicitação de Exclusão de Conta</b>\n' +
-        `<b>Usuário:</b> ${usuarioLogado}\n` +
-        `<b>ID Conta:</b> #${conta.id}\n` +
-        (isOrigemNotaFiscal ? `<b>ID Nota Fiscal:</b> #${idNota}\n` : '') +
-        `<b>Descrição:</b> ${conta.descricao}\n` +
-        `<b>Tipo:</b> ${conta.tipo}\n` +
-        `<b>Valor:</b> ${formatCurrencyBRL(conta.valor)}\n` +
-        `<b>Vencimento:</b> ${formatDateBR(conta.vencimento)}\n` +
-        `<b>Motivo:</b> ${motivo}\n\n` +
-        'Selecione uma opção:';
+      const idNota = conta.notaFiscalId || conta.id;
+      if (isOrigemNotaFiscal && typeof excluirNota === 'function') {
+        try { await excluirNota(idNota); } catch (err) { console.error(err); }
+      }
 
-      const replyMarkup = {
-        inline_keyboard: [[
-          { text: '✅ Aprovar', callback_data: `delete_conta:approve:${requestId}` },
-          { text: '❌ Negar', callback_data: `delete_conta:deny:${requestId}` }
-        ]]
-      };
+      await excluirConta(contaId);
+      await fetchContas();
+      toast.success("Conta excluída com sucesso!");
 
-      await tgSendRaw(texto, replyMarkup);
-      toast.info('Solicitação enviada ao financeiro. Aguardando aprovação…');
+      await sendTelegramEvent({
+        title: "Conta Excluída",
+        emoji: "🗑️",
+        screen: "Gestão de Contas",
+        lines: [
+          `Conta #${conta.codigo || conta.id} (${conta.descricao || "Sem descrição"}) foi excluída por ${usuarioLogado}.`,
+        ],
+      });
 
-      logEvent("SOLICITACAO_EXCLUSAO_CONTA", { idConta: conta.id, requestId });
-
-      pendentesRef.current[requestId] = { attempts: 0 };
-      iniciarPollingDecisao(requestId, conta, Date.now());
+      logEvent("CONTA_EXCLUIDA", { idConta: conta.id, idNota });
     } catch (error) {
-      toast.error("Erro ao solicitar exclusão da conta.");
-      logEvent("ERRO_SOLICITAR_EXCLUSAO_CONTA", { id: conta.id, error: error.message });
+      console.error("Erro ao excluir conta:", error);
+      toast.error("Erro ao excluir a conta.");
+    }
+  };
+
+  const abrirModalExcluir = (conta) => {
+    setContaParaExcluir(conta);
+    setModalExcluirOpen(true);
+  };
+
+  const handleConfirmarExclusaoConta = async (conta) => {
+    const alvo = conta || contaParaExcluir;
+    setModalExcluirOpen(false);
+    setContaParaExcluir(null);
+    if (alvo) {
+      await handleExcluirConta(alvo);
     }
   };
 
@@ -648,7 +489,21 @@ const ContasPage = () => {
         });
 
       } else {
-        const novaConta = await salvarConta(payload);
+        const curUser = getCurrentUser() || {};
+        const activeEmail = String(curUser.email || localStorage.getItem("usuario_email") || "").toLowerCase().trim();
+        const activeId = String(curUser.id || localStorage.getItem("usuario_id") || "").trim();
+        const activeFilial = curUser.filial || localStorage.getItem("usuario_filial") || "Filial 1";
+
+        const payloadFinal = {
+          ...payload,
+          userEmail: payload.userEmail || activeEmail,
+          userId: payload.userId || activeId,
+          filial: payload.filial || activeFilial,
+          criadoPor: payload.criadoPor || usuarioLogado,
+          usuarioCriacao: payload.usuarioCriacao || usuarioLogado,
+        };
+
+        const novaConta = await salvarConta(payloadFinal);
         const novoId = novaConta?.id || Date.now();
 
         if (payload.applyBaixa && payload.baixaTargetId) {
@@ -998,7 +853,6 @@ const ContasPage = () => {
                     <button
                       className="btn-editar"
                       onClick={() => handleEditarConta(conta)}
-                      disabled={isUserAdmin && conta.exclusaoPendente}
                       title="Editar Conta"
                     >
                       <FaEdit /> Editar
@@ -1043,25 +897,18 @@ const ContasPage = () => {
                         </button>
                       </div>
                     )
-                  ) : isUserAdmin ? (
-                    conta.exclusaoPendente ? (
-                      <button
-                        className="btn-excluir btn-warning"
-                        disabled
-                        style={{ opacity: 0.8, cursor: 'not-allowed' }}
-                        title="Exclusão aguardando aprovação do financeiro..."
-                      >
-                        ⏳ Exclusão Pendente...
-                      </button>
-                    ) : (
-                      <button
-                        className="btn-excluir"
-                        onClick={() => handleExcluirConta(conta)}
-                        title="Solicitar Exclusão da Conta"
-                      >
-                        <FaTrash /> Solicitar Exclusão
-                      </button>
-                    )
+                  ) : podeExcluirConta(conta) ? (
+                    <button
+                      type="button"
+                      className="btn-excluir"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        abrirModalExcluir(conta);
+                      }}
+                      title="Excluir Conta"
+                    >
+                      <FaTrash /> Excluir
+                    </button>
                   ) : null}
                 </div>
               </div>
@@ -1258,15 +1105,7 @@ const ContasPage = () => {
         </div>
       )}
 
-      {/* Modal de Motivo de Exclusão */}
-      <ModalMotivo
-        isOpen={modalMotivoConfig.isOpen}
-        onClose={() => setModalMotivoConfig({ isOpen: false, conta: null })}
-        onConfirm={confirmarExclusaoConta}
-        titulo="Solicitar Exclusão de Conta"
-        descricao="Informe o motivo da exclusão para enviar a solicitação de aprovação:"
-        textoBotao="Solicitar Exclusão"
-      />
+      {/* Modal Conta */}
 
       <ModalConta
         isOpen={modalOpen}
@@ -1295,6 +1134,17 @@ const ContasPage = () => {
         contas={contas}
         contaSelecionadaInicial={contaParaPagamento}
         onAplicarPagamento={handleAplicarPagamento}
+      />
+
+      {/* Modal de Confirmação de Exclusão de Conta */}
+      <ModalExcluirConta
+        isOpen={modalExcluirOpen}
+        onClose={() => {
+          setModalExcluirOpen(false);
+          setContaParaExcluir(null);
+        }}
+        onConfirm={handleConfirmarExclusaoConta}
+        conta={contaParaExcluir}
       />
     </div>
   );

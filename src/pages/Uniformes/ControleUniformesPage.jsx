@@ -16,6 +16,7 @@ import ModalDepartamentosUniformes from '../../components/Modais/ModalDepartamen
 import ModalEntregaUniforme from '../../components/Modais/ModalEntregaUniforme';
 import ModalEnvioEmMassa from '../../components/Modais/ModalEnvioEmMassa';
 import ModalSaidaUniformeDescarte from '../../components/Modais/ModalSaidaUniformeDescarte';
+import ModalRelatorioUniformes from '../../components/Modais/ModalRelatorioUniformes';
 import { getUser, isAdmin } from '../../auth/auth';
 import './uniformes.css';
 
@@ -27,6 +28,7 @@ export default function ControleUniformesPage() {
   const [modalSaidaDescarteAberto, setModalSaidaDescarteAberto] = useState(false);
   const [modalEnvioEmMassaAberto, setModalEnvioEmMassaAberto] = useState(false);
   const [modalDepartamentosAberto, setModalDepartamentosAberto] = useState(false);
+  const [modalRelatorioUniformesAberto, setModalRelatorioUniformesAberto] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState('consolidado'); // 'consolidado', 'novos', 'usados', 'movimentacoes'
   const [modoVisual, setModoVisual] = useState('dashboard'); // 'dashboard' (grade de containers) ou 'tabela'
 
@@ -346,6 +348,30 @@ export default function ControleUniformesPage() {
             }}
           >
             <span>🗑️</span> Saída de Uniforme
+          </button>
+
+          {/* 6. Relatório de Uniformes */}
+          <button
+            type="button"
+            className="btn-relatorio-uniforme"
+            onClick={() => setModalRelatorioUniformesAberto(true)}
+            style={{
+              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+              color: '#ffffff',
+              border: '1px solid #60a5fa',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              fontSize: '13.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.25s ease',
+              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+            }}
+          >
+            <span>📋</span> Relatório de Uniformes
           </button>
         </div>
       </div>
@@ -818,6 +844,14 @@ export default function ControleUniformesPage() {
         onDepartamentoCadastrado={() => {
           carregarDados();
         }}
+      />
+
+      {/* Modal de Relatório Consolidado de Uniformes por Departamento */}
+      <ModalRelatorioUniformes
+        isOpen={modalRelatorioUniformesAberto}
+        onClose={() => setModalRelatorioUniformesAberto(false)}
+        estoque={estoque}
+        movimentacoes={movimentacoes}
       />
     </div>
   );

@@ -6,6 +6,8 @@ import ModalProdutoOS from '../../components/Modais/ModalProdutoOS';
 import ModalServicosOS from '../../components/Modais/ModalServicosOS';
 import ModalCustosPagamentoOS from '../../components/Modais/ModalCustosPagamentoOS';
 import ModalFiltroOS from '../../components/Modais/ModalFiltroOS';
+import ModalSelecionarTermo from '../../components/Modais/ModalSelecionarTermo';
+import { MODELOS_TERMOS } from '../../data/termosCondicoes';
 import { toast } from 'react-toastify';
 import { logEvent } from '../../utils/logger';
 import { sendTelegramEvent } from '../../utils/telegram';
@@ -19,6 +21,8 @@ import '../../components/Visual/OrdemServicoForm.css';
 const OrdemServicoForm = ({ onSalvar = () => { }, ordens = [] }) => {
   const [modal, setModal] = useState(null);
   const [modalFiltroAberto, setModalFiltroAberto] = useState(false);
+  const [modalTermoAberto, setModalTermoAberto] = useState(false);
+  const [acaoAoConfirmarTermo, setAcaoAoConfirmarTermo] = useState('salvar');
   const [dados, setDados] = useState({
     cliente: {},
     equipamento: {},
@@ -30,6 +34,9 @@ const OrdemServicoForm = ({ onSalvar = () => { }, ordens = [] }) => {
     formaPagamento: '',
     valorPagamento: '',
     tecnico: '',
+    tipoTermo: 'conscientizacao',
+    tituloTermo: 'Declaração de Conscientização / Testes',
+    termoCondicoes: MODELOS_TERMOS[0].texto,
     numeroOS: 'OS-' + Date.now(),
   });
 
@@ -73,6 +80,7 @@ const OrdemServicoForm = ({ onSalvar = () => { }, ordens = [] }) => {
     `Forma de Pagamento: ${os.formaPagamento || '-'}`,
     `Valor do Pagamento: ${os.valorPagamento || 'R$ 0,00'}`,
     `Técnico: ${os.tecnico || '-'}`,
+    `Garantia / Termo: ${os.tituloTermo || 'Padrão'}`,
   ];
 
   const notificarTelegram = async (os, textoAlternativo) => {
@@ -102,37 +110,59 @@ const OrdemServicoForm = ({ onSalvar = () => { }, ordens = [] }) => {
     }
   };
 
-  const salvarOS = async () => {
+  const salvarOS = () => {
+    // Ao clicar em Salvar, abre o modal para selecionar o termo desejado
+    setAcaoAoConfirmarTermo('salvar');
+    setModalTermoAberto(true);
+  };
+
+  const handleConfirmarTermo = async (modeloEscolhido) => {
+    const dadosAtualizados = {
+      ...dados,
+      tipoTermo: modeloEscolhido.id,
+      tituloTermo: modeloEscolhido.titulo,
+      termoCondicoes: modeloEscolhido.texto,
+    };
+    setDados(dadosAtualizados);
+    setModalTermoAberto(false);
+
+    if (acaoAoConfirmarTermo === 'salvar') {
+      await executarSalvarOS(dadosAtualizados);
+    } else {
+      toast.success(`Termo "${modeloEscolhido.titulo}" selecionado.`);
+    }
+  };
+
+  const executarSalvarOS = async (dadosParaSalvar) => {
     try {
       // Salva na base de clientes permanente para reutilização futura
-      if (dados.cliente?.nome || dados.cliente?.documento) {
-        salvarClienteNaBase(dados.cliente);
+      if (dadosParaSalvar.cliente?.nome || dadosParaSalvar.cliente?.documento) {
+        salvarClienteNaBase(dadosParaSalvar.cliente);
       }
 
       // Salva na base de equipamentos/produtos para reutilização futura
-      if (dados.equipamento?.marca || dados.equipamento?.modelo || dados.equipamento?.serie) {
-        salvarEquipamentoNaBase(dados.equipamento);
+      if (dadosParaSalvar.equipamento?.marca || dadosParaSalvar.equipamento?.modelo || dadosParaSalvar.equipamento?.serie) {
+        salvarEquipamentoNaBase(dadosParaSalvar.equipamento);
       }
 
-      onSalvar(dados);
+      onSalvar(dadosParaSalvar);
 
-      const contrato = gerarContratoDaOS(dados);
+      const contrato = gerarContratoDaOS(dadosParaSalvar);
       salvarContrato(contrato);
 
       logEvent({
         type: 'contratos',
         title: 'Contrato gerado automaticamente pela OS',
         details: {
-          numeroOS: dados.numeroOS,
-          cliente: dados.cliente?.nome,
+          numeroOS: dadosParaSalvar.numeroOS,
+          cliente: dadosParaSalvar.cliente?.nome,
         },
       });
 
-      toast.success('Ordem de Serviço salva e contrato gerado.');
-      await notificarTelegram(dados);
+      toast.success('Ordem de Serviço salva com termo vinculado e contrato gerado.');
+      await notificarTelegram(dadosParaSalvar);
 
-      setDados((prev) => ({
-        ...prev,
+      setDados({
         cliente: {},
         equipamento: {},
         servicos: '',
@@ -143,8 +173,11 @@ const OrdemServicoForm = ({ onSalvar = () => { }, ordens = [] }) => {
         formaPagamento: '',
         valorPagamento: '',
         tecnico: '',
+        tipoTermo: 'conscientizacao',
+        tituloTermo: 'Declaração de Conscientização / Testes',
+        termoCondicoes: MODELOS_TERMOS[0].texto,
         numeroOS: 'OS-' + Date.now(),
-      }));
+      });
     } catch (error) {
       console.error(error);
       toast.error('Erro ao salvar Ordem de Serviço.');
@@ -313,6 +346,30 @@ const OrdemServicoForm = ({ onSalvar = () => { }, ordens = [] }) => {
             {dados.tecnico ? '✓ Ok' : ''}
           </span>
         </button>
+
+        {/* 6. Termo de Garantia / Condições */}
+        <button
+          type="button"
+          className={`btn-secao ${dados.tipoTermo ? 'filled' : ''}`}
+          onClick={() => {
+            setAcaoAoConfirmarTermo('selecionar');
+            setModalTermoAberto(true);
+          }}
+          title="Clique para selecionar o termo de garantia ou conscientização"
+        >
+          <div className="btn-secao-left">
+            <span className="btn-secao-icon">📜</span>
+            <div className="btn-secao-text">
+              <span className="btn-secao-name">Termo de Garantia</span>
+              <span className="btn-secao-hint">
+                {dados.tituloTermo || 'Garantia / Conscientização'}
+              </span>
+            </div>
+          </div>
+          <span className={`btn-secao-tag ${dados.tipoTermo ? 'done' : 'pending'}`}>
+            {dados.tipoTermo ? '✓ Ok' : ''}
+          </span>
+        </button>
       </div>
 
       {/* Ações Finais */}
@@ -323,9 +380,9 @@ const OrdemServicoForm = ({ onSalvar = () => { }, ordens = [] }) => {
         <button className="btn-acao btn-secondary" onClick={visualizarContrato}>
           <span>📄</span> Visualizar Contrato
         </button>
-        <button className="btn-acao btn-info" onClick={testarTelegram}>
+        {/* <button className="btn-acao btn-info" onClick={testarTelegram}>
           <span>✈️</span> Testar Telegram
-        </button>
+        </button> */}
       </div>
 
       {/* Modais */}
@@ -420,6 +477,17 @@ const OrdemServicoForm = ({ onSalvar = () => { }, ordens = [] }) => {
             handleSelectCliente(cli, equip);
             setModalFiltroAberto(false);
           }}
+        />
+      )}
+
+      {/* Modal para Selecionar Termo de Garantia / Condições */}
+      {modalTermoAberto && (
+        <ModalSelecionarTermo
+          isOpen={true}
+          onClose={() => setModalTermoAberto(false)}
+          termoSelecionadoId={dados.tipoTermo}
+          textoBotaoConfirmar={acaoAoConfirmarTermo === 'salvar' ? '💾 Confirmar e Salvar OS' : '✓ Aplicar Termo'}
+          onConfirmar={handleConfirmarTermo}
         />
       )}
     </div>

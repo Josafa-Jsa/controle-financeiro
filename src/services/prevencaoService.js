@@ -21,8 +21,54 @@ function _resolveUser(provided = null) {
 
   const id = u.id || null;
   const isUserAdmin = isAdmin(u);
+  const filial = (u.filial || u.user_filial || 'Filial 1').trim();
 
-  return { id, email, username, name: fullName, isUserAdmin };
+  return { id, email, username, name: fullName, isUserAdmin, filial };
+}
+
+export function resolveMediaUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // Se for caminho relativo de upload (/api/uploads/... ou /uploads/...)
+  let base = '';
+  try {
+    const rawHost = localStorage.getItem('api_server_host');
+    if (rawHost) {
+      base = `http://${rawHost}`;
+    }
+  } catch (_) {
+    /* ignore */
+  }
+
+  if (!base && typeof window !== 'undefined' && window.location.hostname) {
+    const currentHost = window.location.hostname;
+    if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+      base = `http://${currentHost}:4000`;
+    }
+  }
+
+  if (base) {
+    const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+    return `${base}${cleanUrl}`;
+  }
+
+  return url;
+}
+
+export async function uploadArquivoEvidencia(file) {
+  if (!file) throw new Error('Nenhum arquivo fornecido.');
+  const formData = new FormData();
+  formData.append('arquivo', file);
+
+  const res = await api.post('/prevencao/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return res.data;
 }
 
 function sanitizeList(list) {
@@ -30,8 +76,8 @@ function sanitizeList(list) {
   return list.map((oc) => {
     if (!oc || !Array.isArray(oc.evidencias)) return oc;
     const cleanEvs = oc.evidencias.map((ev) => {
-      // Se arquivoUrl for um base64 gigantesco (> 500KB), remove o blob pesado para preservar a memória
-      if (ev && typeof ev.arquivoUrl === 'string' && ev.arquivoUrl.length > 500_000) {
+      // Se arquivoUrl for um base64 gigantesco (> 500KB), remove o blob pesado para preservar o storage
+      if (ev && typeof ev.arquivoUrl === 'string' && ev.arquivoUrl.startsWith('data:') && ev.arquivoUrl.length > 500_000) {
         return { ...ev, arquivoUrl: '' };
       }
       return ev;
@@ -127,13 +173,34 @@ export function listarOcorrencias(customUser = null) {
     const u = _resolveUser(customUser);
     const list = safeRead();
 
-    // ADMIN: Visualiza TODAS as ocorrências de todos os usuários
+    // ADMIN: Visualiza TODAS as ocorrências de todos os usuários e filiais
     if (u.isUserAdmin) {
       return list;
     }
 
-    // USUÁRIO COMUM: Visualiza SOMENTE as ocorrências registradas por ele mesmo
-    return list.filter((oc) => _checkPertenceAoUsuario(oc, u));
+    // USUÁRIO DA FILIAL: Visualiza TODAS as ocorrências da sua filial ou registradas por ele mesmo
+    const userFilialNorm = String(u.filial || 'Filial 1').trim().toLowerCase();
+
+    return list.filter((oc) => {
+      const ocFilialNorm = String(oc.filial || '').trim().toLowerCase();
+
+      // 1. Ocorrência cadastrada na mesma filial do usuário
+      if (ocFilialNorm && userFilialNorm && ocFilialNorm === userFilialNorm) {
+        return true;
+      }
+
+      // 2. Ou registrada pelo próprio usuário logado
+      if (_checkPertenceAoUsuario(oc, u)) {
+        return true;
+      }
+
+      // 3. Fallback para ocorrências legadas sem filial: se o usuário for da Filial 1
+      if (!ocFilialNorm && userFilialNorm === 'filial 1') {
+        return true;
+      }
+
+      return false;
+    });
   } catch (e) {
     console.error('Erro ao listar ocorrências de prevenção:', e);
     return [];
@@ -168,6 +235,7 @@ export async function salvarOcorrencia(ocorrencia, customUser = null) {
       classificacao: ocorrencia.classificacao || 'Média',
       local: ocorrencia.local || 'Loja Principal',
       setor: ocorrencia.setor || 'Geral',
+      filial: ocorrencia.filial || u.filial || 'Filial 1',
       descricao: ocorrencia.descricao || '',
       relatoFatos: ocorrencia.relatoFatos || '',
       medidasAdotadas: ocorrencia.medidasAdotadas || '',

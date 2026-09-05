@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 const DATA_DIR = path.resolve(__dirname, '../../data');
 const DATA_FILE = path.resolve(DATA_DIR, 'contas.json');
 
-const ADMIN_EMAILS = ['jsa@jsa.com', 'jsa.admin@gmail.com'];
+const ADMIN_EMAILS = ['jsa@jsa.com', 'jsa.admin@gmail.com', 'josafa.santos.jss@gmail.com'];
 
 // Garante que o diretório server/data exista
 if (!fs.existsSync(DATA_DIR)) {
@@ -46,22 +46,18 @@ function filtrarContasPorUsuario(lista = [], req) {
   if (!reqEmail && !reqId) return lista;
 
   const isAdminReq = ADMIN_EMAILS.includes(reqEmail);
+  if (isAdminReq) {
+    // Administrador visualiza todas as contas do sistema financeiro
+    return lista;
+  }
 
   return lista.filter((c) => {
     const cEmail = String(c.userEmail || c.user_email || '').trim().toLowerCase();
     const cId = String(c.userId || c.user_id || '').trim();
 
-    if (isAdminReq) {
-      // Administrador visualiza suas contas (emails admin ou contas base do sistema)
-      if (!cEmail || ADMIN_EMAILS.includes(cEmail)) return true;
-      if (cId && reqId && cId === reqId) return true;
-      return false;
-    } else {
-      // Usuário comum visualiza ÚNICA e ESTRITAMENTE as suas próprias contas
-      if (cEmail && reqEmail && cEmail === reqEmail) return true;
-      if (cId && reqId && cId === reqId) return true;
-      return false;
-    }
+    if (cEmail && reqEmail && cEmail === reqEmail) return true;
+    if (cId && reqId && cId === reqId) return true;
+    return false;
   });
 }
 
@@ -76,11 +72,10 @@ export async function listContas(req, res) {
 
     if (reqEmail || reqId) {
       if (isAdminReq) {
-        query += ' WHERE (user_email IN (?, ?) OR user_email IS NULL OR user_email = "") ORDER BY vencimento ASC, id DESC';
-        params.push(ADMIN_EMAILS[0], ADMIN_EMAILS[1]);
+        query += ' ORDER BY vencimento ASC, id DESC';
       } else {
-        query += ' WHERE (user_email = ?) ORDER BY vencimento ASC, id DESC';
-        params.push(reqEmail);
+        query += ' WHERE (user_email = ? OR (user_id IS NOT NULL AND user_id != "" AND user_id = ?)) ORDER BY vencimento ASC, id DESC';
+        params.push(reqEmail, reqId || '');
       }
     } else {
       query += ' ORDER BY vencimento ASC, id DESC';

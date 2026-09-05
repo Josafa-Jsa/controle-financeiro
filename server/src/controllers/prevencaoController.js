@@ -1,7 +1,23 @@
 import pool from '../config/db.js';
 
+let columnsChecked = false;
+async function ensurePrevencaoColumns() {
+  if (columnsChecked) return;
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM prevencao");
+    const colNames = cols.map((c) => c.Field);
+    if (!colNames.includes('filial')) {
+      await pool.query("ALTER TABLE prevencao ADD COLUMN filial VARCHAR(100) NULL DEFAULT 'Filial 1' AFTER setor");
+    }
+    columnsChecked = true;
+  } catch (err) {
+    console.warn("Aviso ao checar colunas da tabela prevencao:", err.message);
+  }
+}
+
 export async function listPrevencao(req, res) {
   try {
+    await ensurePrevencaoColumns();
     const query = 'SELECT * FROM prevencao ORDER BY created_at DESC LIMIT 500';
     const [rows] = await pool.query(query);
 
@@ -17,6 +33,7 @@ export async function listPrevencao(req, res) {
       classificacao: row.classificacao || 'Média',
       local: row.local || '',
       setor: row.setor || '',
+      filial: row.filial || 'Filial 1',
       descricao: row.descricao || '',
       relatoFatos: row.relato_fatos || '',
       medidasAdotadas: row.medidas_adotadas || '',
@@ -45,6 +62,7 @@ export async function listPrevencao(req, res) {
 
 export async function createPrevencao(req, res) {
   try {
+    await ensurePrevencaoColumns();
     const d = req.body || {};
     const numero = d.numero || `OC-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
     const nome = d.nome || `Ocorrência - ${d.tipo || 'Geral'}`;
@@ -56,6 +74,7 @@ export async function createPrevencao(req, res) {
     const classificacao = d.classificacao || 'Média';
     const local = d.local || '';
     const setor = d.setor || '';
+    const filial = d.filial || 'Filial 1';
     const descricao = d.descricao || '';
     const relatoFatos = d.relatoFatos || '';
     const medidasAdotadas = d.medidasAdotadas || '';
@@ -75,12 +94,12 @@ export async function createPrevencao(req, res) {
     const sql = `
       INSERT INTO prevencao (
         numero, nome, status, data, hora_inicio, hora_termino,
-        tipo, classificacao, local, setor, descricao,
+        tipo, classificacao, local, setor, filial, descricao,
         relato_fatos, medidas_adotadas, pessoas_envolvidas, pessoa_envolvida,
         produtos_envolvidos, valor_total_envolvido, abordagem, evidencias,
         responsaveis_registro, historico_custodia, user_id, user_email,
         user_login, registrado_por
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         nome = VALUES(nome),
         status = VALUES(status),
@@ -91,6 +110,7 @@ export async function createPrevencao(req, res) {
         classificacao = VALUES(classificacao),
         local = VALUES(local),
         setor = VALUES(setor),
+        filial = VALUES(filial),
         descricao = VALUES(descricao),
         relato_fatos = VALUES(relato_fatos),
         medidas_adotadas = VALUES(medidas_adotadas),
@@ -108,7 +128,7 @@ export async function createPrevencao(req, res) {
 
     const params = [
       numero, nome, status, data, horaInicio, horaTermino,
-      tipo, classificacao, local, setor, descricao,
+      tipo, classificacao, local, setor, filial, descricao,
       relatoFatos, medidasAdotadas, pessoasEnvolvidas, pessoaEnvolvida,
       produtosEnvolvidos, valorTotalEnvolvido, abordagem, evidencias,
       responsaveisRegistro, historicoCustodia, userId, userEmail,
@@ -118,7 +138,7 @@ export async function createPrevencao(req, res) {
     const [result] = await pool.query(sql, params);
     const newId = result.insertId || d.id;
 
-    res.status(201).json({ ok: true, id: newId, numero, status });
+    res.status(201).json({ ok: true, id: newId, numero, status, filial });
   } catch (error) {
     console.error('Erro ao criar/atualizar ocorrência:', error);
     res.status(500).json({ error: 'Erro ao salvar ocorrência.', details: error.message });
@@ -127,6 +147,7 @@ export async function createPrevencao(req, res) {
 
 export async function updatePrevencao(req, res) {
   try {
+    await ensurePrevencaoColumns();
     const { id } = req.params;
     const d = req.body || {};
 
@@ -139,6 +160,7 @@ export async function updatePrevencao(req, res) {
     if (d.classificacao !== undefined) { updates.push('classificacao = ?'); params.push(d.classificacao); }
     if (d.local !== undefined) { updates.push('local = ?'); params.push(d.local); }
     if (d.setor !== undefined) { updates.push('setor = ?'); params.push(d.setor); }
+    if (d.filial !== undefined) { updates.push('filial = ?'); params.push(d.filial); }
     if (d.descricao !== undefined) { updates.push('descricao = ?'); params.push(d.descricao); }
     if (d.relatoFatos !== undefined) { updates.push('relato_fatos = ?'); params.push(d.relatoFatos); }
     if (d.medidasAdotadas !== undefined) { updates.push('medidas_adotadas = ?'); params.push(d.medidasAdotadas); }
@@ -177,3 +199,24 @@ export async function deletePrevencao(req, res) {
     res.status(500).json({ error: 'Erro ao excluir ocorrência.', details: error.message });
   }
 }
+
+export async function uploadEvidencia(req, res) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    }
+    const relativeUrl = `/api/uploads/evidencias/${req.file.filename}`;
+    res.status(201).json({
+      ok: true,
+      url: relativeUrl,
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+    });
+  } catch (err) {
+    console.error('Erro ao fazer upload de evidência:', err);
+    res.status(500).json({ error: 'Erro ao processar arquivo.', details: err.message });
+  }
+}
+

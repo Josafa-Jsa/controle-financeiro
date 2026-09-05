@@ -56,6 +56,7 @@ export default function PrevencaoPage() {
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroClassificacao, setFiltroClassificacao] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
+  const [filtroFilial, setFiltroFilial] = useState('');
   const [visualizacao, setVisualizacao] = useState('containers'); // 'containers' ou 'tabela'
   const [modoVisual, setModoVisual] = useState('menu'); // 'menu' (painel nativo em grade) ou 'lista' (ocorrências)
 
@@ -484,16 +485,18 @@ export default function PrevencaoPage() {
           )) ||
         String(oc.responsaveisRegistro?.emitidoPor?.nome || '').toLowerCase().includes(term) ||
         String(oc.registradoPor || '').toLowerCase().includes(term) ||
+        String(oc.filial || '').toLowerCase().includes(term) ||
         String(oc.local || '').toLowerCase().includes(term) ||
         String(oc.setor || '').toLowerCase().includes(term);
 
       const matchTipo = !filtroTipo || oc.tipo === filtroTipo;
       const matchClass = !filtroClassificacao || oc.classificacao === filtroClassificacao;
       const matchStatus = !filtroStatus || statusOc === filtroStatus;
+      const matchFilial = !filtroFilial || oc.filial === filtroFilial;
 
-      return matchText && matchTipo && matchClass && matchStatus;
+      return matchText && matchTipo && matchClass && matchStatus && matchFilial;
     });
-  }, [ocorrencias, searchTerm, filtroTipo, filtroClassificacao, filtroStatus]);
+  }, [ocorrencias, searchTerm, filtroTipo, filtroClassificacao, filtroStatus, filtroFilial]);
 
   return (
     <div className="page-container fade-in-page">
@@ -526,11 +529,11 @@ export default function PrevencaoPage() {
               </p>
               {isUserAdmin ? (
                 <span className="admin-badge-indicator" style={{ fontSize: '0.82rem', padding: '3px 10px' }}>
-                  👑 Visão Geral Admin (Todas as Ocorrências do Sistema)
+                  👑 Visão Geral Admin (Todas as Filiais e Ocorrências)
                 </span>
               ) : (
-                <span className="badge-recente" style={{ fontSize: '0.82rem', padding: '3px 10px' }}>
-                  🛡️ Minhas Ocorrências
+                <span className="badge-recente" style={{ fontSize: '0.82rem', padding: '3px 10px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                  🏢 Ocorrências da {usuario?.filial || 'Filial 1'} (Acesso Setorial)
                 </span>
               )}
             </div>
@@ -742,6 +745,22 @@ export default function PrevencaoPage() {
               </option>
             ))}
           </select>
+
+          {isUserAdmin && (
+            <select
+              value={filtroFilial}
+              onChange={(e) => setFiltroFilial(e.target.value)}
+              className="select-input"
+              style={{ maxWidth: '160px' }}
+            >
+              <option value="">Todas as Filiais</option>
+              {['Filial 1', 'Filial 2', 'Filial 3', 'Filial 4', 'Filial 5', 'Filial 6', 'Filial 7', 'Filial Particular'].map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Alternador de Visualização */}
@@ -838,6 +857,9 @@ export default function PrevencaoPage() {
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                        <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: 700, background: 'rgba(14, 165, 233, 0.15)', border: '1px solid rgba(14, 165, 233, 0.3)', color: '#38bdf8' }}>
+                          🏢 {oc.filial || 'Filial 1'}
+                        </span>
                         <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11.5px', fontWeight: 600, background: '#242b35', border: '1px solid #334155', color: '#f1f5f9' }}>
                           ⚠️ {oc.tipo}
                         </span>
@@ -903,7 +925,7 @@ export default function PrevencaoPage() {
                       gap: '8px',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', flexWrap: 'wrap' }}>
                       <span style={{ color: '#38bdf8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span>👤</span> Registrado por: <strong style={{ color: '#fff' }}>{autorNome}</strong>
                       </span>
@@ -912,6 +934,9 @@ export default function PrevencaoPage() {
                           @{oc.userLogin}
                         </span>
                       )}
+                      <span style={{ color: '#00d2ff', fontSize: '11.5px', background: 'rgba(0, 210, 255, 0.1)', padding: '1px 8px', borderRadius: '4px', border: '1px solid rgba(0, 210, 255, 0.25)', fontWeight: 600 }}>
+                        🏢 {oc.filial || 'Filial 1'}
+                      </span>
                       {oc.userEmail && (
                         <span style={{ color: '#64748b', fontSize: '11px' }}>
                           • {oc.userEmail}
@@ -1445,6 +1470,7 @@ export default function PrevencaoPage() {
               <tr style={{ background: '#1e2632', borderBottom: '1px solid #2d3748' }}>
                 <th style={{ padding: '12px 16px', textAlign: 'left' }}>ID</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left' }}>Nome da Ocorrência</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left' }}>Filial</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left' }}>Registrado por</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left' }}>Do que se trata</th>
                 <th style={{ padding: '12px 16px', textAlign: 'center' }}>Status</th>
@@ -1457,7 +1483,7 @@ export default function PrevencaoPage() {
             <tbody>
               {ocorrenciasFiltradas.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '30px', color: '#64748b' }}>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '30px', color: '#64748b' }}>
                     Nenhuma ocorrência encontrada.
                   </td>
                 </tr>
@@ -1507,6 +1533,9 @@ export default function PrevencaoPage() {
                       </td>
                       <td style={{ padding: '12px 16px', fontWeight: 600, color: '#f1f5f9' }}>
                         {nomeOcorrencia}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#38bdf8', fontSize: '12px', fontWeight: 700 }}>
+                        🏢 {oc.filial || 'Filial 1'}
                       </td>
                       <td style={{ padding: '12px 16px', color: '#38bdf8', fontSize: '12.5px', fontWeight: 600 }}>
                         👤 {autorNome}

@@ -60,6 +60,12 @@
   background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
 }
 
+.btn-relatorio-uniforme:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(96, 165, 250, 0.5);
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
 /* Cards de Métricas */
 .uniformes-stats-grid {
   display: grid;

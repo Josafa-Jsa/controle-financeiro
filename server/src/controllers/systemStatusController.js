@@ -32,13 +32,17 @@ async function ensureTable() {
       CREATE TABLE IF NOT EXISTS \`system_status\` (
         \`id\` INT PRIMARY KEY AUTO_INCREMENT,
         \`em_manutencao\` TINYINT(1) NOT NULL DEFAULT 0,
-        \`tela\` VARCHAR(255) NULL,
+        \`tela\` TEXT NULL,
         \`mensagem\` TEXT NULL,
         \`tipo\` VARCHAR(100) NULL DEFAULT 'ajuste',
         \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         \`updated_by\` VARCHAR(255) NULL
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    try {
+      await pool.query('ALTER TABLE `system_status` MODIFY COLUMN `tela` TEXT NULL');
+    } catch {}
 
     const [rows] = await pool.query('SELECT COUNT(*) as count FROM `system_status`');
     if (rows[0].count === 0) {

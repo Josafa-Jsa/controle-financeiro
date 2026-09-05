@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { getUser } from '../../auth/auth';
+import { uploadArquivoEvidencia, resolveMediaUrl } from '../../services/prevencaoService';
 import '../Visual/modal.css';
 
 export const TIPOS_EVIDENCIA = [
@@ -34,14 +35,17 @@ export default function ModalEvidencias({
     horaFim: '',
     arquivoNome: '',
     arquivoUrl: '',
+    caminhoOrigem: '',
     observacao: '',
   });
+
+  const [isUploading, setIsUploading] = useState(false);
 
   // Evento Manual de Custódia
   const [novoEventoTexto, setNovoEventoTexto] = useState('');
 
   // Preview de Mídia
-  const [previewMedia, setPreviewMedia] = useState(null); // { tipo: 'Vídeo'|'Imagem', url: '', nome: '' }
+  const [previewMedia, setPreviewMedia] = useState(null); // { tipo: 'Vídeo'|'Imagem', url: '', rawUrl: '', nome: '', caminho: '' }
 
   const usuario = getUser();
   const nomeOperador = usuario?.name || usuario?.nome || usuario?.email || 'Operador';
@@ -68,6 +72,7 @@ export default function ModalEvidencias({
       horaFim: '',
       arquivoNome: '',
       arquivoUrl: '',
+      caminhoOrigem: '',
       observacao: '',
     });
 
@@ -130,7 +135,7 @@ export default function ModalEvidencias({
     });
   };
 
-  // Upload protegido contra estouro de memória
+  // Upload protegido contra estouro de memória e salvamento do caminho real no servidor
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -142,53 +147,63 @@ export default function ModalEvidencias({
     };
 
     const tamanhoStr = formatSize(file.size);
+    const isVideo = file.type.startsWith('video/');
+    const isImage = file.type.startsWith('image/');
+    const tipoDetectado = isVideo ? 'Vídeo' : isImage ? 'Imagem' : novaEvidencia.tipo;
 
-    if (file.type.startsWith('image/')) {
-      try {
-        const compressedBase64 = await compressImage(file);
+    // Preview local imediato
+    let objectUrl = '';
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch (_) {
+      /* fallback */
+    }
+
+    // Preenche o nome e caminho temporário imediatamente ao selecionar o arquivo
+    setNovaEvidencia((prev) => ({
+      ...prev,
+      tipo: tipoDetectado,
+      arquivoNome: file.name,
+      arquivoUrl: objectUrl || file.name,
+      caminhoOrigem: file.name,
+      tamanho: tamanhoStr,
+    }));
+
+    setIsUploading(true);
+    toast.info(`Processando e salvando ${isImage ? 'imagem' : isVideo ? 'vídeo' : 'arquivo'} "${file.name}" (${tamanhoStr})...`);
+
+    try {
+      // Faz o upload no servidor para que todos da filial possam reproduzir/visualizar permanentemente
+      const uploadRes = await uploadArquivoEvidencia(file);
+      if (uploadRes && uploadRes.url) {
+        // Caminho preenchido automaticamente com a URL do servidor
         setNovaEvidencia((prev) => ({
           ...prev,
-          arquivoNome: file.name,
-          arquivoUrl: compressedBase64,
+          tipo: tipoDetectado,
+          arquivoNome: uploadRes.originalName || file.name,
+          arquivoUrl: uploadRes.url,
+          caminhoOrigem: uploadRes.url,
           tamanho: tamanhoStr,
         }));
-        toast.success(`Imagem "${file.name}" (${tamanhoStr}) otimizada com sucesso.`);
-      } catch (err) {
-        console.error(err);
-        setNovaEvidencia((prev) => ({
-          ...prev,
-          arquivoNome: file.name,
-          arquivoUrl: '',
-          tamanho: tamanhoStr,
-        }));
+        toast.success(`Caminho preenchido automaticamente: ${uploadRes.url}`);
       }
-    } else if (file.type.startsWith('video/')) {
-      // Para vídeos: usamos Blob Object URL para preview em memória sem converter para string base64 pesada
-      let objectUrl = '';
-      try {
-        objectUrl = URL.createObjectURL(file);
-      } catch {}
-
-      setNovaEvidencia((prev) => ({
-        ...prev,
-        arquivoNome: file.name,
-        arquivoUrl: objectUrl,
-        tamanho: tamanhoStr,
-      }));
-      toast.success(`Vídeo "${file.name}" (${tamanhoStr}) registrado.`);
-    } else {
-      let objectUrl = '';
-      try {
-        objectUrl = URL.createObjectURL(file);
-      } catch {}
-
-      setNovaEvidencia((prev) => ({
-        ...prev,
-        arquivoNome: file.name,
-        arquivoUrl: objectUrl,
-        tamanho: tamanhoStr,
-      }));
-      toast.success(`Arquivo "${file.name}" (${tamanhoStr}) registrado.`);
+    } catch (err) {
+      console.warn('Upload no servidor indisponível, usando fallback local:', err.message);
+      if (isImage) {
+        try {
+          const compressed = await compressImage(file);
+          setNovaEvidencia((prev) => ({
+            ...prev,
+            arquivoUrl: compressed,
+            caminhoOrigem: file.name,
+          }));
+        } catch (_) {
+          /* fallback */
+        }
+      }
+      toast.info(`Arquivo anexado localmente (${tamanhoStr}).`);
+    } finally {
+      setIsUploading(false);
     }
 
     e.target.value = '';
@@ -211,6 +226,7 @@ export default function ModalEvidencias({
       horaFim: novaEvidencia.horaFim,
       arquivoNome: nomePadraoArquivo,
       arquivoUrl: novaEvidencia.arquivoUrl || '',
+      caminhoOrigem: novaEvidencia.caminhoOrigem || novaEvidencia.arquivoUrl || '',
       tamanho: novaEvidencia.tamanho || '',
       adicionadoPor: nomeOperador,
       dataHoraUpload: new Date().toISOString(),
@@ -442,9 +458,9 @@ export default function ModalEvidencias({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.5fr auto', gap: '8px', alignItems: 'flex-end' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.6fr 1.2fr auto', gap: '8px', alignItems: 'flex-end' }}>
                   <div className="form-row">
-                    <label style={{ fontSize: '11px' }}>Arquivo de Mídia / Documento:</label>
+                    <label style={{ fontSize: '11px' }}>Arquivo de Mídia / Anexo:</label>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <input
                         type="file"
@@ -472,7 +488,7 @@ export default function ModalEvidencias({
                       </label>
                       <input
                         type="text"
-                        placeholder="Nome do arquivo ou anexo..."
+                        placeholder="Nome do arquivo..."
                         value={novaEvidencia.arquivoNome}
                         onChange={(e) => handleInputChange('arquivoNome', e.target.value)}
                         style={{ height: '32px', fontSize: '12px', flex: 1 }}
@@ -481,10 +497,29 @@ export default function ModalEvidencias({
                   </div>
 
                   <div className="form-row">
+                    <label style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>📍 Caminho do Arquivo / URL:</span>
+                      {novaEvidencia.arquivoUrl && (
+                        <span style={{ color: '#4ade80', fontSize: '10px', fontWeight: 600 }}>✓ Auto-preenchido</span>
+                      )}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Preenchido automaticamente ao selecionar..."
+                      value={novaEvidencia.arquivoUrl}
+                      onChange={(e) => {
+                        handleInputChange('arquivoUrl', e.target.value);
+                        handleInputChange('caminhoOrigem', e.target.value);
+                      }}
+                      style={{ height: '32px', fontSize: '12px', color: '#38bdf8', fontFamily: 'monospace' }}
+                    />
+                  </div>
+
+                  <div className="form-row">
                     <label style={{ fontSize: '11px' }}>Observação:</label>
                     <input
                       type="text"
-                      placeholder="Ex: Trecho com indivíduo guardando itens na bolsa"
+                      placeholder="Ex: Trecho com o fato ocorrido"
                       value={novaEvidencia.observacao}
                       onChange={(e) => handleInputChange('observacao', e.target.value)}
                       style={{ height: '32px', fontSize: '12px' }}
@@ -495,9 +530,10 @@ export default function ModalEvidencias({
                     <button
                       type="submit"
                       className="salve"
-                      style={{ height: '32px', padding: '0 14px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+                      disabled={isUploading}
+                      style={{ height: '32px', padding: '0 14px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', opacity: isUploading ? 0.7 : 1, cursor: isUploading ? 'not-allowed' : 'pointer' }}
                     >
-                      ➕ Anexar Evidência
+                      {isUploading ? '⏳ Salvando...' : '➕ Anexar Evidência'}
                     </button>
                   </div>
                 </div>
@@ -557,6 +593,15 @@ export default function ModalEvidencias({
                         <span>👤 Por: <strong style={{ color: '#94a3b8' }}>{ev.adicionadoPor}</strong></span>
                       </div>
 
+                      {(ev.caminhoOrigem || ev.arquivoUrl) && (
+                        <div style={{ fontSize: '11px', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
+                          <span>📍 Caminho de acesso:</span>
+                          <code style={{ background: '#090b0e', padding: '1px 6px', borderRadius: '4px', border: '1px solid #283340', color: '#7dd3fc', maxWidth: '380px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {ev.caminhoOrigem || ev.arquivoUrl}
+                          </code>
+                        </div>
+                      )}
+
                       {ev.observacao && (
                         <div style={{ fontSize: '11.5px', color: '#fbbf24', fontStyle: 'italic', marginTop: '2px' }}>
                           💬 "{ev.observacao}"
@@ -567,25 +612,70 @@ export default function ModalEvidencias({
                     {/* Ações da Evidência: Visualizar / Remover */}
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       {ev.tipo === 'Vídeo' && (
-                        <button
-                          type="button"
-                          className="quick-action-btn"
-                          onClick={() => setPreviewMedia({ tipo: 'Vídeo', url: ev.arquivoUrl, nome: ev.arquivoNome })}
-                          style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.4)', padding: '4px 10px', fontSize: '11.5px', fontWeight: 700 }}
-                        >
-                          ▶ Visualizar Vídeo
-                        </button>
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className="quick-action-btn"
+                            onClick={() => {
+                              const resolved = resolveMediaUrl(ev.arquivoUrl);
+                              setPreviewMedia({
+                                tipo: 'Vídeo',
+                                url: resolved,
+                                rawUrl: ev.arquivoUrl,
+                                nome: ev.arquivoNome,
+                                caminho: ev.caminhoOrigem || ev.arquivoUrl,
+                              });
+                            }}
+                            style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.4)', padding: '4px 10px', fontSize: '11.5px', fontWeight: 700 }}
+                            title="Visualizar vídeo e iniciar reprodução"
+                          >
+                            ▶ Visualizar Vídeo
+                          </button>
+                          {ev.arquivoUrl && (
+                            <button
+                              type="button"
+                              className="quick-action-btn"
+                              onClick={() => window.open(resolveMediaUrl(ev.arquivoUrl), '_blank')}
+                              style={{ background: 'rgba(14, 165, 233, 0.15)', color: '#38bdf8', borderColor: 'rgba(14, 165, 233, 0.4)', padding: '4px 8px', fontSize: '11px', fontWeight: 600 }}
+                              title="Direcionar para o caminho do arquivo em nova guia"
+                            >
+                              🌐 Caminho
+                            </button>
+                          )}
+                        </div>
                       )}
 
                       {ev.tipo === 'Imagem' && (
-                        <button
-                          type="button"
-                          className="quick-action-btn"
-                          onClick={() => setPreviewMedia({ tipo: 'Imagem', url: ev.arquivoUrl, nome: ev.arquivoNome })}
-                          style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#4ade80', borderColor: 'rgba(16, 185, 129, 0.4)', padding: '4px 10px', fontSize: '11.5px', fontWeight: 700 }}
-                        >
-                          🖼 Visualizar Imagem
-                        </button>
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className="quick-action-btn"
+                            onClick={() => {
+                              const resolved = resolveMediaUrl(ev.arquivoUrl);
+                              setPreviewMedia({
+                                tipo: 'Imagem',
+                                url: resolved,
+                                rawUrl: ev.arquivoUrl,
+                                nome: ev.arquivoNome,
+                                caminho: ev.caminhoOrigem || ev.arquivoUrl,
+                              });
+                            }}
+                            style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#4ade80', borderColor: 'rgba(16, 185, 129, 0.4)', padding: '4px 10px', fontSize: '11.5px', fontWeight: 700 }}
+                          >
+                            🖼 Visualizar Imagem
+                          </button>
+                          {ev.arquivoUrl && (
+                            <button
+                              type="button"
+                              className="quick-action-btn"
+                              onClick={() => window.open(resolveMediaUrl(ev.arquivoUrl), '_blank')}
+                              style={{ background: 'rgba(14, 165, 233, 0.15)', color: '#38bdf8', borderColor: 'rgba(14, 165, 233, 0.4)', padding: '4px 8px', fontSize: '11px', fontWeight: 600 }}
+                              title="Direcionar para o caminho do arquivo em nova guia"
+                            >
+                              🌐 Caminho
+                            </button>
+                          )}
+                        </div>
                       )}
 
                       {(ev.tipo === 'Documento' || ev.tipo === 'Relatório' || ev.tipo === 'Outros' || ev.tipo === 'Áudio') && (
@@ -822,30 +912,131 @@ export default function ModalEvidencias({
               </div>
 
               {previewMedia.tipo === 'Vídeo' ? (
-                previewMedia.url ? (
-                  <video
-                    src={previewMedia.url}
-                    controls
-                    autoPlay
-                    style={{ width: '100%', maxHeight: '350px', borderRadius: '8px', background: '#000' }}
-                  />
-                ) : (
-                  <div style={{ padding: '40px 20px', textAlign: 'center', background: '#090b0e', borderRadius: '8px', color: '#94a3b8' }}>
-                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>📹</div>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#f1f5f9', fontWeight: 600 }}>
-                      Arquivo: {previewMedia.nome}
-                    </p>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>
-                      (Vídeo preservado no repositório de evidências)
-                    </p>
+                <div>
+                  {/* Barra de Direcionamento ao Caminho do Vídeo */}
+                  <div
+                    style={{
+                      background: '#0d1117',
+                      border: '1px solid #30363d',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      marginBottom: '10px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <span style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>📍</span>
+                      <span>
+                        Caminho de origem: <strong style={{ color: '#38bdf8', fontFamily: 'monospace' }}>{previewMedia.caminho || previewMedia.url || previewMedia.nome}</strong>
+                      </span>
+                    </span>
+
+                    {previewMedia.url && (
+                      <button
+                        type="button"
+                        onClick={() => window.open(previewMedia.url, '_blank')}
+                        style={{
+                          background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '5px 12px',
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)',
+                        }}
+                        title="Direcionar para o caminho do arquivo e reproduzir em nova guia"
+                      >
+                        <span>🌐</span> Abrir Caminho em Nova Guia
+                      </button>
+                    )}
                   </div>
-                )
+
+                  {previewMedia.url ? (
+                    <video
+                      src={previewMedia.url}
+                      controls
+                      autoPlay
+                      playsInline
+                      style={{ width: '100%', maxHeight: '380px', borderRadius: '8px', background: '#000' }}
+                    />
+                  ) : (
+                    <div style={{ padding: '40px 20px', textAlign: 'center', background: '#090b0e', borderRadius: '8px', color: '#94a3b8' }}>
+                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>📹</div>
+                      <p style={{ margin: 0, fontSize: '14px', color: '#f1f5f9', fontWeight: 600 }}>
+                        Arquivo: {previewMedia.nome}
+                      </p>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>
+                        (Caminho: {previewMedia.caminho || 'Não informado'})
+                      </p>
+                    </div>
+                  )}
+                </div>
               ) : previewMedia.url ? (
-                <img
-                  src={previewMedia.url}
-                  alt={previewMedia.nome}
-                  style={{ width: '100%', maxHeight: '350px', objectFit: 'contain', borderRadius: '8px' }}
-                />
+                <div>
+                  {/* Barra de Direcionamento ao Caminho da Imagem */}
+                  <div
+                    style={{
+                      background: '#0d1117',
+                      border: '1px solid #30363d',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      marginBottom: '10px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                      fontSize: '12px',
+                    }}
+                  >
+                    <span style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>📍</span>
+                      <span>
+                        Caminho de origem: <strong style={{ color: '#38bdf8', fontFamily: 'monospace' }}>{previewMedia.caminho || previewMedia.url || previewMedia.nome}</strong>
+                      </span>
+                    </span>
+
+                    {previewMedia.url && (
+                      <button
+                        type="button"
+                        onClick={() => window.open(previewMedia.url, '_blank')}
+                        style={{
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '5px 12px',
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)',
+                        }}
+                        title="Direcionar para o caminho do arquivo em nova guia"
+                      >
+                        <span>🌐</span> Abrir Caminho em Nova Guia
+                      </button>
+                    )}
+                  </div>
+
+                  <img
+                    src={previewMedia.url}
+                    alt={previewMedia.nome}
+                    style={{ width: '100%', maxHeight: '380px', objectFit: 'contain', borderRadius: '8px' }}
+                  />
+                </div>
               ) : (
                 <div style={{ padding: '40px 20px', textAlign: 'center', background: '#090b0e', borderRadius: '8px', color: '#94a3b8' }}>
                   <div style={{ fontSize: '32px', marginBottom: '8px' }}>📷</div>

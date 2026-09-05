@@ -7,7 +7,11 @@ const Footer = () => {
   const perms = Array.isArray(u.permissions || u.permissoes)
     ? (u.permissions || u.permissoes)
     : [];
-  const isBigMaster = perms.includes('prevencao') || perms.includes('uniformes');
+  const isBigMaster =
+    perms.includes('prevencao') ||
+    perms.includes('uniformes') ||
+    perms.includes('controle-uniformes') ||
+    perms.includes('controle-notas');
 
   return (
     <footer

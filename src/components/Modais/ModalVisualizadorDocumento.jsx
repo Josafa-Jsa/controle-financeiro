@@ -9,28 +9,35 @@ export default function ModalVisualizadorDocumento({
   titulo = 'Visualização do Documento Oficial',
   subtitulo = 'Documento emitido pelo sistema Big Master',
   blob = null,
+  dataUrl = '',
   nomeArquivo = 'Documento_Oficial.pdf',
 }) {
   const [pdfUrl, setPdfUrl] = useState('');
   const iframeRef = useRef(null);
 
   useEffect(() => {
-    if (isOpen && blob) {
-      try {
-        const url = URL.createObjectURL(blob);
-        setPdfUrl(url);
+    if (isOpen) {
+      if (dataUrl) {
+        setPdfUrl(dataUrl);
+      } else if (blob) {
+        try {
+          const url = URL.createObjectURL(blob);
+          setPdfUrl(url);
 
-        return () => {
-          if (url) URL.revokeObjectURL(url);
-        };
-      } catch (err) {
-        console.error('Erro ao gerar visualização do documento:', err);
-        toast.error('Erro ao gerar visualização do documento.');
+          return () => {
+            if (url) URL.revokeObjectURL(url);
+          };
+        } catch (err) {
+          console.error('Erro ao gerar visualização do documento:', err);
+          toast.error('Erro ao gerar visualização do documento.');
+        }
+      } else {
+        setPdfUrl('');
       }
     } else {
       setPdfUrl('');
     }
-  }, [isOpen, blob]);
+  }, [isOpen, blob, dataUrl]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -42,7 +49,7 @@ export default function ModalVisualizadorDocumento({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !blob) return null;
+  if (!isOpen || (!blob && !dataUrl && !pdfUrl)) return null;
 
   const handleImprimir = () => {
     try {
@@ -60,15 +67,14 @@ export default function ModalVisualizadorDocumento({
 
   const handleSalvarPDF = () => {
     try {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
+      const href = pdfUrl || dataUrl || (blob ? URL.createObjectURL(blob) : '');
+      if (!href) return;
       const a = document.createElement('a');
-      a.href = url;
+      a.href = href;
       a.download = nomeArquivo;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
       toast.success('Documento salvo com sucesso!');
     } catch (e) {
       console.error('Erro ao salvar arquivo PDF:', e);

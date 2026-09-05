@@ -1,21 +1,41 @@
 // src/services/notasService.js
 import { parseToBackendFloat } from "../utils/numberUtils";
 import { api } from "../api/client";
+import { getUser, isAdmin } from "../auth/auth";
 
 const KEY = "notas_jsa";
 
+function _resolveUser(provided = null) {
+  const u = provided || getUser() || {};
+  const email = (u.email || u.user_email || '').trim().toLowerCase();
+  const rawName = (u.name || u.nome || '').trim();
+  const rawSurname = (u.surname || u.sobrenome || '').trim();
+  let fullName = [rawName, rawSurname].filter(Boolean).join(' ');
+  if (!fullName || fullName.toLowerCase() === 'usuario') {
+    fullName = email ? email.split('@')[0] : 'Operador';
+  }
+
+  const isUserAdmin = isAdmin(u);
+  const filialStorage = localStorage.getItem('usuario_filial');
+  const filial = (u.filial || u.user_filial || filialStorage || 'Filial 1').trim();
+
+  return { id: u.id || null, email, name: fullName, isUserAdmin, filial };
+}
+
 // Sincroniza em segundo plano com o banco de dados
-export async function sincronizarNotasDoServidor() {
+export async function sincronizarNotasDoServidor(customUser = null) {
+  const u = _resolveUser(customUser);
   try {
-    const resp = await api.get("/notas");
+    const params = u.isUserAdmin ? { isAdmin: 'true' } : { filial: u.filial };
+    const resp = await api.get("/notas", { params });
     if (Array.isArray(resp.data)) {
       persist(resp.data);
-      return resp.data;
+      return listarNotas(u);
     }
   } catch (e) {
     // Modo offline resiliente
   }
-  return listarNotas();
+  return listarNotas(u);
 }
 
 // ---------- utils ----------
@@ -46,7 +66,8 @@ function nextNumero(list) {
   return nums.length ? Math.max(...nums) + 1 : 1;
 }
 
-function normalizeNota(nota) {
+function normalizeNota(nota, customUser = null) {
+  const u = _resolveUser(customUser);
   let numeroLimpo = nota.numero != null ? String(nota.numero).trim() : '';
   let chaveAcesso = String(nota.chavedeacesso || '').trim();
 
@@ -61,10 +82,19 @@ function normalizeNota(nota) {
     numeroLimpo = String(Number(nNF));
   }
 
+  const cnpj = nota.cnpj ? String(nota.cnpj).trim() : '';
+  const produtoRelacionado = nota.produtoRelacionado || nota.produto_relacionado || nota.produto || '';
+  const tipoConta = nota.tipoConta || 'Receber';
+  const filial = (nota.filial || u.filial || 'Filial 1').trim();
+
   return {
     ...nota,
+    filial,
     numero: numeroLimpo || nota.numero,
     chavedeacesso: chaveAcesso,
+    cnpj,
+    produtoRelacionado,
+    tipoConta,
     valor: parseToBackendFloat(nota.valor),
     status: nota.status || "Emitida",
     updatedAt: new Date().toISOString(),
@@ -72,15 +102,28 @@ function normalizeNota(nota) {
 }
 
 // ---------- API ----------
-export function listarNotas() {
+export function listarNotas(customUser = null) {
+  const u = _resolveUser(customUser);
   const raw = localStorage.getItem(KEY);
-  const list = safeParse(raw);
-  return list.map(normalizeNota);
+  const list = safeParse(raw).map((n) => normalizeNota(n, u));
+
+  // Admin visualiza todas as filiais
+  if (u.isUserAdmin) {
+    return list;
+  }
+
+  // Usuário de filial visualiza todas as notas inseridas por todos os usuários da sua filial (ex: Filial 4)
+  const userFilialNorm = String(u.filial || 'Filial 1').trim().toLowerCase();
+  return list.filter((n) => {
+    const notaFilialNorm = String(n.filial || 'Filial 1').trim().toLowerCase();
+    return notaFilialNorm === userFilialNorm;
+  });
 }
 
 /** true se já existir outra nota com a mesma chave (ignora o id informado) */
 export function chaveExiste(chavedeacesso, ignoreId) {
-  const list = listarNotas();
+  const raw = localStorage.getItem(KEY);
+  const list = safeParse(raw);
   const key = String(chavedeacesso || "").trim();
   if (!key) return false;
   return list.some(
@@ -90,10 +133,18 @@ export function chaveExiste(chavedeacesso, ignoreId) {
   );
 }
 
-export function salvarNota(nota) {
-  const list = listarNotas();
+export function salvarNota(nota, customUser = null) {
+  const u = _resolveUser(customUser);
+  const raw = localStorage.getItem(KEY);
+  const list = safeParse(raw).map((n) => normalizeNota(n, u));
 
-  const nova = normalizeNota(nota);
+  const nova = normalizeNota(
+    {
+      ...nota,
+      filial: nota.filial || u.filial || 'Filial 1',
+    },
+    u
+  );
   if (!nova.id) nova.id = nextId(list);
   if (!nova.numero) nova.numero = nextNumero(list);
   if (!nova.createdAt) nova.createdAt = new Date().toISOString();
@@ -109,11 +160,13 @@ export function salvarNota(nota) {
   return nova;
 }
 
-export function atualizarNota(nota) {
-  const list = listarNotas();
+export function atualizarNota(nota, customUser = null) {
+  const u = _resolveUser(customUser);
+  const raw = localStorage.getItem(KEY);
+  const list = safeParse(raw).map((n) => normalizeNota(n, u));
   const idx = list.findIndex((n) => Number(n.id) === Number(nota.id));
   if (idx >= 0) {
-    const atualizada = normalizeNota({ ...list[idx], ...nota });
+    const atualizada = normalizeNota({ ...list[idx], ...nota }, u);
     list[idx] = atualizada;
     persist(list);
 
@@ -128,7 +181,8 @@ export function atualizarNota(nota) {
 }
 
 export function cancelarNota(id) {
-  const list = listarNotas();
+  const raw = localStorage.getItem(KEY);
+  const list = safeParse(raw);
   const idx = list.findIndex((n) => Number(n.id) === Number(id));
   if (idx >= 0) {
     const n = { ...list[idx] };
@@ -150,11 +204,12 @@ export function cancelarNota(id) {
 }
 
 export function excluirNota(id) {
-  const list = listarNotas();
+  const raw = localStorage.getItem(KEY);
+  const list = safeParse(raw);
   const idx = list.findIndex((n) => Number(n.id) === Number(id));
   if (idx < 0) return false;
   const n = list[idx];
-  if (n.statusCancelamento === "Pendente" || n.deletePending || n.exclusaoPendente) {
+  if (n.statusCancelamento === "Pendente") {
     return false;
   }
   list.splice(idx, 1);
@@ -170,7 +225,8 @@ export function excluirNota(id) {
 
 export function excluirNotas(ids = []) {
   const set = new Set((ids || []).map(Number));
-  const list = listarNotas();
+  const raw = localStorage.getItem(KEY);
+  const list = safeParse(raw);
 
   const keep = [];
   const deletedIds = [];
@@ -178,7 +234,7 @@ export function excluirNotas(ids = []) {
 
   for (const n of list) {
     if (set.has(Number(n.id))) {
-      if (n.statusCancelamento === "Pendente" || n.deletePending || n.exclusaoPendente) {
+      if (n.statusCancelamento === "Pendente") {
         blockedIds.push(n.id);
         keep.push(n);
       } else {

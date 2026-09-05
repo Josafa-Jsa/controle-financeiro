@@ -72,9 +72,10 @@ export default function ModalDanfe({
         backgroundColor: 'rgba(0, 0, 0, 0.82)',
         backdropFilter: 'blur(5px)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
         padding: '16px',
+        overflow: 'hidden',
       }}
     >
       <div
@@ -107,13 +108,28 @@ export default function ModalDanfe({
         >
           <div>
             <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>📄</span> DANFE - Documento Auxiliar da NF-e
+              <span>📄</span> DANFE - Documento Auxiliar da NF-e (Meu DANFE / SEFAZ)
             </h2>
             <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>
-              NF-e Nº <strong>#{numeroNota}</strong> • {emitenteNota}
+              NF-e Nº <strong>#{numeroNota}</strong> • {emitenteNota} {nota.cnpj ? `(${nota.cnpj})` : ''} {nota.produtoRelacionado ? `• ${nota.produtoRelacionado}` : ''}
             </p>
           </div>
-
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: '1.4rem',
+              cursor: 'pointer',
+              lineHeight: 1,
+              padding: '4px 8px',
+            }}
+            title="Fechar (ESC)"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Corpo do Modal com Visualizador PDF Embutido */}

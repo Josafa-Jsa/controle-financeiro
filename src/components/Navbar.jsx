@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { logout, getUser, setUser } from "../auth/auth";
 import { api } from "../api/client";
+import { useSystemStatus, verificarManutencaoTela } from "../services/systemStatusService";
 import brasaoImg from "../assets/brasao.png";
 import "./Visual/Navbar.css";
 
@@ -26,6 +27,7 @@ export default function Navbar({ onOpenAccessModal }) {
   const navigate = useNavigate();
   const location = useLocation();
   const fileInputRef = useRef(null);
+  const systemStatus = useSystemStatus();
 
   // Estados do Usuário e Permissões
   const [userPermissions, setUserPermissions] = useState([]);
@@ -53,6 +55,36 @@ export default function Navbar({ onOpenAccessModal }) {
   /* ===================================================== */
   /* NAVEGAÇÃO COM CARREGAMENTO E TOAST                   */
   /* ===================================================== */
+  const renderMaintenanceBadge = (path) => {
+    const status = verificarManutencaoTela(path, systemStatus);
+    if (!status?.emManutencao) return null;
+    const badgeTitle = status.isGeral
+      ? "Sistema em Manutenção em Múltiplas Telas!"
+      : `${status.nomeTela} Em Manutenção...`;
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "2px",
+          marginLeft: "6px",
+          padding: "1px 6px",
+          borderRadius: "10px",
+          fontSize: "0.68rem",
+          fontWeight: 700,
+          backgroundColor: "rgba(245, 158, 11, 0.2)",
+          color: "#f59e0b",
+          border: "1px solid rgba(245, 158, 11, 0.45)",
+          letterSpacing: "0.2px",
+          verticalAlign: "middle",
+        }}
+        title={badgeTitle}
+      >
+        🟡 Ajuste
+      </span>
+    );
+  };
+
   const handleNavClick = (e, path, label) => {
     e.preventDefault();
     setMobileMenuOpen(false);
@@ -62,7 +94,18 @@ export default function Navbar({ onOpenAccessModal }) {
       return;
     }
 
-    toast.info(`📍 Acessando: ${label}`);
+    const checkManutencao = verificarManutencaoTela(path, systemStatus);
+    if (checkManutencao?.emManutencao && !isFullAccess) {
+      const msgManutencao = checkManutencao.isGeral
+        ? "⚠️ Sistema em Manutenção em Múltiplas Telas! O acesso está temporariamente bloqueado."
+        : `⚠️ ${checkManutencao.nomeTela} Em Manutenção... O acesso está bloqueado.`;
+      toast.warn(msgManutencao, {
+        toastId: `manutencao-${path}`,
+      });
+    } else {
+      toast.info(`📍 Acessando: ${label}`);
+    }
+
     setLoadingText(`Redirecionando para ${label}...`);
     setIsNavigating(true);
 
@@ -491,7 +534,7 @@ export default function Navbar({ onOpenAccessModal }) {
             onClick={(e) => handleNavClick(e, "/", "Início")}
             className="brand-link"
           >
-            {userPermissions.includes("prevencao") || userPermissions.includes("uniformes")
+            {userPermissions.includes("prevencao") || userPermissions.includes("uniformes") || userPermissions.includes("controle-uniformes") || userPermissions.includes("controle-notas")
               ? "🛒 Big Master Supermercados"
               : "JSA Soluções Tecnológicas"}
           </Link>
@@ -506,7 +549,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/dashboard" ? "active" : ""
                 }`}
             >
-              📊 Dashboard
+              📊 Dashboard{renderMaintenanceBadge("/dashboard")}
             </Link>
           )}
 
@@ -517,7 +560,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/chamados" ? "active" : ""
                 }`}
             >
-              🎧 Atendimentos
+              🎧 Atendimentos{renderMaintenanceBadge("/chamados")}
             </Link>
           )}
 
@@ -528,7 +571,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/contas" ? "active" : ""
                 }`}
             >
-              💳 Gestão de Contas
+              💳 Gestão de Contas{renderMaintenanceBadge("/contas")}
             </Link>
           )}
 
@@ -539,7 +582,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/fluxo" ? "active" : ""
                 }`}
             >
-              📈 Fluxo de Caixa
+              📈 Fluxo de Caixa{renderMaintenanceBadge("/fluxo")}
             </Link>
           )}
 
@@ -550,7 +593,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/simulador" ? "active" : ""
                 }`}
             >
-              🧮 Simulador
+              🧮 Simulador{renderMaintenanceBadge("/simulador")}
             </Link>
           )}
 
@@ -561,7 +604,18 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/notas" ? "active" : ""
                 }`}
             >
-              📑 Notas Fiscais
+              📑 Notas Fiscais{renderMaintenanceBadge("/notas")}
+            </Link>
+          )}
+
+          {(canAccess("controle-notas") || canAccess("notas")) && (
+            <Link
+              to="/controle-notas"
+              onClick={(e) => handleNavClick(e, "/controle-notas", "Controle de Notas")}
+              className={`nav-link ${location.pathname === "/controle-notas" ? "active" : ""
+                }`}
+            >
+              📋 Controle de Notas{renderMaintenanceBadge("/controle-notas")}
             </Link>
           )}
 
@@ -572,7 +626,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/ordem-servico" ? "active" : ""
                 }`}
             >
-              🛠️ O.S
+              🛠️ O.S{renderMaintenanceBadge("/ordem-servico")}
             </Link>
           )}
 
@@ -583,7 +637,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/contratos" ? "active" : ""
                 }`}
             >
-              📝 Contratos
+              📝 Contratos{renderMaintenanceBadge("/contratos")}
             </Link>
           )}
 
@@ -594,7 +648,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/contrato-internet" ? "active" : ""
                 }`}
             >
-              🌐 Internet
+              🌐 Internet{renderMaintenanceBadge("/contrato-internet")}
             </Link>
           )}
 
@@ -605,7 +659,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/estoque" ? "active" : ""
                 }`}
             >
-              📦 Estoque
+              📦 Estoque{renderMaintenanceBadge("/estoque")}
             </Link>
           )}
 
@@ -616,7 +670,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/prevencao" ? "active" : ""
                 }`}
             >
-              🛡️ Prevenção
+              🛡️ Prevenção{renderMaintenanceBadge("/prevencao")}
             </Link>
           )}
 
@@ -627,7 +681,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/uniformes" ? "active" : ""
                 }`}
             >
-              👔 Uniformes
+              👔 Uniformes{renderMaintenanceBadge("/uniformes")}
             </Link>
           )}
 
@@ -638,7 +692,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/admin/users" ? "active" : ""
                 }`}
             >
-              👥 Usuários
+              👥 Usuários{renderMaintenanceBadge("/admin/users")}
             </Link>
           )}
 
@@ -649,7 +703,7 @@ export default function Navbar({ onOpenAccessModal }) {
               className={`nav-link ${location.pathname === "/admin/log" ? "active" : ""
                 }`}
             >
-              📜 Logs
+              📜 Logs{renderMaintenanceBadge("/admin/log")}
             </Link>
           )}
         </div>
@@ -866,7 +920,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/dashboard", "Dashboard")}
                   className={`mobile-nav-item ${location.pathname === "/dashboard" ? "active" : ""}`}
                 >
-                  <span>📊</span> Dashboard
+                  <span>📊</span> Dashboard{renderMaintenanceBadge("/dashboard")}
                 </Link>
               )}
               {canAccess("chamados") && (
@@ -875,7 +929,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/chamados", "Atendimentos / Chamados")}
                   className={`mobile-nav-item ${location.pathname === "/chamados" ? "active" : ""}`}
                 >
-                  <span>🎧</span> Atendimentos
+                  <span>🎧</span> Atendimentos{renderMaintenanceBadge("/chamados")}
                 </Link>
               )}
               {canAccess("contas") && (
@@ -884,7 +938,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/contas", "Gestão de Contas")}
                   className={`mobile-nav-item ${location.pathname === "/contas" ? "active" : ""}`}
                 >
-                  <span>💳</span> Gestão de Contas
+                  <span>💳</span> Gestão de Contas{renderMaintenanceBadge("/contas")}
                 </Link>
               )}
               {canAccess("fluxo") && (
@@ -893,7 +947,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/fluxo", "Fluxo de Caixa")}
                   className={`mobile-nav-item ${location.pathname === "/fluxo" ? "active" : ""}`}
                 >
-                  <span>📈</span> Fluxo de Caixa
+                  <span>📈</span> Fluxo de Caixa{renderMaintenanceBadge("/fluxo")}
                 </Link>
               )}
               {canAccess("simulador") && (
@@ -902,7 +956,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/simulador", "Simulador de Créditos")}
                   className={`mobile-nav-item ${location.pathname === "/simulador" ? "active" : ""}`}
                 >
-                  <span>🧮</span> Simulador
+                  <span>🧮</span> Simulador{renderMaintenanceBadge("/simulador")}
                 </Link>
               )}
               {canAccess("notas") && (
@@ -911,7 +965,16 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/notas", "Notas Fiscais")}
                   className={`mobile-nav-item ${location.pathname === "/notas" ? "active" : ""}`}
                 >
-                  <span>📑</span> Notas Fiscais
+                  <span>📑</span> Notas Fiscais{renderMaintenanceBadge("/notas")}
+                </Link>
+              )}
+              {(canAccess("controle-notas") || canAccess("notas")) && (
+                <Link
+                  to="/controle-notas"
+                  onClick={(e) => handleNavClick(e, "/controle-notas", "Controle de Notas")}
+                  className={`mobile-nav-item ${location.pathname === "/controle-notas" ? "active" : ""}`}
+                >
+                  <span>📋</span> Controle de Notas{renderMaintenanceBadge("/controle-notas")}
                 </Link>
               )}
               {canAccess("ordem-servico") && (
@@ -920,7 +983,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/ordem-servico", "Ordem de Serviços")}
                   className={`mobile-nav-item ${location.pathname === "/ordem-servico" ? "active" : ""}`}
                 >
-                  <span>🛠️</span> O.S
+                  <span>🛠️</span> O.S{renderMaintenanceBadge("/ordem-servico")}
                 </Link>
               )}
               {canAccess("contratos") && (
@@ -929,7 +992,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/contratos", "Gestão de Contratos")}
                   className={`mobile-nav-item ${location.pathname === "/contratos" ? "active" : ""}`}
                 >
-                  <span>📝</span> Contratos
+                  <span>📝</span> Contratos{renderMaintenanceBadge("/contratos")}
                 </Link>
               )}
               {canAccess("contrato-internet") && (
@@ -938,7 +1001,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/contrato-internet", "Contrato Internet")}
                   className={`mobile-nav-item ${location.pathname === "/contrato-internet" ? "active" : ""}`}
                 >
-                  <span>🌐</span> Internet
+                  <span>🌐</span> Internet{renderMaintenanceBadge("/contrato-internet")}
                 </Link>
               )}
               {canAccess("estoque") && (
@@ -947,7 +1010,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/estoque", "Controle de Estoque")}
                   className={`mobile-nav-item ${location.pathname === "/estoque" ? "active" : ""}`}
                 >
-                  <span>📦</span> Estoque
+                  <span>📦</span> Estoque{renderMaintenanceBadge("/estoque")}
                 </Link>
               )}
               {canAccess("prevencao") && (
@@ -956,7 +1019,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/prevencao", "Prevenção de Perdas")}
                   className={`mobile-nav-item ${location.pathname === "/prevencao" ? "active" : ""}`}
                 >
-                  <span>🛡️</span> Prevenção
+                  <span>🛡️</span> Prevenção{renderMaintenanceBadge("/prevencao")}
                 </Link>
               )}
               {canAccess("uniformes") && (
@@ -965,7 +1028,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/uniformes", "Controle de Uniformes")}
                   className={`mobile-nav-item ${location.pathname === "/uniformes" ? "active" : ""}`}
                 >
-                  <span>👔</span> Uniformes
+                  <span>👔</span> Uniformes{renderMaintenanceBadge("/uniformes")}
                 </Link>
               )}
               {canAccess("usuarios") && (
@@ -974,7 +1037,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/admin/users", "Gerenciamento de Usuários")}
                   className={`mobile-nav-item ${location.pathname === "/admin/users" ? "active" : ""}`}
                 >
-                  <span>👥</span> Usuários
+                  <span>👥</span> Usuários{renderMaintenanceBadge("/admin/users")}
                 </Link>
               )}
               {canAccess("logs") && (
@@ -983,7 +1046,7 @@ export default function Navbar({ onOpenAccessModal }) {
                   onClick={(e) => handleNavClick(e, "/admin/log", "Logs do Sistema")}
                   className={`mobile-nav-item ${location.pathname === "/admin/log" ? "active" : ""}`}
                 >
-                  <span>📜</span> Logs
+                  <span>📜</span> Logs{renderMaintenanceBadge("/admin/log")}
                 </Link>
               )}
               <div className="mobile-nav-divider"></div>

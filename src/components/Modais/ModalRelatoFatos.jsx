@@ -70,6 +70,9 @@ export default function ModalRelatoFatos({
           </h2>
           <div style={{ display: 'flex', gap: '6px', fontSize: '11.5px' }}>
             <span style={{ background: '#242b35', padding: '2px 6px', borderRadius: '4px', color: '#94a3b8' }}>
+              Filial: <strong style={{ color: '#38bdf8' }}>{ocorrencia.filial || 'Filial 1'}</strong>
+            </span>
+            <span style={{ background: '#242b35', padding: '2px 6px', borderRadius: '4px', color: '#94a3b8' }}>
               Tipo: <strong style={{ color: '#fff' }}>{ocorrencia.tipo}</strong>
             </span>
             <span style={{ background: '#242b35', padding: '2px 6px', borderRadius: '4px', color: '#94a3b8' }}>

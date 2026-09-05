@@ -1,211 +1,39 @@
-// // import jsPDF from "jspdf";
-
-// // const gerarPDF = (dados, termos) => {
-// //   try {
-// //     const doc = new jsPDF();
-
-// //     const texto = `
-// // JSA, Soluções Tecnológicas
-
-// // Número OS: ${dados.numeroOS}
-
-// // === Dados do Cliente ===
-// // Nome: ${dados.cliente.nome}
-// // Telefone: ${dados.cliente.telefone}
-// // Endereço: ${dados.cliente.endereco}
-// // Email: ${dados.cliente.email}
-// // CPF/CNPJ: ${dados.cliente.documento}
-
-// // === Equipamento ===
-// // Marca: ${dados.equipamento.marca}
-// // Modelo: ${dados.equipamento.modelo}
-// // Série: ${dados.equipamento.serie}
-// // Problema: ${dados.equipamento.problema}
-
-// // === Serviços ===
-// // ${dados.servicos}
-
-// // === Peças e Materiais ===
-// // ${dados.pecas}
-
-// // === Custos ===
-// // ${dados.custos}
-
-// // === Prazos ===
-// // Início: ${dados.prazoInicio}
-// // Previsão Término: ${dados.prazoFim}
-
-// // === Pagamento ===
-// // Forma: ${dados.pagamento}
-
-// // === Técnico ===
-// // ${dados.tecnico}
-
-// // === Dados da Empresa ===
-// // JSA Soluções Tecnológicas
-// // CPF/CNPJ: 049.032.411-81
-// // Telefone: (65) 98402-7342
-// // Endereço: Rua Benedito Pereira de Oliveira, n. 3879-W Jd. Monte Líbano
-// // Email: jsa.tech.jsa@gmail.com
-
-// // === Termos e Condições ===
-// // ${termos}
-
-// // Assinatura do Cliente: _______________________
-
-// // Assinatura do Técnico: _______________________
-// // `;
-
-// //     doc.setFontSize(10);
-// //     const linhas = doc.splitTextToSize(texto, 180); // largura máxima de 180mm
-// //     doc.text(linhas, 10, 10);
-// //     doc.save(`${dados.numeroOS}.pdf`);
-// //   } catch (error) {
-// //     console.error("Erro ao gerar PDF:", error);
-// //   }
-// // };
-
-// // export default gerarPDF;
-
-// // src/pages/Os/OrdemServicoPDF.js
-// import jsPDF from "jspdf";
-// import { logEvent } from "../../utils/logger";
-
-// function sanitizeFileName(name) {
-//   return String(name || "OS")
-//     .replace(/[\\/:*?"<>|]+/g, "_")
-//     .slice(0, 120);
-// }
-
-// const gerarPDF = (dados = {}, termos = "") => {
-//   try {
-//     const doc = new jsPDF({ unit: "mm", format: "a4" });
-
-//     const empresaBlock = [
-//       "JSA Soluções Tecnológicas",
-//       "",
-//       `Número OS: ${dados?.numeroOS || "-"}`,
-//       "",
-//       "=== Dados do Cliente ===",
-//       `Nome: ${dados?.cliente?.nome || "-"}`,
-//       `Telefone: ${dados?.cliente?.telefone || "-"}`,
-//       `Endereço: ${dados?.cliente?.endereco || "-"}`,
-//       `Email: ${dados?.cliente?.email || "-"}`,
-//       `CPF/CNPJ: ${dados?.cliente?.documento || "-"}`,
-//       "",
-//       "=== Equipamento ===",
-//       `Marca: ${dados?.equipamento?.marca || "-"}`,
-//       `Modelo: ${dados?.equipamento?.modelo || "-"}`,
-//       // `Série: ${dados?.equipamento?.serie || "-"}`,
-//       `Problema: ${dados?.equipamento?.problema || "-"}`,
-//       "",
-//       "=== Serviços ===",
-//       String(dados?.servicos || "-"),
-//       "",
-//       "=== Peças e Materiais ===",
-//       String(dados?.pecas || "-"),
-//       "",
-//       // "=== Custos ===",
-//       // String(dados?.custos || "-"),
-//       // "",
-//       "=== Prazos ===",
-//       // `Início: ${dados?.prazoInicio || "-"}`,
-//       `Previsão Término: ${dados?.prazoFim || "-"}`,
-//       "",
-//       "=== Pagamento ===",
-//       `Forma: ${dados?.pagamento || "-"}`,
-//       "",
-//       "=== Técnico ===",
-//       String(dados?.tecnico || "-"),
-//       "",
-//       "=== Dados da Empresa ===",
-//       "JSA Soluções Tecnológicas",
-//       "CPF/CNPJ: 63.061.124/0001-05",
-//       "Telefone: (65) 98402-7342",
-//       "Endereço: Rua Benedito Pereira de Oliveira, n. 3879-W Jd. Monte Líbano",
-//       "Email: jsa.tech.jsa@gmail.com",
-//       "",
-//       "=== Termos e Condições ===",
-//       String(termos || "-"),
-//       "",
-//       `Gerado em: ${new Date().toLocaleString("pt-BR")}`,
-//     ].join("\n");
-
-//     // layout
-//     const marginLeft = 10;
-//     const marginTop = 12;
-//     const maxWidth = 190; // A4: 210mm width -> 10mm margins
-//     const lineHeight = 5.5;
-//     const pageHeight = 297;
-//     const bottomMargin = 12;
-//     let cursorY = marginTop;
-
-//     doc.setFont("helvetica", "normal");
-//     doc.setFontSize(12);
-
-//     // título
-//     doc.setFontSize(14);
-//     doc.text("Ordem de Serviço - JSA", marginLeft, cursorY);
-//     cursorY += 8;
-
-//     // corpo
-//     doc.setFontSize(10);
-//     const lines = doc.splitTextToSize(empresaBlock, maxWidth);
-
-//     lines.forEach((ln) => {
-//       if (cursorY + lineHeight > pageHeight - bottomMargin) {
-//         doc.addPage();
-//         cursorY = marginTop;
-//       }
-//       doc.text(ln, marginLeft, cursorY);
-//       cursorY += lineHeight;
-//     });
-
-//     // rodapé simples com número de página
-//     const pageCount = doc.getNumberOfPages();
-//     for (let i = 1; i <= pageCount; i++) {
-//       doc.setPage(i);
-//       doc.setFontSize(9);
-//       doc.text(`Página ${i} de ${pageCount}`, 210 - marginLeft - 20, 297 - 8);
-//     }
-
-//     const fileName = sanitizeFileName(`${dados?.numeroOS || "OS"}.pdf`);
-//     doc.save(fileName);
-
-//     // ===== LOG: PDF gerado =====
-//     logEvent({
-//       type: "os",
-//       title: "PDF gerado",
-//       details: {
-//         numeroOS: dados?.numeroOS || "",
-//         cliente: dados?.cliente?.nome || "",
-//         tecnico: dados?.tecnico || "",
-//         arquivo: fileName,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Erro ao gerar PDF:", error);
-//     // log de erro também
-//     try {
-//       logEvent({
-//         type: "os",
-//         title: "Erro ao gerar PDF",
-//         details: {
-//           numeroOS: dados?.numeroOS || "",
-//           erro: String(error?.message || error),
-//         },
-//       });
-//     } catch {}
-//   }
-// };
-
-// export default gerarPDF;
-
-
-
 // src/pages/Os/OrdemServicoPDF.js
 import jsPDF from "jspdf";
 import { logEvent } from "../../utils/logger";
+import logoJSA from "../../assets/JSA.png";
+
+let cachedLogoImage = null;
+
+function getLogoImage() {
+  return new Promise((resolve) => {
+    if (cachedLogoImage && cachedLogoImage.complete && cachedLogoImage.naturalWidth > 0) {
+      return resolve(cachedLogoImage);
+    }
+    if (typeof window === "undefined") {
+      return resolve(null);
+    }
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        cachedLogoImage = img;
+        resolve(img);
+      };
+      img.onerror = () => {
+        resolve(null);
+      };
+      img.src = logoJSA;
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+// Pré-carrega no navegador para resposta instantânea ao clicar
+if (typeof window !== "undefined") {
+  getLogoImage();
+}
 
 function sanitizeFileName(name) {
   return String(name || "OS")
@@ -213,14 +41,74 @@ function sanitizeFileName(name) {
     .slice(0, 120);
 }
 
-const gerarPDF = (dados = {}, termos = "") => {
+const gerarPDF = async (dados = {}, termos = "") => {
   try {
     const doc = new jsPDF({ unit: "mm", format: "a4" });
 
-    const empresaBlock = [
-      "JSA Soluções Tecnológicas",
-      "",
-      `Número OS: ${dados?.numeroOS || "-"}`,
+    const termoFinal = dados?.termoCondicoes || termos || "";
+    const formaPagamentoTexto = dados?.formaPagamento || dados?.pagamento || "-";
+    const valorPagamentoTexto = dados?.valorPagamento ? `R$ ${dados.valorPagamento}` : (dados?.custos || "-");
+
+    // Layout
+    const marginLeft = 10;
+    const marginTop = 12;
+    const maxWidth = 190; // A4: 210mm largura - 20mm margens
+    const lineHeight = 5.5;
+    const pageHeight = 297;
+    const bottomMargin = 12;
+    let cursorY = marginTop;
+
+    // Título
+    // doc.setFont("helvetica", "bold");
+    // doc.setFontSize(14);
+    // doc.text("Ordem de Serviço - JSA", marginLeft, cursorY);
+    // cursorY += 6;
+
+    // Cabeçalho da Empresa: Imagem JSA à esquerda + Dados da Empresa ao lado
+    const logoWidth = 28;
+    const logoHeight = 18.5; // proporção compatível com a imagem (~1.5)
+    const headerStartY = cursorY;
+
+    // Carrega/Recupera a imagem do logo
+    const logoImg = await getLogoImage();
+    if (logoImg) {
+      try {
+        doc.addImage(logoImg, "PNG", marginLeft, headerStartY, logoWidth, logoHeight);
+      } catch (errImg) {
+        console.warn("Aviso ao adicionar imagem no PDF:", errImg);
+      }
+    }
+
+    // Informações da Empresa alinhadas ao lado direito da logo
+    const textX = marginLeft + logoWidth + 4; // 10 + 28 + 4 = 42mm
+    let infoY = headerStartY + 3.2;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.text("JSA Soluções Tecnológicas", textX, infoY);
+    infoY += 3.8;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("CPF/CNPJ: 63.061.124/0001-05", textX, infoY);
+    infoY += 3.5;
+    doc.text("Telefone: (65) 98402-7342", textX, infoY);
+    infoY += 3.5;
+    doc.text("Endereço: Rua Benedito Pereira de Oliveira, n. 3879-W Jd. Monte Líbano, Tangará da Serra - MT", textX, infoY);
+    infoY += 3.5;
+    doc.text("Email: jsa.tech.jsa@gmail.com", textX, infoY);
+
+    cursorY = Math.max(headerStartY + logoHeight, infoY) + 3;
+
+    // Linha divisória sutil
+    doc.setDrawColor(180, 180, 195);
+    doc.setLineWidth(0.3);
+    doc.line(marginLeft, cursorY, marginLeft + maxWidth, cursorY);
+    cursorY += 4.5;
+
+    // Corpo da Ordem de Serviço
+    const corpoBlock = [
+      `N°: ${dados?.numeroOS || "-"}`,
       "",
       "=== Dados do Cliente ===",
       `Nome: ${dados?.cliente?.nome || "-"}`,
@@ -242,50 +130,27 @@ const gerarPDF = (dados = {}, termos = "") => {
       String(dados?.pecas || "-"),
       "",
       "=== Custos ===",
-      String(dados?.custos || "-"),
+      String(valorPagamentoTexto),
       "",
       "=== Prazos ===",
       `Início: ${dados?.prazoInicio || "-"}`,
       `Previsão Término: ${dados?.prazoFim || "-"}`,
       "",
       "=== Pagamento ===",
-      `Forma: ${dados?.pagamento || "-"}`,
+      `Forma: ${formaPagamentoTexto}`,
       "",
       "=== Técnico ===",
       String(dados?.tecnico || "-"),
       "",
-      "=== Dados da Empresa ===",
-      "JSA Soluções Tecnológicas",
-      "CPF/CNPJ: 63.061.124/0001-05",
-      "Telefone: (65) 98402-7342",
-      "Endereço: Rua Benedito Pereira de Oliveira, n. 3879-W Jd. Monte Líbano, Tangará da Serra - MT",
-      "Email: jsa.tech.jsa@gmail.com",
-      "",
       "=== Termos e Condições ===",
-      String(termos || "-"),
+      String(termoFinal || "-"),
       "",
       `Gerado em: ${new Date().toLocaleString("pt-BR")}`,
     ].join("\n");
 
-    // Layout
-    const marginLeft = 10;
-    const marginTop = 12;
-    const maxWidth = 190; // A4: 210mm largura - 20mm margens
-    const lineHeight = 5.5;
-    const pageHeight = 297;
-    const bottomMargin = 12;
-    let cursorY = marginTop;
-
     doc.setFont("helvetica", "normal");
-
-    // Título
-    doc.setFontSize(14);
-    doc.text("Ordem de Serviço - JSA", marginLeft, cursorY);
-    cursorY += 8;
-
-    // Corpo
     doc.setFontSize(10);
-    const lines = doc.splitTextToSize(empresaBlock, maxWidth);
+    const lines = doc.splitTextToSize(corpoBlock, maxWidth);
 
     lines.forEach((ln) => {
       if (cursorY + lineHeight > pageHeight - bottomMargin) {
@@ -329,7 +194,7 @@ const gerarPDF = (dados = {}, termos = "") => {
           erro: String(error?.message || error),
         },
       });
-    } catch {}
+    } catch { }
   }
 };
 

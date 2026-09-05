@@ -36,24 +36,34 @@ api.interceptors.request.use(
     let user = null;
     try {
       const raw =
+        localStorage.getItem('usuario_logado') ||
         localStorage.getItem('auth_user') ||
         localStorage.getItem('user') ||
         localStorage.getItem('currentUser');
       if (raw) user = JSON.parse(raw);
     } catch (e) {}
 
-    if (user) {
-      if (user.token) {
-        config.headers.Authorization = `Bearer ${user.token}`;
-      }
-      const email = user.email || user.user_metadata?.email || '';
-      if (email) {
-        config.headers['x-user-email'] = email.toLowerCase();
-      }
-      const uid = user.id || user.uid || '';
-      if (uid) {
-        config.headers['x-user-id'] = String(uid);
-      }
+    const token = user?.token || localStorage.getItem('token') || localStorage.getItem('auth_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    const email =
+      user?.email ||
+      user?.user_metadata?.email ||
+      localStorage.getItem('usuario_email') ||
+      '';
+    if (email) {
+      config.headers['x-user-email'] = String(email).trim().toLowerCase();
+    }
+
+    const uid =
+      user?.id ||
+      user?.uid ||
+      localStorage.getItem('usuario_id') ||
+      '';
+    if (uid) {
+      config.headers['x-user-id'] = String(uid).trim();
     }
     return config;
   },

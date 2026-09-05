@@ -147,13 +147,19 @@ export function gerarRelatorioBaixasUniformePDF(dadosBaixa) {
   doc.text('Autorização de Baixa Contábil & Estoque', margin + colW + 10 + (colW - 16) / 2, currentY + 31.5, { align: 'center' });
 
   // Rodapé
+  const pageHeight = doc.internal.pageSize.getHeight();
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);
   doc.text(
+    'Copyright © 2026 JSA Soluções Tecnológicas. All rights reserved.',
+    margin,
+    pageHeight - 6
+  );
+  doc.text(
     'BIG MASTER SUPERMERCADOS • Departamento de Prevenção de Perdas e Patrimônio • Documento Oficial',
-    pageWidth / 2,
-    286,
-    { align: 'center' }
+    pageWidth - margin,
+    pageHeight - 6,
+    { align: 'right' }
   );
 
   return doc;

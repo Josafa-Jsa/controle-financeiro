@@ -1,4 +1,8 @@
 import { Router } from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import * as authController from '../controllers/authController.js';
 import * as contasController from '../controllers/contasController.js';
 import * as notasController from '../controllers/notasController.js';
@@ -10,6 +14,31 @@ import * as simuladorController from '../controllers/simuladorController.js';
 import * as logsController from '../controllers/logsController.js';
 import * as prevencaoController from '../controllers/prevencaoController.js';
 import * as systemStatusController from '../controllers/systemStatusController.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsEvidenciasDir = path.resolve(__dirname, '../../uploads/evidencias');
+if (!fs.existsSync(uploadsEvidenciasDir)) {
+  fs.mkdirSync(uploadsEvidenciasDir, { recursive: true });
+}
+
+const evidenciaStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsEvidenciasDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '');
+    const cleanName = path.basename(file.originalname || 'arquivo', ext)
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 50);
+    cb(null, `${cleanName}_${Date.now()}${ext}`);
+  },
+});
+
+const uploadEvidenciaMiddleware = multer({
+  storage: evidenciaStorage,
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB
+});
 
 const router = Router();
 
@@ -36,9 +65,26 @@ router.delete('/contas/:id', contasController.deleteConta);
 
 // Notas Fiscais
 router.get('/notas', notasController.listNotas);
+router.get('/notas/consultar-chave/:chave', notasController.consultarChave);
 router.post('/notas', notasController.createNota);
 router.put('/notas/:id', notasController.updateNota);
 router.delete('/notas/:id', notasController.deleteNota);
+
+// Controle de Notas
+import * as controleNotasController from '../controllers/controleNotasController.js';
+router.get('/controle-notas', controleNotasController.listControleNotas);
+router.get('/relatorio-controle-notas', controleNotasController.getRelatorioControleNotas);
+router.post('/controle-notas', controleNotasController.createControleNota);
+router.put('/controle-notas/:id', controleNotasController.updateControleNota);
+router.delete('/controle-notas/:id', controleNotasController.deleteControleNota);
+
+// Fornecedores (Cadastro compartilhado e sincronizado no banco de dados)
+import * as fornecedoresController from '../controllers/fornecedoresController.js';
+router.get('/fornecedores', fornecedoresController.listFornecedores);
+router.get('/fornecedores/consultar/:cnpj', fornecedoresController.getFornecedorByCnpj);
+router.post('/fornecedores', fornecedoresController.createOrUpdateFornecedor);
+router.put('/fornecedores/:id', fornecedoresController.createOrUpdateFornecedor);
+router.delete('/fornecedores/:id', fornecedoresController.deleteFornecedor);
 
 // Ordens de Serviço (O.S)
 router.get('/os', osController.listOS);
@@ -77,6 +123,7 @@ router.post('/logs', logsController.createLog);
 // Prevenção de Perdas e Roubos
 router.get('/prevencao', prevencaoController.listPrevencao);
 router.post('/prevencao', prevencaoController.createPrevencao);
+router.post('/prevencao/upload', uploadEvidenciaMiddleware.single('arquivo'), prevencaoController.uploadEvidencia);
 router.put('/prevencao/:id', prevencaoController.updatePrevencao);
 router.delete('/prevencao/:id', prevencaoController.deletePrevencao);
 

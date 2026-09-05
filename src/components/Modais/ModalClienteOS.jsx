@@ -225,7 +225,7 @@ export default function ModalClienteOS({
           {/* Botões */}
           <div className="modal-buttons" style={{ marginTop: '16px' }}>
             <button className="salve" type="submit">
-              💾 Salvar Cliente
+              💾 Salvar
             </button>
             <button className="cancela" type="button" onClick={onClose}>
               Cancelar

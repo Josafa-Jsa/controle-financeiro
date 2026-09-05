@@ -139,7 +139,7 @@ export function gerarComprovanteUniformePDF(dadosEntrega) {
 
   currentY += 40;
 
-  // 6. Bloco de Assinatura do Colaborador
+  // 6. Bloco de Assinatura do Colaborador (Coleta Física na Folha A4)
   doc.setDrawColor(148, 163, 184);
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(margin, currentY, contentWidth, 42, 2, 2, 'FD');
@@ -147,37 +147,49 @@ export function gerarComprovanteUniformePDF(dadosEntrega) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(30, 41, 59);
-  doc.text('ASSINATURA DIGITAL DO COLABORADOR (RETIRADA CONFIRMADA)', margin + 4, currentY + 5.5);
+  doc.text('ASSINATURA DO COLABORADOR (RETIRADA DE UNIFORME NA FOLHA A4)', margin + 4, currentY + 5.5);
 
-  if (dadosEntrega.assinatura) {
+  if (dadosEntrega.assinatura && typeof dadosEntrega.assinatura === 'string' && dadosEntrega.assinatura.startsWith('data:image')) {
     try {
-      // Embed da imagem da assinatura digital
-      doc.addImage(dadosEntrega.assinatura, 'PNG', margin + (contentWidth - 60) / 2, currentY + 8, 60, 20);
-    } catch {}
+      doc.addImage(dadosEntrega.assinatura, 'PNG', margin + (contentWidth - 60) / 2, currentY + 7, 60, 19);
+    } catch (err) {
+      console.warn('Erro ao inserir imagem de assinatura:', err);
+    }
   }
 
-  // Linha de Assinatura
+  // Linha para Assinatura Física com Caneta
   doc.setDrawColor(71, 85, 105);
-  doc.line(margin + 20, currentY + 31, pageWidth - margin - 20, currentY + 31);
+  doc.line(margin + 20, currentY + 27, pageWidth - margin - 20, currentY + 27);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(8.5);
   doc.setTextColor(15, 23, 42);
-  doc.text(String(dadosEntrega.nome || 'Colaborador').toUpperCase(), pageWidth / 2, currentY + 35, { align: 'center' });
+  doc.text(String(dadosEntrega.nome || 'Colaborador').toUpperCase(), pageWidth / 2, currentY + 32, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
+  doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text(`CPF: ${dadosEntrega.cpf || '-'} • Matrícula: ${dadosEntrega.matricula || '-'}`, pageWidth / 2, currentY + 38.5, { align: 'center' });
+  doc.text(
+    `CPF: ${dadosEntrega.cpf || '-'} • Matrícula: ${dadosEntrega.matricula || '-'} • Data da Coleta: ____/____/________`,
+    pageWidth / 2,
+    currentY + 36.5,
+    { align: 'center' }
+  );
 
   // 7. Rodapé Institucional
+  const pageHeight = doc.internal.pageSize.getHeight();
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    'BIG MASTER SUPERMERCADOS • Controle de Patrimônio e Uniformes • Documento Eletrônico Válido',
-    pageWidth / 2,
-    286,
-    { align: 'center' }
+    'Copyright © 2026 JSA Soluções Tecnológicas. All rights reserved.',
+    margin,
+    pageHeight - 6
+  );
+  doc.text(
+    'BIG MASTER SUPERMERCADOS • Controle de Patrimônio e Uniformes • Documento Oficial',
+    pageWidth - margin,
+    pageHeight - 6,
+    { align: 'right' }
   );
 
   return doc;

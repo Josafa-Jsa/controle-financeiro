@@ -3,58 +3,167 @@ import { toast } from "react-toastify";
 import { logEvent } from "../utils/logger";
 import { parseToBackendFloat } from "../utils/numberUtils";
 import { api } from "../api/client";
-import { getCurrentUser } from "../auth/auth";
+import { getCurrentUser, isAdmin } from "../auth/auth";
 
 const STORAGE_KEY = "contas";
+const DELETED_KEY = "contas_deleted_ids";
 
-const ADMIN_EMAILS = ["jsa@jsa.com", "jsa.admin@gmail.com"];
+export function getDeletedContasIds() {
+  try {
+    const raw = localStorage.getItem(DELETED_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function registerDeletedContaId(id) {
+  try {
+    const s = getDeletedContasIds();
+    s.add(String(id));
+    const arr = Array.from(s).slice(-500);
+    localStorage.setItem(DELETED_KEY, JSON.stringify(arr));
+  } catch (e) {
+    console.warn("Erro ao registrar ID deletado:", e);
+  }
+}
+
+export function unregisterDeletedContaId(id) {
+  try {
+    const s = getDeletedContasIds();
+    if (s.has(String(id))) {
+      s.delete(String(id));
+      const arr = Array.from(s);
+      localStorage.setItem(DELETED_KEY, JSON.stringify(arr));
+    }
+  } catch (e) {
+    console.warn("Erro ao desregistrar ID deletado:", e);
+  }
+}
+
+const ADMIN_EMAILS = ["jsa@jsa.com", "jsa.admin@gmail.com", "josafa.santos.jss@gmail.com"];
 
 // Filtra uma lista de contas estritamente para o usuário atualmente logado
 function filtrarParaUsuarioAtual(contas = []) {
   const curUser = getCurrentUser();
   if (!curUser) return [];
-  const emailLogado = String(curUser.email || "").trim().toLowerCase();
-  const idLogado = String(curUser.id || "").trim();
-  const isAdminUser = curUser.role === "ADMIN" || ADMIN_EMAILS.includes(emailLogado);
+  const emailLogado = String(
+    curUser.email ||
+    curUser.user_email ||
+    localStorage.getItem("usuario_email") ||
+    ""
+  ).trim().toLowerCase();
 
+  const idLogado = String(
+    curUser.id ||
+    curUser.userId ||
+    localStorage.getItem("usuario_id") ||
+    ""
+  ).trim();
+
+  const usernameLogado = String(
+    curUser.username ||
+    localStorage.getItem("usuario_login") ||
+    ""
+  ).trim().toLowerCase();
+
+  const isAdminUser =
+    isAdmin(curUser) ||
+    ADMIN_EMAILS.includes(emailLogado) ||
+    curUser.role === "ADMIN" ||
+    curUser.role === "admin";
+
+  // Administrador tem acesso irrestrito a todas as contas do sistema financeiro
+  if (isAdminUser) {
+    return contas;
+  }
+
+  // Usuário comum visualiza ESTRITAMENTE as contas pertencentes a si próprio
   return contas.filter((c) => {
     const cEmail = String(c.userEmail || "").trim().toLowerCase();
     const cId = String(c.userId || "").trim();
+    const cUsername = String(c.username || "").trim().toLowerCase();
 
-    if (isAdminUser) {
-      // O Admin visualiza contas dos emails de Admin e contas base do sistema
-      if (!cEmail || ADMIN_EMAILS.includes(cEmail)) return true;
-      if (cId && idLogado && cId === idLogado) return true;
-      return false;
-    } else {
-      // Usuário comum visualiza ÚNICA e ESTRITAMENTE as suas próprias contas
-      if (cEmail && emailLogado && cEmail === emailLogado) return true;
-      if (cId && idLogado && cId === idLogado) return true;
-      return false;
-    }
+    // 1. Se possui e-mail associado, deve bater exatamente com o e-mail do usuário logado
+    if (cEmail && emailLogado && cEmail === emailLogado) return true;
+
+    // 2. Se possui ID associado, deve bater exatamente com o ID do usuário logado
+    if (cId && idLogado && cId === idLogado) return true;
+
+    // 3. Se possui username associado, deve bater exatamente com o username do usuário logado
+    if (cUsername && usernameLogado && cUsername === usernameLogado) return true;
+
+    // Não pertence a este usuário: não exibe
+    return false;
   });
 }
 
-// Sincroniza ativamente com o servidor (garante consistência entre Desktop 5173 e Mobile 2515 com isolamento por usuário)
+// Sincroniza ativamente com o servidor (garante consistência com isolamento estrito por usuário)
 export async function sincronizarContasDoServidor() {
   try {
-    const resp = await api.get("/contas");
+    const curUser = getCurrentUser();
+    const emailLogado = String(
+      curUser?.email ||
+      curUser?.user_email ||
+      localStorage.getItem("usuario_email") ||
+      ""
+    ).trim().toLowerCase();
+    const idLogado = String(
+      curUser?.id ||
+      curUser?.userId ||
+      localStorage.getItem("usuario_id") ||
+      ""
+    ).trim();
+    const usernameLogado = String(
+      curUser?.username ||
+      localStorage.getItem("usuario_login") ||
+      ""
+    ).trim().toLowerCase();
+    const isAdminUser =
+      isAdmin(curUser) ||
+      ADMIN_EMAILS.includes(emailLogado) ||
+      curUser?.role === "ADMIN" ||
+      curUser?.role === "admin";
+
+    const resp = await api.get("/contas", {
+      params: {
+        userEmail: emailLogado,
+        userId: idLogado,
+      },
+    });
+
     if (Array.isArray(resp.data)) {
       const serverContas = resp.data;
       const localContas = safeRead();
+      const deletedIds = getDeletedContasIds();
 
       const mapa = new Map();
 
-      // Prioriza dados do servidor
+      // Prioriza dados do servidor (ignorando contas deletadas)
       for (const sc of serverContas) {
-        if (sc && sc.id != null) {
+        if (sc && sc.id != null && !deletedIds.has(String(sc.id))) {
           mapa.set(String(sc.id), sc);
         }
       }
 
-      // Adiciona contas locais caso ainda não existam no servidor
+      // Adiciona contas locais caso ainda não existam no servidor (e não tenham sido deletadas)
       for (const lc of localContas) {
-        if (lc && lc.id != null && !mapa.has(String(lc.id))) {
+        if (lc && lc.id != null && !deletedIds.has(String(lc.id)) && !mapa.has(String(lc.id))) {
+          // Se não for admin, não mescla nem envia contas de outro usuário para o servidor
+          if (!isAdminUser) {
+            const lcEmail = String(lc.userEmail || "").trim().toLowerCase();
+            const lcId = String(lc.userId || "").trim();
+            const lcUsername = String(lc.username || "").trim().toLowerCase();
+            const belongsToCurUser =
+              (lcEmail && emailLogado && lcEmail === emailLogado) ||
+              (lcId && idLogado && lcId === idLogado) ||
+              (lcUsername && usernameLogado && lcUsername === usernameLogado);
+
+            if (!belongsToCurUser) {
+              continue;
+            }
+          }
           mapa.set(String(lc.id), lc);
           api.post("/contas", lc).catch(() => {});
         }
@@ -123,10 +232,13 @@ function safeRead() {
     const raw = localStorage.getItem(STORAGE_KEY);
     const arr = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(arr)) return [];
-    return arr.map((c) => ({
-      ...c,
-      descricao: sanitizarDescricaoConta(c.descricao),
-    }));
+    const deletedIds = getDeletedContasIds();
+    return arr
+      .filter((c) => c && c.id != null && !deletedIds.has(String(c.id)))
+      .map((c) => ({
+        ...c,
+        descricao: sanitizarDescricaoConta(c.descricao),
+      }));
   } catch (e) {
     console.error("[contasService] JSON parse falhou:", e);
     return [];
@@ -141,12 +253,19 @@ function safeWrite(lista) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(listaSanitizada));
 }
 
+export function generateUniqueContaId(lista = []) {
+  const existingIds = new Set((lista || []).map((c) => String(c?.id)).filter(Boolean));
+  const deletedIds = getDeletedContasIds();
+  let newId = Date.now();
+  while (existingIds.has(String(newId)) || deletedIds.has(String(newId))) {
+    newId += Math.floor(Math.random() * 100) + 1;
+  }
+  unregisterDeletedContaId(newId);
+  return newId;
+}
+
 function generateId(lista) {
-  const maxId = lista.reduce((acc, c) => {
-    const n = typeof c.id === "number" ? c.id : Number(c.id);
-    return Number.isFinite(n) && n > acc ? n : acc;
-  }, 0);
-  return maxId + 1;
+  return generateUniqueContaId(lista);
 }
 
 function round2(n) {
@@ -176,9 +295,14 @@ function normalizeConta(c, lista = []) {
     gerarCodigoAleatorio6Digitos(lista);
 
   const curUser = getCurrentUser();
-  const emailPadrao = curUser?.email ? String(curUser.email).toLowerCase() : "jsa@jsa.com";
+  const emailPadrao = (
+    curUser?.email ||
+    curUser?.user_email ||
+    localStorage.getItem("usuario_email") ||
+    "jsa@jsa.com"
+  ).toLowerCase();
   const userEmail = c.userEmail ? String(c.userEmail).toLowerCase() : emailPadrao;
-  const userId = c.userId || (curUser?.id ? String(curUser.id) : "1");
+  const userId = c.userId || (curUser?.id ? String(curUser.id) : (localStorage.getItem("usuario_id") || "1"));
 
   return {
     id: c.id ?? null,
@@ -195,8 +319,12 @@ function normalizeConta(c, lista = []) {
       : hojeISO,
     status: c.status === "Pago" ? "Pago" : "Pendente",
     editada: Boolean(c.editada),
-    referenciaTipo: c.referenciaTipo,
-    referenciaId: c.referenciaId,
+    referenciaTipo: c.referenciaTipo || (c.origem === "Nota Fiscal" ? "nota" : null),
+    referenciaId: c.referenciaId || (c.notaFiscalId ? String(c.notaFiscalId) : null),
+    origem: c.origem || (c.referenciaTipo === "nota" ? "Nota Fiscal" : null),
+    notaFiscalId: c.notaFiscalId || (c.referenciaTipo === "nota" ? c.referenciaId : null),
+    cliente: c.cliente || null,
+    filial: c.filial || null,
     createdAt: c.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     // Histórico de baixas com valores decimais puros
@@ -295,14 +423,17 @@ export function buscarPorReferencia(referenciaTipo, referenciaId) {
   );
 }
 
-export function salvarConta(novaConta) {
+export function salvarConta(novaConta, options = { silencioso: false }) {
   try {
     const contas = safeRead();
-    const contaNorm = normalizeConta({ ...novaConta, id: null });
-    contaNorm.id = generateId(contas);
+    const contaNorm = normalizeConta({ ...novaConta, id: null }, contas);
+    contaNorm.id = novaConta.id ? Number(novaConta.id) : generateUniqueContaId(contas);
+    unregisterDeletedContaId(contaNorm.id);
     contas.push(contaNorm);
     safeWrite(contas);
-    toast.success(`Conta "${contaNorm.descricao}" cadastrada com sucesso!`);
+    if (!options?.silencioso) {
+      toast.success(`Conta "${contaNorm.descricao}" cadastrada com sucesso!`);
+    }
 
     // Persiste no banco de dados via API
     api.post("/contas", contaNorm).catch((e) =>
@@ -335,6 +466,57 @@ export function salvarConta(novaConta) {
       details: { erro: String(error?.message || error) },
     });
     return null;
+  }
+}
+
+// Salva um lote de contas de forma atômica e resiliente (ex: Enviar Notas para Contas)
+export async function salvarContasEmLote(novasContas = []) {
+  if (!Array.isArray(novasContas) || novasContas.length === 0) return [];
+  try {
+    const contas = safeRead();
+    const contasCriadas = [];
+    const codigosExistentes = new Set(
+      contas.map((c) => String(c?.codigo || c?.codigoConta || "")).filter(Boolean)
+    );
+
+    for (let i = 0; i < novasContas.length; i++) {
+      const item = novasContas[i];
+      const contaNorm = normalizeConta({ ...item, id: null }, contas);
+      const novoId = item.id ? Number(item.id) : generateUniqueContaId([...contas, ...contasCriadas]);
+      contaNorm.id = novoId;
+      unregisterDeletedContaId(novoId);
+
+      let cod = contaNorm.codigo || contaNorm.codigoConta;
+      if (!cod || String(cod).length !== 6 || codigosExistentes.has(String(cod))) {
+        cod = gerarCodigoAleatorio6Digitos([...contas, ...contasCriadas]);
+      }
+      codigosExistentes.add(String(cod));
+      contaNorm.codigo = String(cod);
+      contaNorm.codigoConta = String(cod);
+
+      contas.push(contaNorm);
+      contasCriadas.push(contaNorm);
+    }
+
+    safeWrite(contas);
+
+    // Persiste no banco de dados via API e aguarda para assegurar sincronia imediata
+    try {
+      await Promise.all(
+        contasCriadas.map((c) =>
+          api.post("/contas", c).catch((e) =>
+            console.warn("Aviso ao persistir conta em lote no banco via API:", e.message)
+          )
+        )
+      );
+    } catch (e) {
+      console.warn("Aviso na persistência em lote via API:", e);
+    }
+
+    return contasCriadas;
+  } catch (error) {
+    console.error("Erro ao salvar contas em lote:", error);
+    return [];
   }
 }
 
@@ -434,18 +616,23 @@ export function marcarComoPago(id, dataPagamento = new Date()) {
   }
 }
 
-export function excluirConta(id) {
+export async function excluirConta(id) {
   try {
+    // 1. Registra no tombstone para que nenhuma sincronização restaure
+    registerDeletedContaId(id);
+
+    // 2. Remove imediatamente do localStorage
     const contas = safeRead();
     const contaAntes = contas.find((c) => String(c.id) === String(id));
     const filtradas = contas.filter((conta) => String(conta.id) !== String(id));
     safeWrite(filtradas);
-    toast.warn(`Conta "${contaAntes?.descricao || '#' + id}" excluída com sucesso!`);
 
-    // Persiste exclusão no banco de dados via API
-    api.delete(`/contas/${id}`).catch((e) =>
-      console.warn("Aviso ao excluir conta no banco via API:", e.message)
-    );
+    // 3. Aguarda confirmação de exclusão no servidor antes de prosseguir
+    try {
+      await api.delete(`/contas/${id}`);
+    } catch (e) {
+      console.warn("Aviso ao excluir conta no banco via API:", e.message);
+    }
 
     // LOG: exclusão
     logEvent({

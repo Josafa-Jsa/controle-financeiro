@@ -256,6 +256,29 @@ CREATE TABLE IF NOT EXISTS \`app_logs\` (
   INDEX \`idx_logs_user\` (\`user_id\`),
   INDEX \`idx_logs_created\` (\`created_at\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 12. Tabela de Fornecedores Cadastrados (fornecedores)
+CREATE TABLE IF NOT EXISTS \`fornecedores\` (
+  \`id\` BIGINT NOT NULL AUTO_INCREMENT,
+  \`cnpj\` VARCHAR(30) NOT NULL UNIQUE,
+  \`cnpj_raw\` VARCHAR(20) NOT NULL UNIQUE,
+  \`nome\` VARCHAR(255) NOT NULL,
+  \`razao_social\` VARCHAR(255) NULL,
+  \`nome_fantasia\` VARCHAR(255) NULL,
+  \`categoria\` VARCHAR(150) NULL,
+  \`produto_relacionado\` VARCHAR(255) NULL,
+  \`tipo_conta\` VARCHAR(50) DEFAULT 'Pagar',
+  \`tipo\` VARCHAR(50) DEFAULT 'NFe',
+  \`telefone\` VARCHAR(50) NULL,
+  \`email\` VARCHAR(190) NULL,
+  \`origem_padrao\` VARCHAR(100) DEFAULT 'manual',
+  \`created_by\` VARCHAR(190) NULL,
+  \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (\`id\`),
+  INDEX \`idx_fornecedores_cnpj\` (\`cnpj_raw\`),
+  INDEX \`idx_fornecedores_nome\` (\`nome\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 `;
 
 export async function runMigration(options = {}) {

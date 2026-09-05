@@ -27,6 +27,21 @@ export const usuarioPossuiPagamentoAtivo = (usuarioNome) => {
 export const verificarStatusBloqueioUsuario = (usuarioNome, perfil) => {
   if (perfil === 'admin') return { bloqueado: false };
 
+  // Usuários de Filial 1 a 7 não possuem cobrança SYS automática nem bloqueio por atraso
+  const filialStorage = localStorage.getItem('usuario_filial') || '';
+  let filialAtual = filialStorage;
+  try {
+    const raw = localStorage.getItem('auth_user') || localStorage.getItem('currentUser') || localStorage.getItem('user');
+    if (raw) {
+      const u = JSON.parse(raw);
+      if (u?.filial) filialAtual = u.filial;
+    }
+  } catch {}
+
+  if (filialAtual && filialAtual !== 'Filial Particular') {
+    return { bloqueado: false };
+  }
+
   const contas = listarContas() || [];
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);

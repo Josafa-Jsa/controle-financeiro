@@ -29,6 +29,17 @@ export const STATUS_OCORRENCIA = [
   'Finalizada',
 ];
 
+export const FILIAIS = [
+  'Filial 1',
+  'Filial 2',
+  'Filial 3',
+  'Filial 4',
+  'Filial 5',
+  'Filial 6',
+  'Filial 7',
+  'Filial Particular',
+];
+
 export default function ModalOcorrencia({
   isOpen,
   onClose,
@@ -46,11 +57,15 @@ export default function ModalOcorrencia({
     classificacao: 'Média',
     local: '',
     setor: '',
+    filial: 'Filial 1',
     descricao: '',
   });
 
   useEffect(() => {
     if (!isOpen) return;
+
+    const user = getUser();
+    const userFilialPadrao = user?.filial || 'Filial 1';
 
     if (ocorrenciaParaEditar) {
       setFormData({
@@ -65,6 +80,7 @@ export default function ModalOcorrencia({
         classificacao: ocorrenciaParaEditar.classificacao || 'Média',
         local: ocorrenciaParaEditar.local || '',
         setor: ocorrenciaParaEditar.setor || '',
+        filial: ocorrenciaParaEditar.filial || userFilialPadrao,
         descricao: ocorrenciaParaEditar.descricao || '',
       });
     } else {
@@ -86,6 +102,7 @@ export default function ModalOcorrencia({
         classificacao: 'Média',
         local: '',
         setor: '',
+        filial: userFilialPadrao,
         descricao: '',
       });
     }
@@ -126,6 +143,7 @@ export default function ModalOcorrencia({
     const payload = {
       ...formData,
       nome: formData.nome.trim(),
+      filial: formData.filial || user?.filial || 'Filial 1',
       registradoPor: user?.name || user?.nome || user?.email || 'Operador',
     };
 
@@ -244,8 +262,8 @@ export default function ModalOcorrencia({
             </div>
           </div>
 
-          {/* Linha 3: Local e Setor */}
-          <div className="form-grid">
+          {/* Linha 3: Local, Setor e Filial */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '8px' }}>
             <div className="form-row">
               <label>📍 Local:</label>
               <input
@@ -266,6 +284,22 @@ export default function ModalOcorrencia({
                 value={formData.setor}
                 onChange={handleChange}
               />
+            </div>
+
+            <div className="form-row">
+              <label className="required">🏢 Filial Referente:</label>
+              <select
+                name="filial"
+                value={formData.filial}
+                onChange={handleChange}
+                required
+              >
+                {FILIAIS.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

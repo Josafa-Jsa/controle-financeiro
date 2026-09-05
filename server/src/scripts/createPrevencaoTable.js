@@ -15,6 +15,7 @@ async function run() {
         \`classificacao\` VARCHAR(50) NOT NULL DEFAULT 'Média',
         \`local\` VARCHAR(255) NULL,
         \`setor\` VARCHAR(255) NULL,
+        \`filial\` VARCHAR(100) NULL DEFAULT 'Filial 1',
         \`descricao\` TEXT NULL,
         \`relato_fatos\` LONGTEXT NULL,
         \`medidas_adotadas\` LONGTEXT NULL,

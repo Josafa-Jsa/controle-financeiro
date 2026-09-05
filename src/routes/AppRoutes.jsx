@@ -568,12 +568,14 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import MobileBottomNav from "../components/MobileBottomNav";
 import JsaLoginIntroAnimation from "../components/Visual/JsaLoginIntroAnimation";
+import TelaEmManutencaoView, { AdminMaintenanceNoticeBanner } from "../components/Visual/TelaEmManutencaoView";
+import { useSystemStatus, verificarManutencaoTela } from "../services/systemStatusService";
 import { useAdminPresenceAlerts } from "../hooks/useAdminPresenceAlerts";
 import { isMobilePort, initDeviceMode } from "../utils/deviceMode";
 import "../components/Visual/mobileExclusive2515.css";
 
 /* ---------- Auth ---------- */
-import { getUser, isAdmin } from "../auth/auth";
+import { getUser, isAdmin, isLoggedIn } from "../auth/auth";
 
 /* ---------- Páginas de Auth (públicas) ---------- */
 import Login from "../pages/Auth/Login";
@@ -591,6 +593,7 @@ import ContratosPage from "../pages/Contratos/ContratosPage";
 import ContratoInternetPage from "../pages/Contratos/ContratoInternetPage";
 import EstoquePage from "../pages/Estoque/EstoquePage";
 import NotasPage from "../pages/NotasFiscais/NotasPage";
+import ControleNotasPage from "../pages/ControleNotas/ControleNotasPage";
 import PrevencaoPage from "../pages/Prevencao/PrevencaoPage";
 import ControleUniformesPage from "../pages/Uniformes/ControleUniformesPage";
 
@@ -610,21 +613,11 @@ import AdminUsersPage from "../pages/Admin/AdminUsersPage";
    Funções auxiliares de checagem
 ========================================================= */
 function checkIsLoggedIn() {
-  return !!getUser();
+  return isLoggedIn();
 }
 
 function checkIsAdmin() {
-  const u = getUser();
-  if (!u) return false;
-
-  const email = (u?.email || u?.username || "").toLowerCase().trim();
-  const name = (u?.name || u?.nome || "").trim();
-
-  return (
-    email === "jsa@jsa.com" ||
-    email === "josafa.santos.jss@gmail.com" ||
-    name === "JSA Admin"
-  );
+  return isAdmin();
 }
 
 /* =========================================================
@@ -665,6 +658,12 @@ function DashboardRouter() {
     if (perms.includes("prevencao")) {
       return <Navigate to="/prevencao" replace />;
     }
+    if (perms.includes("uniformes") || perms.includes("controle-uniformes")) {
+      return <Navigate to="/uniformes" replace />;
+    }
+    if (perms.includes("controle-notas")) {
+      return <Navigate to="/controle-notas" replace />;
+    }
     if (perms.includes("contas")) {
       return <Navigate to="/contas" replace />;
     }
@@ -702,14 +701,43 @@ function DashboardRouter() {
 ========================================================= */
 function ProtectedRoute({ children, requiredPermission }) {
   const location = useLocation();
+  const systemStatus = useSystemStatus();
 
   if (!checkIsLoggedIn()) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (requiredPermission) {
-    if (checkIsAdmin()) return children;
+  const isUserAdmin = checkIsAdmin();
+  const manutencaoAtiva = verificarManutencaoTela(location.pathname, systemStatus);
 
+  // SE A TELA ESTIVER EM MANUTENÇÃO E O USUÁRIO NÃO FOR ADMINISTRADOR:
+  // BLOQUEIA A TELA IMEDIATAMENTE EXIBINDO "[Nome da Tela] Em Manutenção..." OU "Sistema em Manutenção em Múltiplas Telas!"
+  if (manutencaoAtiva && !isUserAdmin) {
+    return (
+      <TelaEmManutencaoView
+        nomeTela={manutencaoAtiva.nomeTela}
+        mensagem={manutencaoAtiva.mensagem}
+        isGeral={manutencaoAtiva.isGeral}
+      />
+    );
+  }
+
+  // SE FOR ADMINISTRADOR E A TELA ESTIVER EM MANUTENÇÃO: EXIBE AVISO SUPERIOR
+  if (manutencaoAtiva && isUserAdmin) {
+    return (
+      <>
+        <AdminMaintenanceNoticeBanner
+          nomeTela={manutencaoAtiva.nomeTela}
+          mensagem={manutencaoAtiva.mensagem}
+        />
+        {children}
+      </>
+    );
+  }
+
+  if (isUserAdmin) return children;
+
+  if (requiredPermission) {
     const u = getUser();
     const perms = Array.isArray(u?.permissions || u?.permissoes)
       ? (u.permissions || u.permissoes)
@@ -895,6 +923,24 @@ export default function AppRoutes({ ordens, adicionarOrdem, excluirOrdem }) {
           element={
             <ProtectedRoute requiredPermission="notas">
               <NotasPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/controle-notas"
+          element={
+            <ProtectedRoute requiredPermission="controle-notas">
+              <ControleNotasPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/controle-de-notas"
+          element={
+            <ProtectedRoute requiredPermission="controle-notas">
+              <ControleNotasPage />
             </ProtectedRoute>
           }
         />

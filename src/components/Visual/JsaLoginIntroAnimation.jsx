@@ -15,11 +15,12 @@ export default function JsaLoginIntroAnimation({ onComplete = () => { } }) {
       const permissions = Array.isArray(u?.permissions || u?.permissoes)
         ? (u.permissions || u.permissoes)
         : [];
-      
+
       const hasBigMaster =
         permissions.includes("prevencao") ||
         permissions.includes("uniformes") ||
-        permissions.includes("controle-uniformes");
+        permissions.includes("controle-uniformes") ||
+        permissions.includes("controle-notas");
       setIsPrevencaoUser(hasBigMaster);
     } catch {
       setIsPrevencaoUser(false);
@@ -59,26 +60,25 @@ export default function JsaLoginIntroAnimation({ onComplete = () => { } }) {
       />
 
       <div
-        className={`jsa-intro-brand-container ${
-          animationPhase === "center" ? "state-center" : "state-top-left"
-        }`}
+        className={`jsa-intro-brand-container ${animationPhase === "center" ? "state-center" : "state-top-left"
+          }`}
       >
         <h1
           className="jsa-intro-title"
           style={
             isPrevencaoUser
               ? {
-                  background: "linear-gradient(135deg, #00d2ff 0%, #3b82f6 50%, #6366f1 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  textShadow: "0 0 40px rgba(0, 210, 255, 0.6)",
-                }
+                background: "linear-gradient(135deg, #00d2ff 0%, #3b82f6 50%, #6366f1 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                textShadow: "0 0 40px rgba(0, 210, 255, 0.6)",
+              }
               : undefined
           }
         >
           {isPrevencaoUser ? (
             <>
-              <span>🛒</span> Big Master Supermercados
+              <span>🛒</span> Big Master
             </>
           ) : (
             <>
@@ -89,7 +89,8 @@ export default function JsaLoginIntroAnimation({ onComplete = () => { } }) {
 
         <div className={`jsa-intro-subtitle ${animationPhase !== "center" ? "hide" : ""}`}>
           {isPrevencaoUser
-            ? "Prevenção de Perdas, Segurança & Gestão Operacional"
+            // ? "Prevenção de Perdas, Segurança & Gestão Operacional"
+            ? "Supermercados"
             : "Gestão Financeira, Segurança e Tecnologia"}
         </div>
       </div>

@@ -27,6 +27,18 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Servir diretório de uploads de mídias/evidências
+const uploadsDir = path.resolve(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+const evidenciasDir = path.join(uploadsDir, 'evidencias');
+if (!fs.existsSync(evidenciasDir)) {
+  fs.mkdirSync(evidenciasDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+app.use('/api/uploads', express.static(uploadsDir));
+
 // Logging de requisições simples
 app.use((req, res, next) => {
   console.log(`[${new Date().toLocaleTimeString('pt-BR')}] ${req.method} ${req.originalUrl}`);

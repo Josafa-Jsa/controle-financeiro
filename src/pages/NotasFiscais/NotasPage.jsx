@@ -7,19 +7,35 @@ import {
   cancelarNota,
   excluirNota,
   chaveExiste,
+  sincronizarNotasDoServidor,
 } from '../../services/notasService';
 
 import ModalNota from '../../components/Modais/ModalNota';
+import ModalEditarNota from '../../components/Modais/ModalEditarNota';
 import ModalMotivo from '../../components/Modais/ModalMotivo';
 import ModalDanfe from '../../components/Modais/ModalDanfe';
+import ModalExcluirNota from '../../components/Modais/ModalExcluirNota';
+import ModalCadastrarFornecedor from '../../components/Modais/ModalCadastrarFornecedor';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import {
+  obterPadraoCnpj,
+  salvarPadraoCnpj,
+  formatarCnpj,
+} from '../../services/memoriaCnpjService';
+import { sincronizarFornecedoresDoServidor } from '../../services/fornecedoresService';
+
+import {
   listarContas as listarContasFinanceiro,
   salvarConta as salvarContaFinanceiro,
+  atualizarConta as atualizarContaFinanceiro,
+  salvarContasEmLote,
   sincronizarContasDoServidor,
+  excluirConta,
+  buscarPorReferencia,
 } from '../../services/contasService';
+import { getUser, isAdmin, getCurrentUser } from '../../auth/auth';
 
 import { gerarDanfePDF } from '../../utils/gerarDanfePDF';
 
@@ -53,33 +69,38 @@ function nfSaveCooldownMap(map) {
   } catch { }
 }
 
-function nfStartCooldown(id, ms = NF_COOLDOWN_MS) {
-  if (!id) return;
+function nfSetCooldown(id) {
   const map = nfGetCooldownMap();
-  const now = Date.now();
-  if (!map[id] || now >= map[id]) {
-    map[id] = now + ms;
-    nfSaveCooldownMap(map);
+  map[String(id)] = Date.now() + NF_COOLDOWN_MS;
+  nfSaveCooldownMap(map);
+}
+
+function nfRemaining(id) {
+  const map = nfGetCooldownMap();
+  const until = Number(map[String(id)]) || 0;
+  return Math.max(0, until - Date.now());
+}
+
+/* ---------------- Utils ---------------- */
+const formatarValor = (valor) => formatCurrencyBRL(valor || 0);
+
+const formatarData = (dataStr) => {
+  if (!dataStr) return '-';
+  try {
+    const d = new Date(dataStr);
+    return formatDateBR(d);
+  } catch {
+    return dataStr;
   }
-}
-
-function nfRemaining(id, now = Date.now()) {
-  const map = nfGetCooldownMap();
-  const ts = map[id] || 0;
-  return Math.max(0, ts - now);
-}
-
-/* ---------------- Helpers ---------------- */
-const formatarValor = (v) => formatCurrencyBRL(v);
-const formatarData = (d) => formatDateBR(d);
+};
 
 const extrairLinhasNota = (nota) => {
-  const origem = nota.origem || nota.clienteOuServico || '-';
-  const numero = nota.numero || '-';
-  const tipo = nota.tipo || '-';
+  const origem = nota.clienteOuServico || nota.origem || 'Não informado';
+  const numero = nota.numero ? `#${nota.numero}` : `#${nota.id || 'S/N'}`;
+  const tipo = nota.tipo || 'NFe';
   const valor = formatarValor(nota.valor);
   const data = formatarData(nota.dataEmissao);
-  const status = nota.status || 'Adicionada';
+  const status = !nota.status || nota.status === 'Emitida' ? 'Adicionada' : nota.status;
 
   const lines = [
     `Origem: ${origem}`,
@@ -116,45 +137,68 @@ function obterDescricaoNotaLimpa(nota) {
   const numLimpo = extrairNumeroLimpoNota(nota);
   const origemOuCliente = nota.origem || nota.clienteOuServico || '';
   if (numLimpo) {
-    return origemOuCliente ? `NF ${numLimpo} - ${origemOuCliente}` : `NF ${numLimpo}`;
+    return origemOuCliente ? `#1-NF ${numLimpo} - ${origemOuCliente}` : `#1-NF ${numLimpo}`;
   }
-  return origemOuCliente ? `NF - ${origemOuCliente}` : `NF #${nota.id || '1'}`;
+  return origemOuCliente ? `#1-NF - ${origemOuCliente}` : `#1-NF #${nota.id || '1'}`;
 }
 
-/* ---------------- Geração de conta a receber ao emitir nota ---------------- */
-async function gerarContaReceberParaNota(notaCriada) {
+/* ---------------- Geração de conta a pagar ou receber ao salvar nota ---------------- */
+async function gerarContaParaNota(notaCriada) {
   try {
     const contas = (await sincronizarContasDoServidor()) || listarContasFinanceiro() || [];
     const numLimpo = extrairNumeroLimpoNota(notaCriada);
+    const regexNumNF = numLimpo ? new RegExp(`(?:#1-NF|NF)\\s*#?\\s*${numLimpo}\\b`, 'i') : null;
 
     const jaExiste = contas.some(
       (c) =>
         (String(c.referenciaTipo) === 'nota' && String(c.referenciaId) === String(notaCriada.id)) ||
-        (numLimpo && c.descricao && (c.descricao.includes(`NF ${numLimpo}`) || c.descricao.includes(`NF #${numLimpo}`)))
+        (c.notaFiscalId && String(c.notaFiscalId) === String(notaCriada.id)) ||
+        (regexNumNF ? regexNumNF.test(c.descricao || '') : false)
     );
     if (jaExiste) return;
 
     const descricao = obterDescricaoNotaLimpa(notaCriada);
+    const curUser = getCurrentUser() || {};
+    const userEmail = (
+      curUser.email ||
+      curUser.user_email ||
+      localStorage.getItem('usuario_email') ||
+      (curUser.username ? `${curUser.username}@jsa.com` : 'jsa@jsa.com')
+    ).toLowerCase().trim();
+    const userId = String(
+      curUser.id ||
+      curUser.userId ||
+      localStorage.getItem('usuario_id') ||
+      '1'
+    ).trim();
+    const userFilial = curUser.filial || localStorage.getItem('usuario_filial') || 'Filial 1';
+
+    const tipoFinal = notaCriada.tipoConta || 'Receber';
 
     const novaConta = {
-      tipo: 'Receber',
       descricao,
+      tipo: tipoFinal, // 'Receber' ou 'Pagar'
       valor: Number(notaCriada.valor) || 0,
       vencimento: notaCriada.dataEmissao || new Date().toISOString().slice(0, 10),
       status: 'Pendente',
+      notaFiscalId: notaCriada.id,
       referenciaTipo: 'nota',
       referenciaId: String(notaCriada.id),
+      usuario: userEmail,
+      usuarioId: userId,
+      filial: userFilial,
+      observacao: `Gerado automaticamente a partir da Nota Fiscal #${notaCriada.numero || notaCriada.id} (${tipoFinal === 'Pagar' ? 'A Pagar' : 'A Receber'})`,
     };
 
-    const criada = salvarContaFinanceiro(novaConta);
+    const criada = await salvarContaFinanceiro(novaConta);
 
     logEvent({
-      type: 'notas',
-      title: 'Conta a receber gerada pela Nota',
+      type: 'contas',
+      title: tipoFinal === 'Pagar' ? 'Conta a pagar gerada (Nota Fiscal)' : 'Conta a receber gerada (Nota Fiscal)',
       details: {
         notaId: notaCriada.id,
-        notaNumero: notaCriada.numero,
         contaId: criada?.id,
+        tipo: tipoFinal,
         descricao: criada?.descricao,
         valor: criada?.valor,
         vencimento: criada?.vencimento,
@@ -163,6 +207,7 @@ async function gerarContaReceberParaNota(notaCriada) {
 
     const lines = [
       `Descrição: ${criada?.descricao || '-'}`,
+      `Tipo: Conta a ${tipoFinal.toUpperCase()}`,
       `Valor: ${formatarValor(criada?.valor)}`,
       `Vencimento: ${formatarData(criada?.vencimento)}`,
       `Status: ${criada?.status || '-'}`,
@@ -172,13 +217,47 @@ async function gerarContaReceberParaNota(notaCriada) {
     }
 
     await sendTelegramEvent({
-      title: 'Conta a Receber Gerada Automaticamente',
-      emoji: '🟢',
+      title: tipoFinal === 'Pagar' ? 'Conta a Pagar Gerada Automaticamente' : 'Conta a Receber Gerada Automaticamente',
+      emoji: tipoFinal === 'Pagar' ? '🔴' : '🟢',
       screen: 'Notas Fiscais',
       lines,
     });
   } catch (e) {
-    console.error('[Notas] Falha ao gerar conta a receber:', e);
+    console.error('[Notas] Falha ao gerar conta a partir da nota:', e);
+  }
+}
+
+async function sincronizarContaParaNotaEditada(notaAtualizada) {
+  try {
+    const contas = (await sincronizarContasDoServidor()) || listarContasFinanceiro() || [];
+    const numLimpo = extrairNumeroLimpoNota(notaAtualizada);
+    const regexNumNF = numLimpo ? new RegExp(`(?:#1-NF|NF)\\s*#?\\s*${numLimpo}\\b`, 'i') : null;
+
+    const contaCorrespondente = contas.find(
+      (c) =>
+        (String(c.referenciaTipo) === 'nota' && String(c.referenciaId) === String(notaAtualizada.id)) ||
+        (c.notaFiscalId && String(c.notaFiscalId) === String(notaAtualizada.id)) ||
+        (regexNumNF ? regexNumNF.test(c.descricao || '') : false)
+    );
+
+    const tipoFinal = notaAtualizada.tipoConta || contaCorrespondente?.tipo || 'Receber';
+
+    if (contaCorrespondente) {
+      const descricao = obterDescricaoNotaLimpa(notaAtualizada);
+      const contaAtualizada = {
+        ...contaCorrespondente,
+        tipo: tipoFinal,
+        descricao,
+        valor: Number(notaAtualizada.valor) || contaCorrespondente.valor,
+        vencimento: notaAtualizada.dataEmissao || contaCorrespondente.vencimento,
+        observacao: `Gerado a partir da Nota Fiscal #${notaAtualizada.numero || notaAtualizada.id}`,
+      };
+      await atualizarContaFinanceiro(contaAtualizada.id, contaAtualizada);
+    } else {
+      await gerarContaParaNota(notaAtualizada);
+    }
+  } catch (e) {
+    console.warn('[Notas] Falha ao sincronizar conta para nota editada:', e);
   }
 }
 
@@ -187,19 +266,31 @@ const POLL_INTERVAL_MS = 4000;
 const POLL_MAX_ATTEMPTS = 45;
 
 export default function NotasPage() {
+  const usuarioLogado = getUser();
+  const isUserAdmin = isAdmin(usuarioLogado);
+  const filialUsuario =
+    usuarioLogado?.filial ||
+    usuarioLogado?.user_filial ||
+    localStorage.getItem('usuario_filial') ||
+    'Filial 1';
+
   const [notas, setNotas] = useState([]);
   const [modalAberto, setModalAberto] = useState(false);
   const [notaSelecionada, setNotaSelecionada] = useState(null);
+  const [notaParaEditarRapido, setNotaParaEditarRapido] = useState(null);
   const [numeroBusca, setNumeroBusca] = useState('');
   const [selecionadas, setSelecionadas] = useState({});
   const [enviandoContas, setEnviandoContas] = useState(false);
   const [danfeModalNota, setDanfeModalNota] = useState(null);
+  const [modalExcluirNotaAberto, setModalExcluirNotaAberto] = useState(false);
+  const [modalCadastrarFornecedorAberto, setModalCadastrarFornecedorAberto] = useState(false);
+  const [notaParaExcluir, setNotaParaExcluir] = useState(null);
 
-  /* Estado do Modal de Motivo (Cancelamento / Exclusão) */
+  /* Estado do Modal de Motivo (Cancelamento) */
   const [modalMotivoConfig, setModalMotivoConfig] = useState({
     isOpen: false,
     nota: null,
-    tipo: 'cancelar', // 'cancelar' | 'excluir'
+    tipo: 'cancelar',
     titulo: '',
     descricao: '',
     placeholder: '',
@@ -213,13 +304,86 @@ export default function NotasPage() {
   const pendentesRef = useRef({});
   const lastUpdateIdRef = useRef(0);
 
+  const handleConfirmarExclusaoNota = async (nota) => {
+    if (!nota) return;
+    const idNota = nota.id;
+    setModalExcluirNotaAberto(false);
+    setNotaParaExcluir(null);
+
+    // 1. Atualização otimista imediata na interface
+    setNotas((prev) => prev.filter((n) => String(n.id) !== String(idNota)));
+
+    try {
+      // 2. Exclui a Nota Fiscal
+      excluirNota(idNota);
+
+      // 3. Exclui eventual Conta a Receber correspondente no Financeiro
+      try {
+        const contasRef = buscarPorReferencia('nota', idNota);
+        if (contasRef && contasRef.length > 0) {
+          for (const c of contasRef) {
+            await excluirConta(c.id);
+          }
+        }
+      } catch (errRef) {
+        console.warn('Aviso ao excluir conta vinculada à nota:', errRef);
+      }
+
+      carregarNotas();
+      toast.success(`Nota Fiscal #${nota.numero || nota.id} excluída com sucesso!`);
+
+      await sendTelegramEvent({
+        title: 'Nota Fiscal Excluída',
+        emoji: '🗑️',
+        screen: 'Notas Fiscais',
+        lines: [
+          `Nota Fiscal #${nota.numero || nota.id} (${formatCurrencyBRL(nota.valor || 0)}) foi excluída.`,
+          `Cliente / Origem: ${nota.clienteOuServico || nota.origem || 'Não informado'}`,
+        ],
+      });
+
+      logEvent({ type: 'notas', title: 'Nota excluída', details: { id: idNota, numero: nota.numero } });
+    } catch (err) {
+      console.error('Erro ao excluir nota fiscal:', err);
+      toast.error('Falha ao excluir a nota fiscal.');
+      carregarNotas();
+    }
+  };
+
   const carregarNotas = () => {
-    const dados = listarNotas();
-    setNotas(dados || []);
+    const dados = listarNotas(usuarioLogado);
+    const limpos = (dados || []).map((n) => {
+      if (n && n.exclusaoPendente) {
+        const copy = { ...n };
+        delete copy.exclusaoPendente;
+        delete copy.deleteRequestId;
+        return copy;
+      }
+      return n;
+    });
+    setNotas(limpos);
   };
 
   useEffect(() => {
     carregarNotas();
+    sincronizarNotasDoServidor(usuarioLogado)
+      .then((res) => {
+        if (Array.isArray(res) && res.length) {
+          const limpos = res.map((n) => {
+            if (n && n.exclusaoPendente) {
+              const copy = { ...n };
+              delete copy.exclusaoPendente;
+              delete copy.deleteRequestId;
+              return copy;
+            }
+            return n;
+          });
+          setNotas(limpos);
+        }
+      })
+      .catch(() => {});
+
+    sincronizarFornecedoresDoServidor().catch(() => {});
 
     return () => {
       Object.keys(pendentesRef.current).forEach((reqId) => {
@@ -252,10 +416,16 @@ export default function NotasPage() {
       toast.info(`Nota não encontrada. Abrindo cadastro preenchido.`);
 
       const eChaveLonga = /^\d{20,}$/.test(numLimpo);
+      const padrao = obterPadraoCnpj(numLimpo);
 
       setNotaSelecionada({
         numero: eChaveLonga ? '' : numLimpo,
         chavedeacesso: numLimpo,
+        clienteOuServico: padrao?.nome || '',
+        origem: padrao?.nome || '',
+        cnpj: padrao?.cnpj || '',
+        produtoRelacionado: padrao?.produtoRelacionado || '',
+        tipoConta: padrao?.tipoConta || 'Receber',
         status: 'Adicionada',
       });
     }
@@ -556,18 +726,30 @@ export default function NotasPage() {
 
       const notaParaSalvar = {
         ...nota,
+        filial: nota.filial || filialUsuario,
         status: !nota.status || nota.status === 'Emitida' ? 'Adicionada' : nota.status,
       };
 
+      // Persiste ou atualiza o padrão deste CNPJ para futuras notas
+      if (notaParaSalvar.cnpj || notaParaSalvar.chavedeacesso) {
+        salvarPadraoCnpj(notaParaSalvar.cnpj || notaParaSalvar.chavedeacesso, {
+          nome: notaParaSalvar.clienteOuServico || notaParaSalvar.origem,
+          produtoRelacionado: notaParaSalvar.produtoRelacionado,
+          tipoConta: notaParaSalvar.tipoConta,
+          tipo: notaParaSalvar.tipo,
+        });
+      }
+
       if (isEdicao) {
-        atualizarNota(notaParaSalvar);
+        atualizarNota(notaParaSalvar, usuarioLogado);
         await notificarEmissao(notaParaSalvar, true);
+        await sincronizarContaParaNotaEditada(notaParaSalvar);
         toast.info(`Nota Fiscal #${notaParaSalvar.numero || notaParaSalvar.id} atualizada com sucesso!`);
       } else {
-        const criada = salvarNota(notaParaSalvar);
+        const criada = salvarNota(notaParaSalvar, usuarioLogado);
         await notificarEmissao(criada, false);
-        await gerarContaReceberParaNota(criada);
-        toast.success(`Nota Fiscal #${criada.numero || criada.id} emitida com sucesso!`);
+        await gerarContaParaNota(criada);
+        toast.success(`Nota Fiscal #${criada.numero || criada.id} salva com sucesso!`);
       }
 
       carregarNotas();
@@ -628,55 +810,6 @@ export default function NotasPage() {
     }
   };
 
-  const abrirModalExclusao = (nota) => {
-    setModalMotivoConfig({
-      isOpen: true,
-      nota,
-      tipo: 'excluir',
-      titulo: `Solicitar Exclusão da Nota #${nota.numero || nota.id}`,
-      descricao: `Informe o motivo da solicitação de exclusão da Nota Fiscal de ${formatCurrencyBRL(nota.valor)}:`,
-      placeholder: 'Ex: Nota cadastrada em duplicidade, teste de emissão...',
-      textoBotao: 'Solicitar Exclusão',
-    });
-  };
-
-  const executarExclusao = async (nota, motivo) => {
-    const requestId = `REQ-${Date.now()}`;
-    const pend = {
-      ...nota,
-      exclusaoPendente: true,
-      deleteRequestId: requestId,
-      motivoCancelamento: motivo.trim(),
-    };
-
-    try {
-      atualizarNota(pend);
-      carregarNotas();
-
-      const linhasStr = extrairLinhasNota(pend).join('\n');
-      const texto = `🧹 <b>Solicitação de Exclusão</b>\n${linhasStr}\n\n<b>Motivo:</b> ${motivo.trim()}\n\nSelecione uma opção:`;
-
-      const replyMarkup = {
-        inline_keyboard: [[
-          { text: '✅ Aprovar', callback_data: `delete:approve:${requestId}` },
-          { text: '❌ Negar', callback_data: `delete:deny:${requestId}` },
-        ]],
-      };
-
-      await tgSendRaw(texto, replyMarkup);
-      setMensagemProcessamento('Aguardando resposta da exclusão pelo financeiro...');
-      toast.warn(`Solicitação de exclusão da Nota Fiscal #${nota.numero || nota.id} enviada para aprovação!`);
-
-      logEvent({ type: 'notas', title: 'Solicitação de exclusão', details: { id: nota.id, requestId, motivo: motivo.trim() } });
-
-      pendentesRef.current[requestId] = { action: 'delete', attempts: 0 };
-      iniciarPollingDecisao(requestId, nota.id, Date.now());
-    } catch (e) {
-      console.error('Erro ao solicitar exclusão:', e);
-      toast.error('Falha ao solicitar exclusão.');
-    }
-  };
-
   const handleConfirmarMotivo = async (motivo) => {
     const { nota, tipo } = modalMotivoConfig;
     setModalMotivoConfig({
@@ -693,8 +826,6 @@ export default function NotasPage() {
     if (tipo === 'cancelar') {
       nfStartCooldown(nota.id);
       await executarCancelamento(nota, motivo);
-    } else {
-      await executarExclusao(nota, motivo);
     }
   };
 
@@ -704,33 +835,53 @@ export default function NotasPage() {
       toast.info('Verificando e sincronizando notas em Contas a Receber...');
 
       // 1. Sincroniza e busca todas as contas existentes do usuário
-      const contasAtuais = (await sincronizarContasDoServidor()) || [];
+      const contasAtuais = (await sincronizarContasDoServidor()) || listarContasFinanceiro() || [];
 
-      const notasParaProcessar = (notas || []).filter(
+      // Verifica se o usuário marcou notas específicas pelos checkboxes
+      const selecionadasIds = Object.keys(selecionadas).filter((id) => selecionadas[id]);
+
+      const todasAtivas = (notas || []).filter(
         (n) => n.status !== 'Cancelada' && n.statusCancelamento !== 'Pendente'
       );
+
+      const notasParaProcessar = selecionadasIds.length > 0
+        ? todasAtivas.filter((n) => selecionadasIds.includes(String(n.id)))
+        : todasAtivas;
 
       if (notasParaProcessar.length === 0) {
         toast.info('Nenhuma nota fiscal ativa para enviar.');
         return;
       }
 
-      let enviadasCount = 0;
+      const curUser = getCurrentUser() || {};
+      const userEmail = (
+        curUser.email ||
+        curUser.user_email ||
+        localStorage.getItem('usuario_email') ||
+        (curUser.username ? `${curUser.username}@jsa.com` : 'jsa@jsa.com')
+      ).toLowerCase().trim();
+      const userId = String(
+        curUser.id ||
+        curUser.userId ||
+        localStorage.getItem('usuario_id') ||
+        '1'
+      ).trim();
+      const userFilial = curUser.filial || localStorage.getItem('usuario_filial') || 'Filial 1';
+
+      const novasContasParaCriar = [];
       let jaExistentesCount = 0;
 
       for (const nota of notasParaProcessar) {
         const numLimpo = extrairNumeroLimpoNota(nota);
+        const regexNumNF = numLimpo ? new RegExp(`\\bNF\\s*#?\\s*${numLimpo}\\b`, 'i') : null;
 
-        // Valida duplicidade por referenciaId ou por número da NF
+        // Valida duplicidade estrita por referenciaId, notaFiscalId ou número exato da NF
         const jaExiste = contasAtuais.some((c) => {
           const mesmoRef =
-            String(c.referenciaTipo) === 'nota' &&
-            String(c.referenciaId) === String(nota.id);
+            (String(c.referenciaTipo) === 'nota' && String(c.referenciaId) === String(nota.id)) ||
+            (c.notaFiscalId && String(c.notaFiscalId) === String(nota.id));
 
-          const mesmoNumero =
-            numLimpo &&
-            c.descricao &&
-            (c.descricao.includes(`NF ${numLimpo}`) || c.descricao.includes(`NF #${numLimpo}`));
+          const mesmoNumero = regexNumNF ? regexNumNF.test(c.descricao || '') : false;
 
           return mesmoRef || mesmoNumero;
         });
@@ -741,23 +892,35 @@ export default function NotasPage() {
         }
 
         const descricao = obterDescricaoNotaLimpa(nota);
+        const tipoContaNota = nota.tipoConta === 'Pagar' ? 'Pagar' : 'Receber';
 
-        const novaConta = {
-          tipo: 'Receber',
+        novasContasParaCriar.push({
+          tipo: tipoContaNota,
           descricao,
+          observacao: `Gerado a partir da Nota Fiscal #${nota.numero || nota.id}`,
           valor: Number(nota.valor) || 0,
           vencimento: nota.dataEmissao || new Date().toISOString().slice(0, 10),
           status: 'Pendente',
           referenciaTipo: 'nota',
           referenciaId: String(nota.id),
-        };
-
-        const criada = salvarContaFinanceiro(novaConta);
-        if (criada) {
-          enviadasCount++;
-          contasAtuais.push(criada);
-        }
+          origem: 'Nota Fiscal',
+          notaFiscalId: nota.id,
+          userEmail,
+          userId,
+          filial: userFilial,
+        });
       }
+
+      let enviadasCount = 0;
+      if (novasContasParaCriar.length > 0) {
+        const criadas = await salvarContasEmLote(novasContasParaCriar);
+        enviadasCount = criadas.length;
+        // Força sincronização para garantir consistência no cache
+        await sincronizarContasDoServidor();
+      }
+
+      // Limpa a seleção após envio
+      setSelecionadas({});
 
       if (enviadasCount > 0) {
         toast.success(
@@ -836,11 +999,53 @@ export default function NotasPage() {
 
       <div className="notas-header-bar">
         <div>
-          <h1 className="page-title">Notas Fiscais</h1>
-          <p className="page-subtitle">Gerenciamento e controle de Notas Fiscais</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <h1 className="page-title" style={{ margin: 0 }}>Notas Fiscais</h1>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                background: isUserAdmin ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                color: isUserAdmin ? '#60a5fa' : '#34d399',
+                border: `1px solid ${isUserAdmin ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+              }}
+            >
+              <span>🏢</span> {isUserAdmin ? 'Todas as Filiais (Acesso Master)' : `${filialUsuario} • Acesso Setorial`}
+            </span>
+          </div>
+          <p className="page-subtitle" style={{ marginTop: '4px' }}>Gerenciamento e controle de Notas Fiscais</p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-cadastrar-fornecedor-nf"
+            onClick={() => setModalCadastrarFornecedorAberto(true)}
+            style={{
+              background: '#1e293b',
+              color: '#60a5fa',
+              border: '1px solid #3b82f6',
+              padding: '9px 16px',
+              borderRadius: '6px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.9rem',
+              boxShadow: '0 2px 6px rgba(59, 130, 246, 0.25)',
+              transition: 'all 0.2s',
+            }}
+            title="Cadastrar Fornecedor com CNPJ e Nome em Maiúsculas"
+          >
+            <span>🏢</span> Cadastrar Fornecedor
+          </button>
+
           <button
             type="button"
             className="btn btn-enviar-contas"
@@ -942,9 +1147,37 @@ export default function NotasPage() {
                       <span className="nota-number">NF - {nomeOrigem}</span>
                     </label>
                   </div>
-                  <span className={`badge status-${statusClass}`}>
-                    {statusExibicao}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                        color: '#93c5fd',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                      }}
+                    >
+                      🏢 {nota.filial || 'Filial 1'}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        backgroundColor: nota.tipoConta === 'Pagar' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                        color: nota.tipoConta === 'Pagar' ? '#f87171' : '#34d399',
+                        border: `1px solid ${nota.tipoConta === 'Pagar' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
+                      }}
+                    >
+                      {nota.tipoConta === 'Pagar' ? '🔴 A PAGAR' : '🟢 A RECEBER'}
+                    </span>
+                    <span className={`badge status-${statusClass}`}>
+                      {statusExibicao}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="nota-card-body">
@@ -964,6 +1197,22 @@ export default function NotasPage() {
                       <span className="detail-label">Data de Emissão:</span>
                       <span className="detail-value">{formatarData(nota.dataEmissao)}</span>
                     </div>
+                    {nota.cnpj && (
+                      <div className="detail-item">
+                        <span className="detail-label">CNPJ:</span>
+                        <span className="detail-value" style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                          {nota.cnpj}
+                        </span>
+                      </div>
+                    )}
+                    {nota.produtoRelacionado && (
+                      <div className="detail-item full-width">
+                        <span className="detail-label">Produto / Serviço:</span>
+                        <span className="detail-value" style={{ color: '#38bdf8' }}>
+                          {nota.produtoRelacionado}
+                        </span>
+                      </div>
+                    )}
                     <div className="detail-item full-width">
                       <span className="detail-label">Chave de Acesso:</span>
                       <span className="detail-value key-value">
@@ -980,15 +1229,33 @@ export default function NotasPage() {
                       )}
                     </div>
                   )}
-
-                  {nota.exclusaoPendente && (
-                    <div className="nota-alert-box danger">
-                      <span>🚨 Aguardando aprovação de exclusão...</span>
-                    </div>
-                  )}
                 </div>
 
-                <div className="nota-card-footer">
+                <div className="nota-card-footer" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className="btn btn-edit-card"
+                    onClick={() => setNotaParaEditarRapido(nota)}
+                    style={{
+                      background: 'rgba(56, 189, 248, 0.12)',
+                      color: '#38bdf8',
+                      border: '1px solid rgba(56, 189, 248, 0.35)',
+                      padding: '7px 8px',
+                      borderRadius: '6px',
+                      fontWeight: '700',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      transition: 'all 0.2s',
+                    }}
+                    title="Editar Forma (A Receber / A Pagar) e Valor Total da Nota"
+                  >
+                    ✏️ Editar
+                  </button>
+
                   <button
                     type="button"
                     className="btn btn-danfe-card"
@@ -997,63 +1264,45 @@ export default function NotasPage() {
                       background: '#2563eb',
                       color: '#fff',
                       border: 'none',
-                      padding: '6px 12px',
-                      borderRadius: '4px',
+                      padding: '7px 8px',
+                      borderRadius: '6px',
                       fontWeight: '700',
                       fontSize: '0.8rem',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '5px',
+                      justifyContent: 'center',
+                      gap: '4px',
                       transition: 'all 0.2s',
                     }}
-                    title="Visualizar e Imprimir DANFE em modal do sistema"
+                    title="Visualizar e Imprimir Nota Fiscal em modal do sistema"
                   >
-                    🖨️ DANFE
+                    🖨️ Imprimir
                   </button>
 
-                  {/* Botão Editar (comentado a pedido)
                   <button
-                    className="btn btn-secondary edit"
+                    type="button"
+                    className="btn btn-danger-card"
                     onClick={() => {
-                      setNotaSelecionada(nota);
-                      setModalAberto(true);
+                      setNotaParaExcluir(nota);
+                      setModalExcluirNotaAberto(true);
                     }}
-                  >
-                    ✏️ Editar
-                  </button>
-                  */}
-
-                  {/* Botão Solicitar Cancelamento (comentado a pedido)
-                  {nota.statusCancelamento === 'Pendente' ? (
-                    <button className="btn btn-warning cancel" disabled title="Cancelamento em análise">
-                      ⏳ Cancelamento Pendente
-                    </button>
-                  ) : (
-                    <button
-                      className="btn btn-warning cancel"
-                      onClick={() => abrirModalCancelamento(nota)}
-                      disabled={cancelDisabled}
-                      title={
-                        cancelDisabled
-                          ? 'Aguarde o cooldown para tentar novamente'
-                          : 'Solicitar cancelamento'
-                      }
-                    >
-                      🚫 Solicitar Cancelamento
-                    </button>
-                  )}
-                  */}
-
-                  <button
-                    className="btn btn-danger exc"
-                    onClick={() => abrirModalExclusao(nota)}
-                    disabled={!!nota.exclusaoPendente}
-                    title={
-                      nota.exclusaoPendente
-                        ? 'Exclusão pendente no financeiro'
-                        : 'Solicitar exclusão'
-                    }
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      color: '#ef4444',
+                      border: '1px solid rgba(239, 68, 68, 0.35)',
+                      padding: '7px 8px',
+                      borderRadius: '6px',
+                      fontWeight: '700',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      transition: 'all 0.2s',
+                    }}
+                    title="Excluir Nota Fiscal"
                   >
                     🗑️ Excluir
                   </button>
@@ -1070,6 +1319,13 @@ export default function NotasPage() {
         onSave={handleSalvar}
         notaParaEditar={notaSelecionada}
         onOpenDanfe={(n) => setDanfeModalNota(n)}
+      />
+
+      <ModalEditarNota
+        isOpen={!!notaParaEditarRapido}
+        onClose={() => setNotaParaEditarRapido(null)}
+        onSave={handleSalvar}
+        nota={notaParaEditarRapido}
       />
 
       <ModalMotivo
@@ -1096,6 +1352,25 @@ export default function NotasPage() {
         isOpen={!!danfeModalNota}
         onClose={() => setDanfeModalNota(null)}
         nota={danfeModalNota}
+      />
+
+      <ModalExcluirNota
+        isOpen={modalExcluirNotaAberto}
+        onClose={() => {
+          setModalExcluirNotaAberto(false);
+          setNotaParaExcluir(null);
+        }}
+        onConfirm={handleConfirmarExclusaoNota}
+        nota={notaParaExcluir}
+      />
+
+      <ModalCadastrarFornecedor
+        isOpen={modalCadastrarFornecedorAberto}
+        onClose={() => setModalCadastrarFornecedorAberto(false)}
+        onSave={(fornecedorSalvo) => {
+          toast.success(`Fornecedor "${fornecedorSalvo.nome}" cadastrado com sucesso!`);
+          setModalCadastrarFornecedorAberto(false);
+        }}
       />
     </div>
   );

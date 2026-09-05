@@ -95,22 +95,30 @@ export function setExpiry(ts) {
 
 export function isLoggedIn() {
   const u = getUser();
+  if (!u) return false;
+  // ADMIN nunca expira por tempo de atividade
+  if (isAdmin(u)) return true;
   const exp = getExpiry();
-  return !!u && exp > Date.now();
+  return exp > Date.now();
 }
 
 export function isAdmin(customUser) {
   const u = customUser || getUser();
   if (!u) return false;
   const email = String(u.email || "").toLowerCase().trim();
+  const username = String(u.username || "").toLowerCase().trim();
   const name = String(u.name || u.nome || "").trim();
-  const role = String(u.role || "").toUpperCase();
+  const role = String(u.role || "").toUpperCase().trim();
+  const perms = Array.isArray(u.permissions) ? u.permissions : [];
 
   return (
     role === "ADMIN" ||
     email === "jsa@jsa.com" ||
     email === "josafa.santos.jss@gmail.com" ||
-    name === "JSA Admin"
+    username === "jsa.admin" ||
+    name === "JSA Admin" ||
+    perms.includes("*") ||
+    perms.includes("admin")
   );
 }
 
@@ -235,7 +243,7 @@ async function notifyLogin(u) {
         `Email: ${u?.email || "-"}`,
         `Perfil: ${u?.role || ROLES.USER}`,
         `Total de cadastrados: ${users.length}`,
-        `Expira em: 4h`,
+        `Expira em: ${isAdmin(u) ? "Ilimitado (Admin)" : "8h"}`,
         `Data: ${new Date().toLocaleString("pt-BR")}`,
       ],
     });
@@ -259,9 +267,20 @@ async function notifyLogout(u, reason) {
 /* ==================== Fluxo de login/logout ==================== */
 export async function login(user) {
   const now = Date.now();
-  const exp = now + DURATION_MS;
+  const userIsAdmin = isAdmin(user);
   setUser(user);
-  setExpiry(exp);
+
+  if (userIsAdmin) {
+    // ADMIN não possui expiração por tempo nem contador
+    try {
+      localStorage.removeItem(EXPIRES_KEY);
+    } catch {}
+  } else {
+    // Usuários comuns: exatamente 8 horas de sessão ativa
+    const exp = now + DURATION_MS;
+    setExpiry(exp);
+  }
+
   const emailKey = String(user?.email || "").toLowerCase().trim();
   if (emailKey) {
     try {
@@ -309,7 +328,13 @@ export async function logout(reason = "User logout") {
   await notifyLogout(u, reason);
 
   try {
-    if (typeof window !== "undefined") window.location.reload();
+    if (typeof window !== "undefined") {
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      } else {
+        window.location.reload();
+      }
+    }
   } catch {}
 }
 
@@ -469,10 +494,19 @@ export function initAuthWatcher() {
 
   const tick = () => {
     try {
+      const u = getUser();
+      if (!u) return;
+      // ADMIN NUNCA EXPIRA POR TEMPO DE ATIVIDADE
+      if (isAdmin(u)) return;
+
       const exp = getExpiry();
       if (!exp) return;
       if (Date.now() >= exp) {
-        logout("Sessão expirada (4h)");
+        toast.info("Sua sessão de 8 horas expirou. Faça login novamente para continuar.", {
+          toastId: "session_expired_8h",
+          autoClose: 3500,
+        });
+        logout("Sessão expirada (8h)");
       }
     } catch (e) {
       console.error("[auth] watcher error", e);
@@ -480,7 +514,7 @@ export function initAuthWatcher() {
   };
 
   tick();
-  const id = window.setInterval(tick, 30_000);
+  const id = window.setInterval(tick, 10_000);
   window.__authWatcherId = id;
 
   let isForcedLoggingOut = false;
@@ -666,13 +700,40 @@ export function initAuthWatcher() {
 
 /* ==================== Countdown Hook ==================== */
 export function useSessionCountdown() {
-  const [left, setLeft] = useState(() => Math.max(0, getExpiry() - Date.now()));
+  const [left, setLeft] = useState(() => {
+    const u = getUser();
+    if (!u || isAdmin(u)) return 0; // Admin SEM contador de tempo
+    const exp = getExpiry();
+    return exp > 0 ? Math.max(0, exp - Date.now()) : 0;
+  });
+
   useEffect(() => {
-    const upd = () => setLeft(Math.max(0, getExpiry() - Date.now()));
+    const upd = () => {
+      const u = getUser();
+      if (!u || isAdmin(u)) {
+        setLeft(0);
+        return;
+      }
+      const exp = getExpiry();
+      if (!exp) {
+        setLeft(0);
+        return;
+      }
+      const remaining = Math.max(0, exp - Date.now());
+      setLeft(remaining);
+      if (remaining <= 0 && exp > 0) {
+        toast.info("Sua sessão de 8 horas expirou. Faça login novamente para continuar.", {
+          toastId: "session_expired_8h",
+          autoClose: 3500,
+        });
+        logout("Sessão expirada (8h)");
+      }
+    };
     upd();
     const id = setInterval(upd, 1000);
     return () => clearInterval(id);
   }, []);
+
   return left;
 }
 

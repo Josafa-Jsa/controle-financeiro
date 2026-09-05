@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 import { sincronizarContasDoServidor } from "../../services/contasService";
 import { listarNotas } from "../../services/notasService";
 import { sincronizarSimulacoesDoServidor } from "../../services/simulacoesService";
-import { obterStatusSistema, obterStatusLocal } from "../../services/systemStatusService";
+import { obterStatusSistema, obterStatusLocal, isManutencaoGeral } from "../../services/systemStatusService";
 import ModalStatusManutencao from "../../components/Modais/ModalStatusManutencao";
 import { getCurrentUser } from "../../auth/auth";
 import { formatCurrencyBRL, formatDateBR, sendTelegramEvent } from "../../utils/telegram";
@@ -76,7 +76,7 @@ export default function Dashboard() {
     if (matched && Array.isArray(matched.permissions)) {
       perms = matched.permissions;
     }
-  } catch {}
+  } catch { }
 
   if (!isAdmin) {
     perms = perms.filter((p) => p !== "*");
@@ -268,7 +268,7 @@ export default function Dashboard() {
         const rawFeed = localStorage.getItem(FEEDBACK_STORAGE_KEY);
         const feeds = rawFeed ? JSON.parse(rawFeed) : [];
         setHistoricoFeedbacks(Array.isArray(feeds) ? feeds : []);
-      } catch (e) {}
+      } catch (e) { }
 
     } catch (err) {
       console.error("Erro ao carregar métricas do dashboard:", err);
@@ -309,7 +309,7 @@ export default function Dashboard() {
       setHistoricoFeedbacks(listaAtualizada);
       try {
         localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(listaAtualizada));
-      } catch (e) {}
+      } catch (e) { }
 
       // Mapeamento de categorias e emojis
       const catNomes = {
@@ -377,7 +377,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "10px" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "10px" }}>
             <div
               className={`company-status-badge ${systemStatus.emManutencao ? "maintenance" : "online"}`}
               style={isAdmin ? { cursor: "pointer" } : undefined}
@@ -387,8 +387,10 @@ export default function Dashboard() {
               <div className={`pulse-dot ${systemStatus.emManutencao ? "maintenance" : "online"}`}></div>
               <span>
                 {systemStatus.emManutencao
-                  ? `⚠️ Manutenção: ${systemStatus.tela || "Ajuste em Andamento"}`
-                  : "Sistema Operacional & Online"}
+                  ? (isManutencaoGeral(systemStatus)
+                    ? "⚠️ Sistema em Manutenção em Múltiplas Telas!"
+                    : `⚠️ Manutenção: ${systemStatus.tela || "Ajuste em Andamento"}`)
+                  : "Sistema Operacional e Online"}
               </span>
             </div>
 
@@ -437,12 +439,14 @@ export default function Dashboard() {
             <span style={{ fontSize: "24px" }}>🛠️</span>
             <div>
               <strong style={{ fontSize: "14px", color: "#fef08a", display: "block" }}>
-                Aviso de Manutenção: Tela "{systemStatus.tela || 'Módulo do Sistema'}" em Ajustes
+                ⚠️ {isManutencaoGeral(systemStatus) ? "Sistema em Manutenção em Múltiplas Telas!" : `${systemStatus.tela || "Tela do Sistema"} Em Manutenção...`}
               </strong>
               <span style={{ fontSize: "12.5px", color: "#fef9c3" }}>
                 {systemStatus.mensagem
                   ? systemStatus.mensagem
-                  : `A tela "${systemStatus.tela}" está recebendo atualizações técnicas no momento. As demais funcionalidades seguem operacionais.`}
+                  : isManutencaoGeral(systemStatus)
+                    ? "O sistema está temporariamente bloqueado para todos os usuários comuns devido a manutenção geral (inclusive login). O acesso será liberado automaticamente assim que retornar ao status Operacional & Online."
+                    : `A tela "${systemStatus.tela || 'selecionada'}" está temporariamente bloqueada para os usuários para ajustes técnicos. O acesso será liberado automaticamente em tempo real assim que o sistema retornar ao status Operacional & Online.`}
               </span>
             </div>
           </div>
@@ -462,7 +466,7 @@ export default function Dashboard() {
                 whiteSpace: "nowrap",
               }}
             >
-              ⚙️ Alterar / Concluir
+              ⚙️ Liberar / Alterar Status
             </button>
           )}
         </div>

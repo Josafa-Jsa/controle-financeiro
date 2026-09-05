@@ -46,9 +46,10 @@ function round2(n) {
 function normalizeContrato(c) {
   const hojeISO = new Date().toISOString().slice(0, 10);
   return {
+    ...c,
     id: c.id ?? null,
-    parceiro: String(c.parceiro || "").trim(),
-    descricao: String(c.descricao || "").trim(),
+    parceiro: String(c.parceiro || c.dadosContratante?.razaoSocial || c.dadosContratante?.nome || "").trim(),
+    descricao: String(c.descricao || c.objetoServico || "").trim(),
     valor: Number.isFinite(Number(c.valor)) ? round2(Number(c.valor)) : 0,
     vencimento: c.vencimento
       ? new Date(c.vencimento).toISOString().slice(0, 10)

@@ -751,6 +751,7 @@ import {
   useSessionCountdown,
   formatRemaining,
   getUser,
+  isAdmin,
 } from "./auth/auth";
 
 /* =========================================================
@@ -799,6 +800,7 @@ class ErrorBoundary extends React.Component {
 export function TopBarRight() {
   const msLeft = useSessionCountdown();
   const user = getUser();
+  const isUserAdmin = isAdmin(user);
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -808,17 +810,17 @@ export function TopBarRight() {
             fontSize: 12,
             padding: "4px 8px",
             borderRadius: 4,
-            background: user.role === "ADMIN" ? "#854d0e" : "#334155",
+            background: isUserAdmin ? "#854d0e" : "#334155",
             color: "#fff",
             fontWeight: "bold",
           }}
         >
-          {user.role === "ADMIN" ? "👑 Admin" : "👤 Usuário"}
+          {isUserAdmin ? "👑 Admin" : "👤 Usuário"}
         </span>
       )}
-      {msLeft > 0 && (
-        <small className="session-badge">
-          Sessão expira em {formatRemaining(msLeft)}
+      {!isUserAdmin && msLeft > 0 && (
+        <small className="session-badge" title="Tempo restante de conexão (limite de 8 horas)">
+          ⏱️ Sessão expira em {formatRemaining(msLeft)}
         </small>
       )}
     </div>

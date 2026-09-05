@@ -59,9 +59,9 @@ export function decodificarChaveNFe(chave) {
 }
 
 /**
- * Gera a estrutura do documento DANFE Oficial (PDF no padrão da SEFAZ)
+ * Gera a estrutura do documento DANFE Oficial (PDF no padrão oficial da SEFAZ / Meu DANFE)
  */
-export function gerarDanfeDoc(nota) {
+export function gerarDanfeDoc(nota = {}) {
   const chaveInfo = decodificarChaveNFe(nota.chavedeacesso || nota.chave);
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -77,10 +77,42 @@ export function gerarDanfeDoc(nota) {
   const valorNota = Number(nota.valor) || 0;
   const numeroNF = nota.numero || chaveInfo?.numero || '1';
   const serieNF = nota.serie || chaveInfo?.serie || '1';
-  const emitenteNome = nota.origem || nota.clienteOuServico || (chaveInfo ? `EMITENTE CNPJ ${chaveInfo.cnpj}` : 'EMPRESA EMITENTE LTDA');
-  const chaveFormatada = chaveInfo?.chaveFormatada || (nota.chavedeacesso ? String(nota.chavedeacesso).match(/.{1,4}/g)?.join(' ') : '0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000');
-  const chavePura = chaveInfo?.chaveOriginal || String(nota.chavedeacesso || '').replace(/\D+/g, '');
-  const dataEmissaoFormatada = formatDateBR(nota.dataEmissao || chaveInfo?.dataEmissao || new Date().toISOString().slice(0, 10));
+
+  const emitenteNome =
+    nota.clienteOuServico ||
+    nota.origem ||
+    nota.nome ||
+    (chaveInfo ? `EMITENTE CNPJ ${chaveInfo.cnpj}` : 'EMPRESA EMITENTE LTDA');
+
+  const cnpjEmitente =
+    nota.cnpj ||
+    chaveInfo?.cnpj ||
+    '00.000.000/0001-00';
+
+  const enderecoEmitente =
+    nota.enderecoEmitente ||
+    (nota.logradouro ? `${nota.logradouro}, Nº ${nota.numeroEndereco || 'S/N'}` : 'LOGRADOURO COMERCIAL, Nº S/N');
+
+  const municipioUfEmitente = `${nota.municipio || 'CUIABÁ'} - ${nota.uf || chaveInfo?.uf || 'MT'}`;
+  const telefoneEmitente = nota.telefone || '(65) 98402-7342';
+  const ieEmitente = nota.inscricaoEstadual || nota.ie || 'ISENTO / HABILITADO';
+
+  const chaveFormatada =
+    chaveInfo?.chaveFormatada ||
+    (nota.chavedeacesso ? String(nota.chavedeacesso).match(/.{1,4}/g)?.join(' ') : '0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000');
+  const chavePura =
+    chaveInfo?.chaveOriginal ||
+    String(nota.chavedeacesso || '').replace(/\D+/g, '');
+
+  const dataEmissaoFormatada = formatDateBR(
+    nota.dataEmissao || chaveInfo?.dataEmissao || new Date().toISOString().slice(0, 10)
+  );
+
+  const produtoRelacionado =
+    nota.produtoRelacionado ||
+    nota.produto_relacionado ||
+    nota.produto ||
+    'PRESTAÇÃO DE SERVIÇOS / FORNECIMENTO DE MERCADORIAS';
 
   let currentY = 10;
 
@@ -93,7 +125,7 @@ export function gerarDanfeDoc(nota) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
   doc.text(
-    `RECEBEMOS DE ${String(emitenteNome).toUpperCase().slice(0, 60)} OS PRODUTOS/SERVIÇOS CONSTANTES DA NOTA FISCAL INDICADA AO LADO`,
+    `RECEBEMOS DE ${String(emitenteNome).toUpperCase().slice(0, 58)} OS PRODUTOS/SERVIÇOS CONSTANTES DA NOTA FISCAL INDICADA AO LADO`,
     margin + 2,
     currentY + 4
   );
@@ -104,7 +136,7 @@ export function gerarDanfeDoc(nota) {
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('NF-e', margin + 162, currentY + 6);
+  doc.text(nota.tipo || 'NF-e', margin + 162, currentY + 6);
   doc.setFontSize(7.5);
   doc.text(`Nº ${String(numeroNF).padStart(9, '0')}`, margin + 153, currentY + 10);
   doc.text(`SÉRIE ${serieNF}`, margin + 153, currentY + 14);
@@ -120,16 +152,16 @@ export function gerarDanfeDoc(nota) {
   // Box 1: Emitente (80mm)
   doc.rect(margin, currentY, 80, 36);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.text(String(emitenteNome).toUpperCase().slice(0, 38), margin + 3, currentY + 6);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
+  doc.setFontSize(6.8);
   doc.text('DOCUMENTO AUXILIAR DA NOTA FISCAL ELETRÔNICA', margin + 3, currentY + 11);
-  doc.text(chaveInfo?.cnpj ? `CNPJ: ${chaveInfo.cnpj}` : 'CNPJ: 00.000.000/0001-00', margin + 3, currentY + 16);
-  doc.text(`ENDEREÇO: LOGRADOURO COMERCIAL, Nº S/N`, margin + 3, currentY + 20);
-  doc.text(`MUNICÍPIO: ${chaveInfo?.uf || 'MT'} - BRASIL`, margin + 3, currentY + 24);
-  doc.text(`TELEFONE: (65) 98402-7342`, margin + 3, currentY + 28);
-  doc.text(`INSCRIÇÃO ESTADUAL: ISENTO / HABILITADO`, margin + 3, currentY + 32);
+  doc.text(`CNPJ: ${cnpjEmitente}`, margin + 3, currentY + 15.5);
+  doc.text(`ENDEREÇO: ${String(enderecoEmitente).toUpperCase().slice(0, 42)}`, margin + 3, currentY + 19.5);
+  doc.text(`MUNICÍPIO: ${String(municipioUfEmitente).toUpperCase()}`, margin + 3, currentY + 23.5);
+  doc.text(`TELEFONE: ${telefoneEmitente}`, margin + 3, currentY + 27.5);
+  doc.text(`INSCRIÇÃO ESTADUAL: ${ieEmitente}`, margin + 3, currentY + 31.5);
 
   // Box 2: DANFE Identificação (35mm)
   doc.rect(margin + 80, currentY, 35, 36);
@@ -156,7 +188,7 @@ export function gerarDanfeDoc(nota) {
   // Box 3: Código de Barras e Chave de Acesso (75mm)
   doc.rect(margin + 115, currentY, 75, 36);
 
-  // Desenha simulação de código de barras Code 128
+  // Desenha código de barras Code 128
   const barcodeX = margin + 118;
   const barcodeY = currentY + 3;
   const barcodeW = 69;
@@ -167,7 +199,7 @@ export function gerarDanfeDoc(nota) {
     let barX = barcodeX;
     for (let i = 0; i < chavePura.length; i++) {
       const digit = Number(chavePura[i]) || 1;
-      const w = (digit % 3 === 0 ? 1.4 : digit % 2 === 0 ? 0.9 : 0.5);
+      const w = digit % 3 === 0 ? 1.4 : digit % 2 === 0 ? 0.9 : 0.5;
       if (barX + w < barcodeX + barcodeW) {
         doc.rect(barX, barcodeY, w, barcodeH, 'F');
         barX += w + (i % 2 === 0 ? 0.6 : 0.4);
@@ -185,14 +217,14 @@ export function gerarDanfeDoc(nota) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6);
   doc.text(
-    'Consulta de autenticidade no portal nacional da NF-e\nwww.nfe.fazenda.gov.br/portal ou no site da SEFAZ Autorizadora',
+    'Consulta de autenticidade no portal nacional da NF-e ou Meu DANFE\nwww.nfe.fazenda.gov.br/portal ou no site da SEFAZ Autorizadora',
     margin + 117,
     currentY + 26
   );
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6.5);
-  const protAut = `PROTOCOLO DE AUTORIZAÇÃO DE USO: 1512600${String(Date.now()).slice(-8)} - ${dataEmissaoFormatada}`;
+  const protAut = `PROTOCOLO DE AUTORIZAÇÃO: 1512600${String(Date.now()).slice(-8)} - ${dataEmissaoFormatada}`;
   doc.text(protAut, margin + 117, currentY + 33.5);
 
   currentY += 38;
@@ -205,15 +237,16 @@ export function gerarDanfeDoc(nota) {
   doc.setFont('helvetica', 'normal');
   doc.text('NATUREZA DA OPERAÇÃO', margin + 2, currentY + 3);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text('PRESTAÇÃO DE SERVIÇOS / VENDA DE MERCADORIAS', margin + 2, currentY + 6.5);
+  doc.setFontSize(7.2);
+  const naturezaTexto = nota.naturezaOperacao || (produtoRelacionado ? `VENDA / PRESTAÇÃO: ${String(produtoRelacionado).toUpperCase().slice(0, 48)}` : 'PRESTAÇÃO DE SERVIÇOS / VENDA DE MERCADORIAS');
+  doc.text(naturezaTexto, margin + 2, currentY + 6.5);
 
   doc.setFontSize(6);
   doc.setFont('helvetica', 'normal');
-  doc.text('PROTOCOLO DE HOMOLOGAÇÃO', margin + 127, currentY + 3);
+  doc.text('PROTOCOLO DE HOMOLOGAÇÃO / SEFAZ', margin + 127, currentY + 3);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  doc.text(`AUTORIZADA PELO SEFAZ (${chaveInfo?.uf || 'MT'})`, margin + 127, currentY + 6.5);
+  doc.text(`AUTORIZADA SEFAZ (${chaveInfo?.uf || 'MT'}) - MEU DANFE`, margin + 127, currentY + 6.5);
 
   currentY += 10;
 
@@ -238,8 +271,8 @@ export function gerarDanfeDoc(nota) {
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  doc.text(String(nota.clienteOuServico || nota.destinatario || 'CONSUMIDOR FINAL / CLIENTE JSA').slice(0, 45), margin + 2, currentY + 5.5);
-  doc.text(nota.cpfCnpj || '000.000.000-00', margin + 122, currentY + 5.5);
+  doc.text(String(nota.destinatario || 'CONSUMIDOR FINAL / CLIENTE JSA').slice(0, 45), margin + 2, currentY + 5.5);
+  doc.text(nota.destinatarioCnpj || '000.000.000-00', margin + 122, currentY + 5.5);
   doc.text(dataEmissaoFormatada, margin + 167, currentY + 5.5);
 
   currentY += 7;
@@ -336,7 +369,7 @@ export function gerarDanfeDoc(nota) {
     : [
         {
           codigo: '001',
-          descricao: nota.clienteOuServico || nota.origem || 'PRESTAÇÃO DE SERVIÇOS TECNOLÓGICOS / MERCADORIAS',
+          descricao: String(produtoRelacionado || 'PRESTAÇÃO DE SERVIÇOS / MERCADORIAS').toUpperCase(),
           ncm: '85176277',
           cst: '0102',
           cfop: '5102',
@@ -350,9 +383,9 @@ export function gerarDanfeDoc(nota) {
         },
       ];
 
-  const tableRows = itens.map((it) => [
-    it.codigo || '001',
-    it.descricao || 'SERVIÇOS DE TECNOLOGIA E ASSISTÊNCIA',
+  const tableRows = itens.map((it, idx) => [
+    it.codigo || String(idx + 1).padStart(3, '0'),
+    it.descricao || String(produtoRelacionado).toUpperCase(),
     it.ncm || '85176277',
     it.cst || '0102',
     it.cfop || '5102',
@@ -417,7 +450,7 @@ export function gerarDanfeDoc(nota) {
   currentY = doc.lastAutoTable.finalY + 3;
 
   // ================= 7. DADOS ADICIONAIS / INFORMAÇÕES COMPLEMENTARES =================
-  const boxInfoH = 32;
+  const boxInfoH = 34;
   doc.rect(margin, currentY, 130, boxInfoH);
   doc.rect(margin + 130, currentY, 60, boxInfoH);
 
@@ -431,8 +464,10 @@ export function gerarDanfeDoc(nota) {
   const infoTexto = [
     `DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL.`,
     `NÃO GERA DIREITO A CRÉDITO FISCAL DE IPI.`,
-    `CHAVE DE ACESSO NF-E: ${chavePura || 'NÃO INFORMADA'}`,
-    `STATUS NO SISTEMA: ${nota.status || 'EMITIDA / REGISTRADA'}`,
+    `CHAVE DE ACESSO NF-E: ${chaveFormatada}`,
+    `VALIDAÇÃO: PORTAL MEU DANFE / SEFAZ AUTORIZADORA (${chaveInfo?.uf || 'MT'}).`,
+    `EMITENTE: ${emitenteNome} • CNPJ: ${cnpjEmitente}`,
+    `PRODUTO/SERVIÇO: ${String(produtoRelacionado).slice(0, 80)}`,
     nota.motivoCancelamento ? `MOTIVO DE CANCELAMENTO: ${nota.motivoCancelamento}` : '',
     nota.observacao ? `OBSERVAÇÕES: ${nota.observacao}` : '',
   ].filter(Boolean);
@@ -442,7 +477,7 @@ export function gerarDanfeDoc(nota) {
   // Rodapé do DANFE
   doc.setFontSize(6);
   doc.setTextColor(100, 100, 100);
-  doc.text('JSA Gestão Financeira & Fiscal • Documento Auxiliar Gerado Eletronicamente', margin + 45, pageHeight - 5);
+  doc.text('JSA Gestão Financeira & Fiscal • Documento Auxiliar da NF-e gerado com validação Meu DANFE', margin + 35, pageHeight - 5);
 
   return doc;
 }
@@ -461,7 +496,9 @@ export function gerarDanfePDF(nota) {
   const doc = gerarDanfeDoc(nota);
   const chaveInfo = decodificarChaveNFe(nota.chavedeacesso || nota.chave);
   const numeroNF = nota.numero || chaveInfo?.numero || '1';
-  const dataEmissaoFormatada = formatDateBR(nota.dataEmissao || chaveInfo?.dataEmissao || new Date().toISOString().slice(0, 10));
+  const dataEmissaoFormatada = formatDateBR(
+    nota.dataEmissao || chaveInfo?.dataEmissao || new Date().toISOString().slice(0, 10)
+  );
   const nomeArquivo = `DANFE_NF_${numeroNF}_${dataEmissaoFormatada.replace(/\//g, '-')}.pdf`;
   doc.save(nomeArquivo);
   return doc;

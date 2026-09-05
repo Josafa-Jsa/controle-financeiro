@@ -1,5 +1,5 @@
 // src/components/Modais/ModalEntregaUniforme.jsx
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import {
   getListaDepartamentos,
@@ -7,11 +7,9 @@ import {
   getTamanhosPorDepartamento,
 } from '../../services/uniformesService';
 import {
-  gerarComprovanteUniformePDF,
   gerarComprovanteUniformeBlob,
 } from '../../utils/gerarComprovanteUniformePDF';
 import ModalVisualizadorDocumento from './ModalVisualizadorDocumento';
-import ModalConfirmacaoSistema from './ModalConfirmacaoSistema';
 import { getUser } from '../../auth/auth';
 import '../Visual/modal.css';
 
@@ -35,11 +33,7 @@ export default function ModalEntregaUniforme({
 
   const [salvando, setSalvando] = useState(false);
   const [modalTermoAberto, setModalTermoAberto] = useState(false);
-  const [modalConfirmarSemAssinaturaAberto, setModalConfirmarSemAssinaturaAberto] = useState(false);
   const [termoBlob, setTermoBlob] = useState(null);
-  const canvasRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [hasSignature, setHasSignature] = useState(false);
 
   // Calcula saldo em estoque disponível para a combinação selecionada
   const saldoDisponivel = useMemo(() => {
@@ -52,7 +46,7 @@ export default function ModalEntregaUniforme({
       : (Number(item.estado_usado_qtd) || 0);
   }, [estoque, formData.departamento, formData.tamanho, formData.estado]);
 
-  // Inicializa o canvas de assinatura
+  // Inicializa o formulário ao abrir
   useEffect(() => {
     if (isOpen) {
       setFormData({
@@ -66,19 +60,6 @@ export default function ModalEntregaUniforme({
         trocaDevolucao: false,
         observacoes: '',
       });
-      setHasSignature(false);
-
-      setTimeout(() => {
-        const canvas = canvasRef.current;
-        if (canvas) {
-          const ctx = canvas.getContext('2d');
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.strokeStyle = '#0f172a';
-          ctx.lineWidth = 2.5;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-        }
-      }, 150);
     }
   }, [isOpen]);
 
@@ -107,59 +88,6 @@ export default function ModalEntregaUniforme({
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
-  };
-
-  // Funções de desenho da assinatura (Mouse e Touch)
-  const getCoordinates = (e) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
-    };
-  };
-
-  const startDrawing = (e) => {
-    e.preventDefault();
-    const { x, y } = getCoordinates(e);
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    setIsDrawing(true);
-    setHasSignature(true);
-  };
-
-  const draw = (e) => {
-    if (!isDrawing) return;
-    e.preventDefault();
-    const { x, y } = getCoordinates(e);
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  };
-
-  const stopDrawing = () => {
-    setIsDrawing(false);
-  };
-
-  const clearSignature = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      setHasSignature(false);
-    }
-  };
-
-  const getSignatureDataUrl = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !hasSignature) return '';
-    return canvas.toDataURL('image/png');
   };
 
   const validarCampos = () => {
@@ -214,7 +142,6 @@ export default function ModalEntregaUniforme({
     const dadosParaPDF = {
       ...formData,
       responsavel: user?.name || user?.nome || 'Operador / Encarregado',
-      assinatura: getSignatureDataUrl(),
     };
 
     try {
@@ -234,7 +161,7 @@ export default function ModalEntregaUniforme({
       const payload = {
         ...formData,
         responsavel: user?.name || user?.nome || 'Operador',
-        assinatura: getSignatureDataUrl(),
+        assinatura: 'Assinatura na Folha A4 Impressa',
         colaborador: formData.nome.trim(),
       };
 
@@ -253,12 +180,6 @@ export default function ModalEntregaUniforme({
   const handleSalvar = async (e) => {
     e.preventDefault();
     if (!validarCampos()) return;
-
-    if (!hasSignature) {
-      setModalConfirmarSemAssinaturaAberto(true);
-      return;
-    }
-
     await executarSalvarEntrega();
   };
 
@@ -285,7 +206,7 @@ export default function ModalEntregaUniforme({
               <span>📦</span> Registrar Entrega de Uniforme
             </h2>
             <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#94a3b8' }}>
-              Preencha os dados do colaborador, colha a assinatura digital e emita o recibo oficial.
+              Preencha os dados do colaborador, emita o termo oficial e recolha a assinatura física na folha A4 impressa.
             </p>
           </div>
         </div>
@@ -481,54 +402,45 @@ export default function ModalEntregaUniforme({
             </label>
           </div>
 
-          {/* Linha 6: Campo de Assinatura Digital */}
-          <div className="form-row" style={{ marginTop: '4px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <label style={{ fontSize: '12px', color: '#fed7aa', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                ✍️ Assinatura do Colaborador (Retirada de Uniforme):
-              </label>
-              <button
-                type="button"
-                onClick={clearSignature}
-                style={{
-                  background: 'none',
-                  border: '1px solid #475569',
-                  color: '#94a3b8',
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                }}
-              >
-                Limpar Assinatura
-              </button>
-            </div>
+          {/* Linha 6: Campo de Assinatura na Folha A4 Impressa */}
+          <div className="form-row" style={{ marginTop: '6px' }}>
+            <label style={{ fontSize: '12px', color: '#fed7aa', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              ✍️ Assinatura do Colaborador:
+            </label>
 
             <div
               style={{
                 border: '2px dashed #475569',
-                borderRadius: '6px',
-                background: '#ffffff',
-                touchAction: 'none',
+                borderRadius: '8px',
+                background: 'rgba(15, 23, 42, 0.65)',
+                padding: '16px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                textAlign: 'center',
               }}
             >
-              <canvas
-                ref={canvasRef}
-                width={630}
-                height={110}
-                style={{ width: '100%', height: '110px', display: 'block', cursor: 'crosshair' }}
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
+              <div
+                style={{
+                  width: '100%',
+                  maxWidth: '380px',
+                  borderBottom: '1.5px solid #94a3b8',
+                  height: '24px',
+                  marginBottom: '6px',
+                }}
               />
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc' }}>
+                {formData.nome ? formData.nome.toUpperCase() : 'NOME DO COLABORADOR'}
+              </div>
+              <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>
+                CPF: {formData.cpf || '000.000.000-00'} • Matrícula: {formData.matricula || '---'}
+              </div>
+              <span style={{ fontSize: '11.5px', color: '#38bdf8', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {/* <span>📄</span> A assinatura será coletada manualmente na folha impressa (Termo A4) no momento da entrega. */}
+              </span>
             </div>
-            <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
-              Assine com o mouse ou diretamente na tela touch do dispositivo.
-            </span>
           </div>
 
           {/* Rodapé de Ações: Fechar, Imprimir e Salvar */}
@@ -606,7 +518,7 @@ export default function ModalEntregaUniforme({
         </form>
       </div>
 
-      {/* Modal de Visualização Nativa do Termo de Entrega com Assinatura */}
+      {/* Modal de Visualização Nativa do Termo de Entrega */}
       <ModalVisualizadorDocumento
         isOpen={modalTermoAberto}
         onClose={() => setModalTermoAberto(false)}
@@ -614,27 +526,6 @@ export default function ModalEntregaUniforme({
         subtitulo={`Colaborador(a): ${formData.nome} • Departamento: ${formData.departamento} • Tamanho: ${formData.tamanho}`}
         blob={termoBlob}
         nomeArquivo={`Termo_Entrega_Uniforme_${(formData.nome || 'Colaborador').replace(/\s+/g, '_')}.pdf`}
-      />
-
-      {/* Modal de Confirmação Nativo do Sistema para Entrega Sem Assinatura */}
-      <ModalConfirmacaoSistema
-        isOpen={modalConfirmarSemAssinaturaAberto}
-        onClose={() => setModalConfirmarSemAssinaturaAberto(false)}
-        onConfirmar={executarSalvarEntrega}
-        titulo="Retirada Sem Assinatura Digital"
-        tipo="alerta"
-        mensagem={
-          <div>
-            <p style={{ margin: '0 0 6px 0' }}>
-              O colaborador <strong>{formData.nome || 'informado'}</strong> ainda não assinou a retirada no campo digital.
-            </p>
-            <p style={{ margin: 0, color: '#f59e0b', fontSize: '12px' }}>
-              Deseja registrar e concluir a entrega no sistema mesmo sem a assinatura digital?
-            </p>
-          </div>
-        }
-        textoConfirmar="Registrar Sem Assinatura"
-        textoCancelar="Voltar e Assinar"
       />
     </div>
   );

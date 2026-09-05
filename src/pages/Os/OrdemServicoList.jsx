@@ -88,7 +88,7 @@ const OrdemServicoList = ({ ordens = [], onExcluir }) => {
 
   // ===== ações =====
   const handleVisualizar = (os) => {
-    gerarPDF(os, termosCondicoes);
+    gerarPDF(os, os?.termoCondicoes || termosCondicoes);
     toast.info(`Visualizando PDF da OS ${os.numeroOS}`);
 
     // log: PDF visualizado
@@ -286,7 +286,26 @@ const OrdemServicoList = ({ ordens = [], onExcluir }) => {
             <tbody>
               {ordensFiltradas.map((os) => (
                 <tr key={os.numeroOS}>
-                  <td className="os-numero">{os.numeroOS}</td>
+                  <td className="os-numero">
+                    <div>{os.numeroOS}</div>
+                    {os.tituloTermo && (
+                      <div
+                        style={{
+                          fontSize: '0.72rem',
+                          color: '#38bdf8',
+                          marginTop: '4px',
+                          fontWeight: 600,
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                          overflow: 'hidden',
+                          maxWidth: '160px',
+                        }}
+                        title={os.tituloTermo}
+                      >
+                        📜 {os.tituloTermo}
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <div style={{ fontWeight: 600, color: '#fff' }}>{os.cliente?.nome || '-'}</div>
                     {os.cliente?.telefone && (
