@@ -196,8 +196,8 @@
     "referenciaTipo": "nota",
     "referenciaId": "2",
     "baixas": [],
-    "createdAt": "2026-09-05T20:52:57.350Z",
-    "updatedAt": "2026-09-05T20:52:57.351Z",
+    "createdAt": "2026-09-05T21:26:27.203Z",
+    "updatedAt": "2026-09-05T21:26:27.203Z",
     "dataPagamento": null,
     "editada": false,
     "exclusaoPendente": false,
@@ -219,8 +219,8 @@
     "referenciaTipo": "nota",
     "referenciaId": "3",
     "baixas": [],
-    "createdAt": "2026-09-05T20:52:57.349Z",
-    "updatedAt": "2026-09-05T20:52:57.349Z"
+    "createdAt": "2026-09-05T21:26:27.199Z",
+    "updatedAt": "2026-09-05T21:26:27.199Z"
   },
   {
     "id": 1788555489558,
@@ -237,8 +237,8 @@
     "referenciaTipo": "nota",
     "referenciaId": "1",
     "baixas": [],
-    "createdAt": "2026-09-05T20:52:57.414Z",
-    "updatedAt": "2026-09-05T20:52:57.414Z"
+    "createdAt": "2026-09-05T21:26:27.286Z",
+    "updatedAt": "2026-09-05T21:26:27.286Z"
   },
   {
     "id": 1788555562147,
@@ -255,8 +255,8 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-05T20:52:57.410Z",
-    "updatedAt": "2026-09-05T20:52:57.410Z"
+    "createdAt": "2026-09-05T21:26:27.209Z",
+    "updatedAt": "2026-09-05T21:26:27.209Z"
   },
   {
     "id": 1788555596274,
@@ -273,8 +273,8 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-05T20:52:57.415Z",
-    "updatedAt": "2026-09-05T20:52:57.415Z"
+    "createdAt": "2026-09-05T21:26:27.288Z",
+    "updatedAt": "2026-09-05T21:26:27.288Z"
   },
   {
     "id": 3,
@@ -443,8 +443,8 @@
     "referenciaTipo": null,
     "referenciaId": null,
     "baixas": [],
-    "createdAt": "2026-09-05T20:52:57.377Z",
-    "updatedAt": "2026-09-05T20:52:57.377Z"
+    "createdAt": "2026-09-05T21:26:27.205Z",
+    "updatedAt": "2026-09-05T21:26:27.205Z"
   },
   {
     "id": 1788618131083,
